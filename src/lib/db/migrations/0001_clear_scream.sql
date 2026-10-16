@@ -1,0 +1,1 @@
+ALTER TABLE "atendeia_tags" ADD COLUMN "color" text DEFAULT '#10b981' NOT NULL;

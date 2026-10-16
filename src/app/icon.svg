@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 112 112">
+  <defs><linearGradient id="marca" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#8B5CF6"/><stop offset=".48" stop-color="#6366F1"/><stop offset="1" stop-color="#06B6D4"/></linearGradient></defs>
+  <rect width="112" height="112" rx="26" fill="#0F172A"/>
+  <g transform="translate(14 8) scale(.87)"><path d="M49 25V13" stroke="#8B5CF6" stroke-width="7"/><circle cx="49" cy="9" r="8" fill="#8B5CF6"/><path d="M32 25h32c17 0 28 12 28 29v13c0 17-11 29-28 29H39l-17 11c-3 2-5 0-5-3V91C8 85 4 77 4 65V54c0-17 11-29 28-29Z" fill="url(#marca)"/><rect x="17" y="38" width="62" height="45" rx="18" fill="#0F172A"/><path d="M29 59c0-9 12-9 12 0m14 0c0-9 12-9 12 0M41 70c4 4 10 4 14 0" fill="none" stroke="url(#marca)" stroke-width="5" stroke-linecap="round"/></g>
+</svg>

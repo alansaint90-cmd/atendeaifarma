@@ -1,0 +1,77 @@
+.dashboard-page { gap: 18px; }
+.clinica-sobretitulo { font-size: 10px; font-weight: 600; color: var(--marca-acao); letter-spacing: 1.5px; margin-bottom: 10px; }
+.clinica-kpi-label { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.clinica-resumo small { line-height: 1.6; overflow-wrap: anywhere; }
+.dashboard-titulo { display: flex; align-items: center; gap: 10px; }
+.dashboard-titulo > span { display: inline-flex; flex-shrink: 0; }
+.dashboard-titulo .icon { width: 20px; height: 20px; }
+.dashboard-page .page-head p { color: var(--muted); }
+.dashboard-page .kpi { position: relative; }
+.dashboard-page .kpi.ia { background: #edfcf5; border-color: #a6e8c7; color: #08704f; }
+.dashboard-kpi-icone { position: absolute; top: 17px; right: 18px; }
+.dashboard-kpi-icone .icon { width: 23px; height: 23px; }
+.dashboard-filtros { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; }
+.dashboard-filtros label { display: grid; gap: 5px; font-size: 13px; font-weight: 650; }
+.dashboard-filtros select, .dashboard-filtros input { min-height: 44px; min-width: 0; border: 1px solid var(--line); border-radius: 9px; background: #fff; padding: 0 12px; }
+.dashboard-filtros select { width: min(100%, 250px); }
+.dashboard-atalhos { display: flex; flex-wrap: wrap; gap: 8px; }
+.dashboard-atalhos button, .dashboard-personalizado button { min-height: 44px; padding: 0 14px; border: 1px solid #0b8e62; border-radius: 9px; background: #fff; color: #08704f; cursor: pointer; }
+.dashboard-atalhos button.ativo, .dashboard-personalizado button { background: #087a54; color: white; }
+.dashboard-atalhos button:focus-visible, .dashboard-personalizado button:focus-visible, .dashboard-filtros select:focus-visible, .dashboard-filtros input:focus-visible { outline: 3px solid #6148df; outline-offset: 2px; }
+.dashboard-personalizado { width: 100%; display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+.dashboard-personalizado label { min-width: 160px; }
+.dashboard-atualizado, .dashboard-nota { margin: 0; color: var(--muted); font-size: 13px; }
+.dashboard-corpo { display: grid; grid-template-columns: minmax(0, 3fr) minmax(225px, 1fr); gap: 18px; align-items: start; }
+.dashboard-principal { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-width: 0; }
+.dashboard-resumo-periodo { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.indicador-periodo { min-height: 150px; display: flex; flex-direction: column; justify-content: space-between; gap: 24px; }
+.indicador-periodo strong { font-size: clamp(30px, 3vw, 44px); line-height: 1; font-weight: 700; }
+.indicador-periodo span { font-size: 14px; }
+.indicador-periodo.conversas strong { color: #184b85; }
+.indicador-periodo.ia strong { color: #08704f; }
+.indicador-periodo.humano strong { color: #a75c00; }
+.dashboard-grafico { min-width: 0; }
+.dashboard-grafico h2 { margin-bottom: 18px; }
+.dashboard-grafico > p { color: var(--muted); font-size: 14px; }
+.dashboard-legenda { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; font-size: 13px; margin: 0 0 8px; }
+.dashboard-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.dashboard-legenda i { width: 11px; height: 11px; border-radius: 50%; }
+.dashboard-chart { display: block; width: 100%; height: auto; min-height: 185px; }
+.dashboard-chart text { fill: #516171; font-size: 12px; }
+.dashboard-tabela { margin-top: 12px; }
+.dashboard-tabela summary { cursor: pointer; color: #204e9a; font-size: 13px; }
+.dashboard-tabela .table { margin-top: 12px; max-height: 280px; overflow: auto; }
+.dashboard-contatos { min-width: 0; }
+.dashboard-contatos h2 { margin-bottom: 18px; }
+.dashboard-contato { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.dashboard-contato:last-child { border-bottom: 0; }
+.dashboard-contato > span { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border-radius: 50%; background: #edf2f8; color: #34506c; font-size: 12px; font-weight: 700; }
+.dashboard-contato > div { display: grid; gap: 2px; min-width: 0; }
+.dashboard-contato strong, .dashboard-contato small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dashboard-contato strong { font-size: 13px; }
+.dashboard-contato small { color: var(--muted); font-size: 12px; }
+@media (max-width: 1000px) { .dashboard-corpo { grid-template-columns: 1fr; } }
+@media (max-width: 720px) {
+  .dashboard-resumo-periodo { grid-template-columns: 1fr; }
+  .indicador-periodo { min-height: 104px; gap: 10px; }
+  .dashboard-filtros select, .dashboard-filtros > label { width: 100%; }
+  .dashboard-atalhos { width: 100%; }
+  .dashboard-atalhos button { flex: 1 1 auto; }
+  .dashboard-personalizado label { flex: 1 1 135px; }
+}
+.clinica-colunas { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; align-items: start; }
+.clinica-colunas .panel-title p, .clinica-colunas .panel > p { color: var(--muted); font-size: 13px; line-height: 1.7; }
+.clinica-paciente { display: flex; align-items: center; gap: 12px; }
+.clinica-paciente > div { display: grid; gap: 4px; }
+.clinica-paciente strong { font-size: 13px; font-weight: 600; }
+.clinica-paciente .avatar { width: 36px; height: 36px; font-size: 11px; color: var(--marca-acao); }
+.clinica-icone { display: inline-flex; padding: 12px; border-radius: 12px; background: var(--surface-2); color: var(--marca-acao); margin-bottom: 16px; }
+.clinica-passos { display: grid; gap: 16px; border-block: 1px solid var(--line); padding-block: 20px; margin-block: 20px; }
+.clinica-passos span { display: flex; gap: 14px; font-size: 12px; color: var(--marca-acao); }
+.clinica-passos strong { color: var(--text); font-weight: 500; }
+.clinica-ver-agenda { margin-top: 20px; }
+@media (max-width: 1100px) { .clinica-colunas { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 768px) { .clinica-colunas .panel-title { align-items: start; flex-direction: column; } .clinica-paciente { gap: 8px; } }
+.clinica-consultas { min-width: 0; }
+.clinica-paciente strong { white-space: normal; overflow-wrap: anywhere; }
+.clinica-paciente .avatar { flex-shrink: 0; }

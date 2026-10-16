@@ -1,0 +1,33 @@
+.sidebar { overflow: visible; }
+.sidebar nav { min-height: 0; overflow-y: auto; }
+.account { position: relative; flex: 0 0 auto; padding: 12px 2px 4px; }
+.account-identity { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.account-avatar { display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 38px; border-radius: 50%; background: #e9e5ff; color: #5142c5; font-size: 12px; font-weight: 800; }
+.account-avatar { overflow: hidden; }
+.account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.account-details { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.account-details strong, .account-details small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-details strong { font-size: 13px; color: var(--text); }
+.account-details small { color: var(--muted); font-size: 12px; }
+.sidebar .account-trigger { flex: 0 0 28px; width: 28px; min-height: 36px; padding: 0; justify-content: center; font-size: 23px; line-height: 1; }
+.account-menu { position: absolute; z-index: 20; bottom: calc(100% + 8px); left: 0; width: min(280px, calc(100vw - 24px)); padding: 7px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: 0 14px 30px #0f172a26; }
+.account-menu a, .sidebar .account-menu button { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: flex-start; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--text); font-size: 14px; font-weight: 500; text-decoration: none; cursor: pointer; }
+.account-menu a:hover, .sidebar .account-menu button:hover { background: #f4f2ff; }
+.sidebar-collapsed .account { display: grid; padding-inline: 0; }
+.sidebar-collapsed .account-identity { flex-wrap: wrap; justify-content: center; }
+.sidebar-collapsed .account-details { display: none; }
+.sidebar-collapsed .account-menu { left: calc(100% + 10px); bottom: 0; }
+.sidebar-collapsed .sidebar .account-menu button { justify-content: flex-start; }
+@media (max-width: 1050px) and (min-width: 721px) {
+  .account-identity { flex-wrap: wrap; justify-content: center; }
+  .account-details { display: none; }
+  .account-menu { left: calc(100% + 10px); bottom: 0; }
+}
+@media (max-width: 720px) {
+  .sidebar { overflow: visible; }
+  .sidebar nav { overflow-x: auto; overflow-y: hidden; }
+  .account, .sidebar-collapsed .account { display: grid; margin-top: 0; padding: 10px 4px 2px; }
+  .account-identity, .sidebar-collapsed .account-identity { flex-wrap: nowrap; justify-content: flex-start; }
+  .account-details, .sidebar-collapsed .account-details { display: grid; }
+  .account-menu, .sidebar-collapsed .account-menu { left: 0; bottom: auto; top: calc(100% + 5px); }
+}

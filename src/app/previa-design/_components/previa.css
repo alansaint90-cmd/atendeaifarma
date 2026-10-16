@@ -1,0 +1,33 @@
+.previa-aviso { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.previa-aviso > div:first-child { display: grid; gap: 4px; }
+.previa-aviso span { font-size: 12px; color: var(--muted); }
+.previa-comparador { display: flex; gap: 8px; }
+.previa-comparador button { white-space: nowrap; font-size: 12px; }
+.previa-sobretitulo { font-size: 10px; font-weight: 600; color: var(--marca-acao); letter-spacing: 1.5px; margin-bottom: 10px; }
+.previa-colunas { display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(260px, 1fr); gap: 24px; align-items: start; }
+.previa-colunas .panel-title p, .previa-colunas .panel > p { color: var(--muted); font-size: 13px; line-height: 1.7; }
+.previa-kpi-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
+.previa-paciente { display: flex; align-items: center; gap: 12px; }
+.previa-paciente > div { display: grid; gap: 4px; }
+.previa-paciente strong { font-size: 13px; font-weight: 600; }
+.previa-paciente .avatar { width: 36px; height: 36px; font-size: 11px; color: var(--marca-acao); }
+.previa-icone { display: inline-flex; padding: 12px; border-radius: 12px; background: var(--surface-2); color: var(--marca-acao); margin-bottom: 16px; }
+.previa-passos { display: grid; gap: 16px; border-block: 1px solid var(--line); padding-block: 20px; margin-block: 20px; }
+.previa-passos span { display: flex; gap: 14px; font-size: 12px; color: var(--marca-acao); }
+.previa-passos strong { color: var(--text); font-weight: 500; }
+.previa-ver-agenda { margin-top: 20px; }
+.previa-horarios { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.previa-horarios button { display: grid; justify-content: center; gap: 4px; padding: 12px 8px; min-height: 76px; }
+.previa-horarios button span { font-size: 11px; }
+.previa-horarios button:disabled { opacity: .65; background: var(--surface-2); }
+.previa-dado-ficticio { display: block; margin-top: 4px; }
+.previa-busca input { max-width: 100%; width: 250px; }
+@media (max-width: 1100px) { .previa-colunas { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 768px) {
+  .previa-aviso { flex-direction: column; align-items: stretch; }
+  .previa-comparador button { flex: 1; }
+  .previa-horarios { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .previa-colunas .panel-title, .card .panel-title { align-items: start; flex-direction: column; }
+  .previa-busca, .previa-busca input { width: 100%; }
+  .previa-paciente { gap: 8px; }
+}

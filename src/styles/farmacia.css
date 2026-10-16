@@ -1,0 +1,31 @@
+.farmacia { --primary: #6d28d9; }
+.farmacia .page-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
+.farmacia-eyebrow { color:var(--primary); font-size:12px; letter-spacing:.12em; font-weight:700; }
+.farmacia-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:16px; }
+.farmacia-kpis article { display:flex; flex-direction:column; gap:16px; }
+.farmacia-kpis strong { font-size:28px; color:var(--text); }
+.farmacia-kpis span { color:var(--muted); font-size:13px; }
+.farmacia-fields { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:16px; align-items:end; }
+.farmacia label { display:flex; flex-direction:column; gap:7px; font-size:13px; font-weight:500; }
+.farmacia label:has(input[type=checkbox]) { flex-direction:row; align-items:center; }
+.farmacia input:not([type=checkbox]), .farmacia select, .farmacia textarea { width:100%; min-height:44px; border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:var(--surface); color:var(--text); }
+.farmacia button { min-height:40px; border-radius:8px; padding:8px 14px; border:1px solid var(--line); cursor:pointer; }
+.farmacia button:disabled { opacity:.5; cursor:not-allowed; }
+.farmacia :is(input,select,textarea,button):focus-visible { outline:3px solid #8b5cf6; outline-offset:3px; }
+.farmacia-toolbar { display:flex; flex-wrap:wrap; gap:12px; align-items:end; margin-block:14px; }
+.farmacia-toolbar label { flex:1; min-width:140px; }
+.farmacia-form { display:flex; flex-direction:column; gap:16px; }
+.farmacia-badge { display:block; width:fit-content; margin-block:4px; border-radius:6px; padding:4px 8px; font-size:12px; font-weight:600; }
+.farmacia-badge.ok { background:#e8f5ed; color:#116139; }
+.farmacia-badge.aviso { background:#fff4dd; color:#82510a; }
+.farmacia-badge.perigo { background:#ffebeb; color:#a32222; }
+.farmacia [role=alert] { padding:12px; border:1px solid #eab3b3; background:#fff2f2; color:#9b2020; border-radius:8px; }
+.farmacia .table { overflow:auto; }
+.farmacia table { width:100%; border-collapse:collapse; text-align:left; }
+.farmacia th,.farmacia td { padding:12px; border-bottom:1px solid var(--line); vertical-align:top; }
+.farmacia th { font-size:12px; color:var(--muted); }
+.farmacia td { font-size:13px; }
+.farmacia-historico { list-style:none; padding:0; max-height:400px; overflow:auto; }
+.farmacia-historico li { border-bottom:1px solid var(--line); padding:12px 0; }
+.farmacia-resultados { display:flex; flex-wrap:wrap; gap:8px; }
+@media(max-width:700px) { .farmacia-fields { grid-template-columns:1fr; } .farmacia-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .farmacia input,.farmacia select,.farmacia textarea { font-size:16px; } .farmacia .grid-2 { grid-template-columns:1fr; } }

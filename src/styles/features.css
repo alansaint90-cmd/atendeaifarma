@@ -1,0 +1,286 @@
+.inbox-layout {
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 18px;
+  min-height: calc(100vh - 110px);
+}
+
+.conversation-list {
+  padding: 14px;
+  overflow: auto;
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+
+.conversation {
+  width: 100%;
+  background: #fff;
+  min-height: 104px;
+  padding: 14px;
+  margin-bottom: 10px;
+  display: grid;
+  gap: 8px;
+  text-align: left;
+}
+
+.conversation.active {
+  border-color: var(--green);
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.conversation span {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-panel {
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  min-width: 0;
+}
+
+.chat-panel header,
+.chat-tools,
+.reply {
+  padding: 16px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-tools {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.chat-tools select {
+  min-width: 210px;
+}
+
+.messages {
+  padding: 20px;
+  overflow: auto;
+  background: #f9fbfc;
+}
+
+.messages.compact {
+  background: transparent;
+  padding: 4px 0 0;
+}
+
+.message span {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.reply {
+  border-bottom: 0;
+  border-top: 1px solid var(--line);
+}
+
+.reply input {
+  flex: 1;
+}
+
+.flow-builder {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.flow-card {
+  border-top: 4px solid var(--green);
+  min-height: 176px;
+}
+
+.flow-card:nth-child(2) {
+  border-top-color: var(--blue);
+}
+
+.flow-card:nth-child(3) {
+  border-top-color: var(--orange);
+}
+
+.flow-card:nth-child(4) {
+  border-top-color: var(--red);
+}
+
+.flow-preview {
+  grid-column: 1 / -1;
+}
+
+.quick-buttons {
+  padding: 10px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--green);
+  font-weight: 750;
+}
+
+.switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.switch input {
+  width: 20px;
+  min-height: 20px;
+}
+
+.settings-grid {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+
+.qr-panel {
+  text-align: center;
+}
+
+.qr {
+  width: 190px;
+  height: 190px;
+  margin: 18px auto;
+  background:
+    linear-gradient(90deg, #10202b 10px, transparent 10px) 0 0 / 30px 30px,
+    linear-gradient(#10202b 10px, transparent 10px) 0 0 / 30px 30px,
+    #fff;
+  border: 12px solid #fff;
+  box-shadow: inset 0 0 0 2px var(--line), var(--shadow);
+}
+
+.plans {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.plan {
+  display: grid;
+  gap: 14px;
+}
+
+.plan strong {
+  font-size: 28px;
+}
+
+.plan.featured {
+  border-color: var(--green);
+  box-shadow: 0 18px 45px rgba(5, 150, 105, 0.15);
+}
+
+:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.35);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1050px) {
+  .shell {
+    grid-template-columns: 84px 1fr;
+  }
+
+  .sidebar .brand span:last-child,
+  .sidebar button {
+    font-size: 0;
+  }
+
+  .sidebar .brand {
+    padding: 0 15px;
+  }
+
+  .sidebar button {
+    justify-content: center;
+  }
+
+  .kpi-grid,
+  .flow-builder,
+  .plans {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-2,
+  .form-grid,
+  .settings-grid,
+  .inbox-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .auth-shell,
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-panel,
+  .auth-preview {
+    padding: 28px;
+  }
+
+  .auth-preview {
+    display: none;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    padding: 12px;
+  }
+
+  .sidebar nav {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .account {
+    display: none;
+  }
+
+  .content {
+    padding: 14px;
+  }
+
+  .page-head,
+  .topbar,
+  .chat-panel header,
+  .reply {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .kpi-grid,
+  .flow-builder,
+  .plans {
+    grid-template-columns: 1fr;
+  }
+
+  .top-actions {
+    margin-left: 0;
+  }
+
+  .chat-tools select,
+  .reply input {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  .conversation,
+  .plan,
+  .kpi {
+    transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  }
+}

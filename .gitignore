@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+node_modules/
+.pnpm-store/
+chatbot-*.png
+verify-chatbot.cjs
+*.log
+.next/
+*.tsbuildinfo
+next-env.d.ts
+tests/artifacts/
+.lixo-quarentena/
+
+/config/test-runtime/
+/tests/resultado-*.log
+.pnpm-store/

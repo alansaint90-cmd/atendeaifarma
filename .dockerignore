@@ -1,0 +1,12 @@
+.git
+.next
+node_modules
+.pnpm-store
+.env
+.env.*
+*.log
+*.tsbuildinfo
+next-env.d.ts
+tests/artifacts
+chatbot-*.png
+config/test-runtime

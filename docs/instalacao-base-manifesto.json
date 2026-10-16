@@ -1,0 +1,252 @@
+[
+  {
+    "caminho": "AGENTS.md",
+    "estado": "criado",
+    "linhas": 161
+  },
+  {
+    "caminho": ".env.example",
+    "estado": "preservado: arquivo existente",
+    "linhas": 8
+  },
+  {
+    "caminho": ".gitattributes",
+    "estado": "criado",
+    "linhas": 4
+  },
+  {
+    "caminho": "docker-compose.yml",
+    "estado": "criado",
+    "linhas": 22
+  },
+  {
+    "caminho": "drizzle.config.ts",
+    "estado": "aguarda adaptação",
+    "linhas": 18
+  },
+  {
+    "caminho": "config/vitest.config.mts",
+    "estado": "criado",
+    "linhas": 18
+  },
+  {
+    "caminho": "config/vitest.setup.ts",
+    "estado": "criado",
+    "linhas": 6
+  },
+  {
+    "caminho": ".githooks/pre-commit",
+    "estado": "criado",
+    "linhas": 14
+  },
+  {
+    "caminho": "src/lib/acao.ts",
+    "estado": "criado",
+    "linhas": 24
+  },
+  {
+    "caminho": "src/lib/db/index.ts",
+    "estado": "aguarda adaptação",
+    "linhas": 12
+  },
+  {
+    "caminho": "src/lib/db/soft-delete.ts",
+    "estado": "criado",
+    "linhas": 28
+  },
+  {
+    "caminho": "src/lib/db/schema/_compartilhado.ts",
+    "estado": "criado",
+    "linhas": 33
+  },
+  {
+    "caminho": "src/lib/db/schema/_enums.ts",
+    "estado": "criado",
+    "linhas": 13
+  },
+  {
+    "caminho": "src/lib/db/schema/usuarios.ts",
+    "estado": "criado",
+    "linhas": 29
+  },
+  {
+    "caminho": "src/lib/db/schema/auditoria.ts",
+    "estado": "criado",
+    "linhas": 28
+  },
+  {
+    "caminho": "src/lib/db/schema/index.ts",
+    "estado": "criado",
+    "linhas": 4
+  },
+  {
+    "caminho": "src/lib/audit/registrar.ts",
+    "estado": "criado",
+    "linhas": 31
+  },
+  {
+    "caminho": "src/lib/auth/permissoes.ts",
+    "estado": "criado",
+    "linhas": 22
+  },
+  {
+    "caminho": "src/lib/auth/sessao.ts",
+    "estado": "criado",
+    "linhas": 37
+  },
+  {
+    "caminho": "src/components/modal-confirmacao-block.tsx",
+    "estado": "criado",
+    "linhas": 83
+  },
+  {
+    "caminho": "templates/schema.ts",
+    "estado": "criado",
+    "linhas": 36
+  },
+  {
+    "caminho": "templates/validator.ts",
+    "estado": "criado",
+    "linhas": 19
+  },
+  {
+    "caminho": "templates/server-action.ts",
+    "estado": "criado",
+    "linhas": 129
+  },
+  {
+    "caminho": "templates/component.tsx",
+    "estado": "criado",
+    "linhas": 86
+  },
+  {
+    "caminho": "templates/component.test.tsx",
+    "estado": "criado",
+    "linhas": 76
+  },
+  {
+    "caminho": "scripts/check-compliance.mjs",
+    "estado": "criado",
+    "linhas": 449
+  },
+  {
+    "caminho": "tests/check-compliance.test.mjs",
+    "estado": "criado",
+    "linhas": 156
+  },
+  {
+    "caminho": "scripts/ativar-hooks.mjs",
+    "estado": "criado",
+    "linhas": 11
+  },
+  {
+    "caminho": "scripts/project-map.mjs",
+    "estado": "criado",
+    "linhas": 251
+  },
+  {
+    "caminho": "scripts/docs-check.mjs",
+    "estado": "criado",
+    "linhas": 220
+  },
+  {
+    "caminho": "scripts/remove-ai-marks.mjs",
+    "estado": "criado",
+    "linhas": 351
+  },
+  {
+    "caminho": "scripts/limpar-lixo-raiz.mjs",
+    "estado": "criado",
+    "linhas": 273
+  },
+  {
+    "caminho": ".github/workflows/deploy.yml",
+    "estado": "aguarda adaptação",
+    "linhas": 196
+  },
+  {
+    "caminho": ".github/pull_request_template.md",
+    "estado": "criado",
+    "linhas": 46
+  },
+  {
+    "caminho": ".agents/skills/criar-tabela/SKILL.md",
+    "estado": "criado",
+    "linhas": 42
+  },
+  {
+    "caminho": ".agents/skills/criar-crud/SKILL.md",
+    "estado": "criado",
+    "linhas": 45
+  },
+  {
+    "caminho": ".agents/skills/criar-componente/SKILL.md",
+    "estado": "criado",
+    "linhas": 48
+  },
+  {
+    "caminho": ".agents/skills/repo-docs-sync/SKILL.md",
+    "estado": "criado",
+    "linhas": 439
+  },
+  {
+    "caminho": ".agents/skills/remove-ai-marks/SKILL.md",
+    "estado": "criado",
+    "linhas": 83
+  },
+  {
+    "caminho": "docs/regras-negocio.md",
+    "estado": "preservado: arquivo existente",
+    "linhas": 83
+  },
+  {
+    "caminho": "docs/rbac.md",
+    "estado": "criado",
+    "linhas": 60
+  },
+  {
+    "caminho": "docs/back.md",
+    "estado": "criado",
+    "linhas": 89
+  },
+  {
+    "caminho": "docs/front.md",
+    "estado": "criado",
+    "linhas": 57
+  },
+  {
+    "caminho": "docs/components.md",
+    "estado": "criado",
+    "linhas": 124
+  },
+  {
+    "caminho": "docs/seguranca-login.md",
+    "estado": "criado",
+    "linhas": 156
+  },
+  {
+    "caminho": "docs/definition-of-done.md",
+    "estado": "criado",
+    "linhas": 56
+  },
+  {
+    "caminho": "docs/git-commits.md",
+    "estado": "criado",
+    "linhas": 44
+  },
+  {
+    "caminho": "docs/adr/README.md",
+    "estado": "criado",
+    "linhas": 25
+  },
+  {
+    "caminho": "docs/adr/0000-template.md",
+    "estado": "criado",
+    "linhas": 32
+  },
+  {
+    "caminho": "docs/adr/0001-stack-base.md",
+    "estado": "criado",
+    "linhas": 47
+  }
+]

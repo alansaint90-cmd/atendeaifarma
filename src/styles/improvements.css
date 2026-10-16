@@ -1,0 +1,17 @@
+.page-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; min-width: 0; }
+[hidden] { display: none !important; }
+.bot-transfer-fields { border: 0; padding: 0; margin: 18px 0 0; min-width: 0; }
+.form-panel textarea { width: 100%; line-height: 1.65; }
+.error-message { color: #b42318; }
+.sidebar-collapsed { grid-template-columns: 84px 1fr; }
+.sidebar-collapsed .nav-label, .sidebar-collapsed .brand span:last-child, .sidebar-collapsed .account { display: none; }
+.sidebar-collapsed .sidebar .brand { padding: 0 15px; }
+.sidebar-collapsed .sidebar button { justify-content: center; }
+.message { white-space: pre-wrap; overflow-wrap: anywhere; }
+button:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
+@media (max-width: 720px) {
+  .sidebar-collapsed { grid-template-columns: 1fr; }
+  .topbar { height: auto; min-height: 66px; padding: 12px; }
+  .bot-dialog-footer { flex-wrap: wrap; }
+  .bot-dialog-footer [role="alert"] { min-width: 100%; order: 3; }
+}

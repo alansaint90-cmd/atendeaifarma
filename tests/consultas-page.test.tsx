@@ -1,0 +1,33 @@
+import { afterEach, expect, test, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { ConsultasPage } from "@/components/consultas/page";
+import { carregarAgendaConsultas, confirmarConsulta, cancelarConsultaAgendada } from "@/lib/actions/consultas";
+import { horariosDoDia, proximasQuintas } from "@/lib/consultas/calendario";
+vi.mock("@/lib/actions/consultas", () => ({ carregarAgendaConsultas: vi.fn(), confirmarConsulta: vi.fn(), cancelarConsultaAgendada: vi.fn() }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); vi.useRealTimers(); });
+test("consulta exige cadastro completo, conferência e confirmação bloqueada por três segundos", async () => {
+  const vaga = { id: crypto.randomUUID(), ...horariosDoDia(proximasQuintas(Date.now() + 86400000 * 7)[0])[0], atualizadoEm: new Date().toISOString(), disponivel: true };
+  vi.mocked(carregarAgendaConsultas).mockResolvedValue({ ok: true, dados: { horarios: [vaga], consultas: [], instancias: ["teste"] } });
+  vi.mocked(confirmarConsulta).mockResolvedValue({ ok: false, erro: "Esse horário acabou de ser ocupado. Escolha o próximo horário livre." });
+  vi.useFakeTimers();
+  render(<ConsultasPage ativoNaTela />);
+  await act(() => vi.advanceTimersByTimeAsync(0));
+  expect(carregarAgendaConsultas).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole("button", { name: /Livre/ }));
+  expect(screen.getByRole("button", { name: "Confirmar consulta" })).toBeDisabled();
+  expect(screen.getByLabelText(/Telefone para contato/)).not.toBeRequired();
+  expect(screen.getByLabelText(/CEP/)).not.toBeRequired();
+  expect(screen.queryByLabelText("UF")).not.toBeInTheDocument();
+  const valores = { "Nome completo do paciente": "Paciente Exemplo", "Data de nascimento": "1990-02-20",
+    "Rua ou avenida": "Rua Teste", "Número": "10", "Bairro": "Bairro Teste", "Cidade": "Salvador" };
+  for (const [nome, value] of Object.entries(valores)) fireEvent.change(screen.getByLabelText(nome, { exact: false }), { target: { value } });
+  fireEvent.click(screen.getByLabelText("Conferi os dados do paciente e o horário."));
+  fireEvent.click(screen.getByRole("button", { name: "Confirmar consulta" }));
+  expect(screen.getByRole("button", { name: "Confirmar", exact: true })).toBeDisabled(); expect(confirmarConsulta).not.toHaveBeenCalled();
+  for (let i = 0; i < 3; i++) await act(() => vi.advanceTimersByTimeAsync(1000));
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Confirmar", exact: true })); });
+  vi.useRealTimers(); expect(await screen.findByRole("alert")).toHaveTextContent("ocupado");
+  expect(screen.queryByText(/Consulta confirmada e cadastro registrado/)).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Nome completo do paciente")).toHaveValue("Paciente Exemplo");
+  expect(cancelarConsultaAgendada).not.toHaveBeenCalled();
+}, 30000);
