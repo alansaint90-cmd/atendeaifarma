@@ -6,7 +6,7 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 183 |
+| Arquivos TS/TSX | 184 |
 | Tabelas (Drizzle) | 43 |
 | Server Actions (arquivos) | 14 |
 | Rotas de API | 7 |
@@ -165,6 +165,7 @@ lib/
     schema/
     bootstrap.ts
     client.ts
+    diagnostico.ts
     index.ts
     migrate.ts
     porta.ts
