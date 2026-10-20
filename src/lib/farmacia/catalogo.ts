@@ -47,15 +47,18 @@ export async function consultarProdutos(banco: BancoSql, ator: AtorFarmacia, ent
 }
 
 export async function salvarProduto(banco: BancoSql, ator: AtorFarmacia, entrada: unknown) {
+  return banco.transaction(tx => salvarProdutoNaTransacao(tx, ator, entrada));
+}
+export async function salvarProdutoNaTransacao(tx: TransacaoSql, ator: AtorFarmacia, entrada: unknown, chaveCadastro?: string) {
   const {id,atualizadoEm,produto:p,estoqueInicial} = salvarProdutoSchema.parse(entrada);
-  return banco.transaction(async tx => {
     await travarEstoque(tx); const autor = await autorizar(tx,ator,"admin");
-    const alvo = id ?? estoqueInicial?.chave ?? randomUUID();
-    if (!id && estoqueInicial) {
+    const alvo = id ?? estoqueInicial?.chave ?? (chaveCadastro ? z.uuid().parse(chaveCadastro) : randomUUID());
+    if (!id && (estoqueInicial || chaveCadastro)) {
       const [existente] = linhas<Record<string,unknown>>(await tx.execute(sql`SELECT * FROM atendeia_produtos WHERE id=${alvo}`));
       if (existente) {
-        const [lote] = linhas<{codigo:string;validade:string|null;quantidade:number}>(await tx.execute(sql`SELECT l.codigo,l.validade::text,m.posterior quantidade FROM atendeia_produtos_lotes l JOIN atendeia_produtos_movimentos m ON m.lote_id=l.id WHERE l.produto_id=${alvo} AND m.chave=${estoqueInicial.chave} AND m.tipo='entrada'`));
-        if (existente.is_deleted || Object.entries(p).some(([k,v])=>existente[k]!==v) || !lote || lote.codigo!==estoqueInicial.codigo || lote.validade!==estoqueInicial.validade || lote.quantidade!==estoqueInicial.quantidade) throw new ErroDeNegocio("Cadastro já recebido com outros dados. Recarregue o estoque.");
+        const [lote] = estoqueInicial ? linhas<{codigo:string;validade:string|null;quantidade:number}>(await tx.execute(sql`SELECT l.codigo,l.validade::text,m.posterior quantidade FROM atendeia_produtos_lotes l JOIN atendeia_produtos_movimentos m ON m.lote_id=l.id WHERE l.produto_id=${alvo} AND l.is_deleted=false AND m.is_deleted=false AND m.chave=${estoqueInicial.chave} AND m.tipo='entrada'`)) : [];
+        if (!estoqueInicial && linhas(await tx.execute(sql`SELECT id FROM atendeia_produtos_movimentos WHERE chave=${alvo} AND is_deleted=false`)).length) throw new ErroDeNegocio("Cadastro já recebido com outros dados. Recarregue o estoque.");
+        if (existente.is_deleted || Object.entries(p).some(([k,v])=>existente[k]!==v) || (estoqueInicial && (!lote || lote.codigo!==estoqueInicial.codigo || lote.validade!==estoqueInicial.validade || lote.quantidade!==estoqueInicial.quantidade))) throw new ErroDeNegocio("Cadastro já recebido com outros dados. Recarregue o estoque.");
         return alvo;
       }
     }
@@ -74,7 +77,6 @@ export async function salvarProduto(banco: BancoSql, ator: AtorFarmacia, entrada
     await auditar(tx,autor,alvo,id ? "produto_editado" : "produto_criado");
     if (estoqueInicial) await registrarEntrada(tx,autor,{...estoqueInicial,produtoId:alvo,bloqueado:false});
     return alvo;
-  });
 }
 
 export async function entradaEstoque(banco: BancoSql, ator: AtorFarmacia, entrada: unknown) {

@@ -7,6 +7,8 @@ import {applyMigrations} from '../src/lib/db/migrate';
 import {systemUserId} from '../src/lib/db/bootstrap';
 import {salvarProduto,entradaEstoque} from '../src/lib/farmacia/catalogo';
 import {criarPedido,executarPedido} from '../src/lib/farmacia/pedidos';
+import {importarProdutos} from '../src/lib/farmacia/importacao';
+import {linhaImportacaoSchema} from '../src/lib/farmacia/importacao-validacao';
 
 test('PostgreSQL 16 real: conexões independentes disputam a última unidade e repetem confirmação',{skip:!process.env.TEST_DATABASE_URL},async()=>{
   const url=new URL(process.env.TEST_DATABASE_URL!);
@@ -31,5 +33,11 @@ test('PostgreSQL 16 real: conexões independentes disputam a última unidade e r
     assert.equal((await a`SELECT count(*)::int total FROM atendeia_produtos_movimentos WHERE pedido_id=${vencedor} AND tipo='venda'`)[0].total,1);
     await Promise.all([executarPedido(dbA,ator,comando(vencedor,'cancelar')),executarPedido(dbB,ator,comando(vencedor,'cancelar'))]);
     assert.equal((await a`SELECT sum(quantidade)::int saldo FROM atendeia_produtos_lotes WHERE produto_id=${produto}`)[0].saldo,1);
+    const sku=randomUUID();
+    const loteImportado={chave:randomUUID(),linhas:[linhaImportacaoSchema.parse({linha:2,nome:'Importação concorrente',concentracao:'500 mg',apresentacao:'caixa',preco:'8.90',quantidade:25,lote:'IMP-01',validade:'2099-12-31',receita:false,controle:'',medicamento:true,sku,ean:null,embalagem:10,principio:'',fabricante:''})]};
+    await Promise.all([importarProdutos(dbA,ator,loteImportado),importarProdutos(dbB,ator,loteImportado)]);
+    assert.equal((await a`SELECT count(*)::int total FROM atendeia_produtos WHERE sku=${sku} AND is_deleted=false`)[0].total,1);
+    assert.equal((await a`SELECT sum(l.quantidade)::int saldo FROM atendeia_produtos_lotes l JOIN atendeia_produtos p ON p.id=l.produto_id WHERE p.sku=${sku} AND l.is_deleted=false AND p.is_deleted=false`)[0].saldo,25);
+    assert.equal((await a`SELECT count(*)::int total FROM atendeia_produtos_movimentos m JOIN atendeia_produtos_lotes l ON l.id=m.lote_id JOIN atendeia_produtos p ON p.id=l.produto_id WHERE p.sku=${sku} AND m.is_deleted=false AND l.is_deleted=false AND p.is_deleted=false`)[0].total,1);
   }finally{await a.end();await b.end();}
 });

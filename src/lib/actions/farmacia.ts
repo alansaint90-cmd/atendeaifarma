@@ -7,6 +7,9 @@ import { db } from "../db/client";
 import { consultarProdutos, salvarProduto, entradaEstoque, ajustarEstoque, historicoProduto } from "../farmacia/catalogo";
 import { criarPedido, executarPedido, habilitarFarmaceutico } from "../farmacia/pedidos";
 import { listarPedidos, painelFarmacia, contextoCadastro } from "../farmacia/consultas";
+import { importarProdutos } from "../farmacia/importacao";
+
+export async function importarPlanilha(entrada:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"admin");const r=await importarProdutos(db(),s,entrada);revalidatePath("/");return r;}); }
 
 export async function carregarProdutos(entrada:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"operador");return consultarProdutos(db(),s,entrada);}); }
 export async function gravarProduto(entrada:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"admin");const r=await salvarProduto(db(),s,entrada);revalidatePath("/");return r;}); }

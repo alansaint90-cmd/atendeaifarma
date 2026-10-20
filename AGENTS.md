@@ -168,6 +168,8 @@ Consulte docs/adr/0014-farmacia.md e docs/regras-negocio.md. PostgreSQL 16 real 
 
 O interpretador da farmácia deve receber o prompt salvo do chatbot da instância e manter o contrato de operações estritas: uma chamada de atender_farmacia, sem SQL ou resposta comercial livre. O modelo de prompt Atende Aí Pharma só é carregado por ação explícita e não substitui automaticamente configurações existentes. Preço e disponibilidade de cada resposta vêm da consulta atual ao PostgreSQL. O processador respeita perguntarNome: false no modelo da farmácia, sem acrescentar identificação às consultas de produto; a extração de nomes espontâneos continua ativa.
 
+Cadastro rápido mantém os detalhes opcionais recolhidos e gera SKU se vazio. Importação Excel cadastra somente novos produtos, até 200 linhas por arquivo de 2 MB, com prévia e confirmação bloqueada por três segundos. Exige classificação de receita explícita, lote e validade quando aplicável. Validação, autorização, trava de estoque, gravação e auditoria compartilham uma única transação; erro desfaz todo o arquivo e repetição da mesma confirmação não duplica saldo. Não atualiza cadastro existente nem importa fórmulas.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

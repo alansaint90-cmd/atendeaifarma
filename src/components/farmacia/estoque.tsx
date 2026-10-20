@@ -4,6 +4,7 @@ import { carregarProdutos,gravarProduto,receberEstoque,carregarHistorico,ajustar
 import type { Produto } from "@/lib/farmacia/catalogo";
 import { buscaSchema } from "@/lib/farmacia/validacao";
 import { ProdutoForm } from "./produto-form";
+import { ImportarProdutos } from "./importar-produtos";
 import { dinheiro,useConfirmacao } from "./comum";
 import type { z } from "zod";
 type Historico=Extract<Awaited<ReturnType<typeof carregarHistorico>>,{ok:true}>["dados"];
@@ -12,13 +13,16 @@ export function EstoquePage({gestor}:{gestor:boolean}) {
   const [dados,setDados]=useState<{produtos:Produto[];total:number}|null>(null);const [erro,setErro]=useState("");
   const [editor,setEditor]=useState<Produto|null|undefined>(undefined);const [selecionado,selecionar]=useState<Produto|null>(null);
   const [historico,setHistorico]=useState<Historico|null>(null);
+  const [importando,setImportando]=useState(false);const [aviso,setAviso]=useState("");
   const carregar=useCallback(async()=>{const r=await carregarProdutos(filtro);if(r.ok){setDados(r.dados);setErro("");}else setErro(r.erro);},[filtro]);
   useEffect(()=>{let ativo=true;const executar=()=>{if(ativo)void carregar().catch(()=>setErro("Consulta indisponível."));};const inicial=setTimeout(executar,200);const timer=setInterval(executar,10000);return()=>{ativo=false;clearTimeout(inicial);clearInterval(timer);};},[carregar]);
   const abrirHistorico=async(p:Produto)=>{selecionar(p);setHistorico(null);const r=await carregarHistorico(p.id);if(r.ok)setHistorico(r.dados);else setErro(r.erro);};
   const c=useConfirmacao(()=>{setEditor(undefined);void carregar();if(selecionado)void abrirHistorico(selecionado);});
   const mudar=<K extends keyof typeof filtro>(k:K,v:typeof filtro[K])=>setFiltro({...filtro,[k]:v,pagina:k==="pagina"?Number(v):1});
-  return <div className="page-stack farmacia"><header className="page-head"><div><h1>Estoque</h1><p>Produtos, lotes e disponibilidade para venda. Atualização a cada 10 segundos.</p></div>{gestor&&<button className="primary" onClick={()=>setEditor(null)}>+ Novo produto</button>}</header>
+  return <div className="page-stack farmacia"><header className="page-head"><div><h1>Estoque</h1><p>Produtos, lotes e disponibilidade para venda. Atualização a cada 10 segundos.</p></div>{gestor&&<div className="farmacia-toolbar"><button className="secondary" onClick={()=>{setEditor(undefined);setImportando(true);setAviso("");}}>Importar Excel</button><button className="primary" onClick={()=>{setImportando(false);setEditor(null);}}>+ Novo produto</button></div>}</header>
     {(erro||c.erro)&&<p role="alert">{erro||c.erro}</p>}
+    {aviso&&<p role="status">{aviso}</p>}
+    {gestor&&importando&&<ImportarProdutos cancelar={()=>setImportando(false)} concluido={()=>{setImportando(false);setAviso("Importação concluída. Produtos e estoque cadastrados com sucesso.");void carregar();}}/>}
     {editor!==undefined&&<ProdutoForm key={editor?.id??"novo"} inicial={editor} cancelar={()=>setEditor(undefined)} salvar={(produto,estoqueInicial)=>c.confirmar(estoqueInicial?`Cadastrar ${produto.nome} com ${estoqueInicial.quantidade} embalagens no lote ${estoqueInicial.codigo}, ao preço de ${dinheiro(produto.promocional??produto.preco)}?`:"Salvar o cadastro e os preços deste produto?",()=>gravarProduto({id:editor?.id??null,atualizadoEm:editor?.atualizadoEm??null,produto,estoqueInicial}))}/>}
     <section className="panel"><div className="farmacia-toolbar"><label>Buscar produto<input type="search" placeholder="Nome, princípio ativo, EAN ou SKU" value={filtro.termo} onChange={e=>mudar("termo",e.target.value)}/></label>
       <label>Categoria<input value={filtro.categoria} placeholder="Todas" onChange={e=>mudar("categoria",e.target.value)}/></label>

@@ -6,12 +6,12 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 185 |
+| Arquivos TS/TSX | 190 |
 | Tabelas (Drizzle) | 43 |
 | Server Actions (arquivos) | 14 |
 | Rotas de API | 7 |
 | Paginas | 5 |
-| Componentes | 29 |
+| Componentes | 30 |
 
 ## Arvore (profundidade 3)
 
@@ -58,6 +58,7 @@ components/
     comum.tsx
     dashboard.tsx
     estoque.tsx
+    importar-produtos.tsx
     pedido-form.tsx
     pedidos.tsx
     produto-form.tsx
@@ -184,12 +185,16 @@ lib/
   farmacia/
     agente.ts
     atendimento.ts
+    cadastro.ts
     catalogo.ts
     comum.ts
     consultas.ts
     crm.ts
+    importacao-validacao.ts
+    importacao.ts
     interpretar.ts
     pedidos.ts
+    planilha.ts
     prompt.ts
     transacoes.ts
     validacao.ts
@@ -386,7 +391,7 @@ _(colunas nao detectadas)_
 - `src/lib/actions/chatbots.ts`: `carregarChatbots()`, `salvarChatbot()`
 - `src/lib/actions/consultas.ts`: `carregarResumoAgenda()`, `carregarAgendaConsultas()`, `confirmarConsulta()`, `cancelarConsultaAgendada()`
 - `src/lib/actions/crm.ts`: `carregarCrm()`, `adicionarFunil()`, `adicionarMotivo()`, `modificarMotivo()`, `salvarAcessosFunis()`, `adicionarOportunidade()`, `fecharNegocio()`, `moverNegocio()`
-- `src/lib/actions/farmacia.ts`: `carregarProdutos()`, `gravarProduto()`, `receberEstoque()`, `ajustarInventario()`, `carregarHistorico()`, `carregarPedidos()`, `registrarPedido()`, `alterarPedido()`, `carregarFarmacia()`, `carregarCadastrosFarmacia()`, `salvarHabilitacao()`
+- `src/lib/actions/farmacia.ts`: `importarPlanilha()`, `carregarProdutos()`, `gravarProduto()`, `receberEstoque()`, `ajustarInventario()`, `carregarHistorico()`, `carregarPedidos()`, `registrarPedido()`, `alterarPedido()`, `carregarFarmacia()`, `carregarCadastrosFarmacia()`, `salvarHabilitacao()`
 - `src/lib/actions/followups.ts`: `carregarFollowups()`, `salvarFollowups()`
 - `src/lib/actions/operacao.ts`: `carregarOperacao()`
 - `src/lib/actions/painel.ts`: `carregarPainel()`

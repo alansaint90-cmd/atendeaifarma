@@ -40,10 +40,6 @@ const SQL_EXT = new Set([".sql"]);
 // de regra (ex.: o regex que detecta Prisma). Nunca auto-sinalizar.
 const SKIP_FILES = new Set(["check-compliance.mjs", "project-map.mjs"]);
 
-// ---------------------------------------------------------------------------
-// Regras baseadas em regex (linha a linha)
-// ---------------------------------------------------------------------------
-
 /**
  * `vale_em_comentario`: a regra dispara mesmo em linha de comentario.
  * @type {{id:string,level:'error'|'warn',re:RegExp,msg:string,ext?:Set<string>,vale_em_comentario?:boolean}[]}
@@ -425,6 +421,9 @@ function analyzeFile(file) {
       msg: "Configurações não pode exibir nem editar o prompt legado do orquestrador." });
   }
 
+  if (rel === "src/lib/farmacia/importacao.ts" && !/importacaoSchema\.parse[\s\S]*banco\.transaction[\s\S]*travarEstoque\(tx\)[\s\S]*autorizar\(tx[\s\S]*salvarProdutoNaTransacao\(tx/.test(content)) {
+    findings.push({ level:"error", id:"farmacia-importacao", file:rel, line:1, msg:"Importação exige validação, transação única, trava, autorização e cadastro auditado compartilhado." });
+  }
   return findings;
 }
 
