@@ -8,7 +8,7 @@ Cada farmácia tem implantação, PostgreSQL, Redis, credenciais, domínio e ins
 
 Campos: nome, princípio, genérico, fabricante, categoria, concentração, apresentação, unidades por embalagem, EAN opcional único, SKU único, preço/promoção, mínimo, receita, controle, ativo, medicamento, observações e aliases. Dinheiro usa decimal string e centavos BigInt. Promoção não supera preço normal.
 
-Quantidade representa embalagens. Cadastro não cria saldo; entrada registra lote e movimento. Medicamento exige validade. Lotes vencidos, bloqueados, excluídos ou produtos inativos não têm disponibilidade. Validade usa o dia de Brasília; próximo do vencimento = até 30 dias.
+Quantidade representa embalagens. Cadastro pode incluir estoque inicial: produto, lote, movimento e auditoria são gravados na mesma transação, com chave idempotente. Sem estoque inicial, o cadastro não cria saldo; reposições usam entrada de mercadoria. Medicamento exige validade. Lotes vencidos, bloqueados, excluídos ou produtos inativos não têm disponibilidade. Validade usa o dia de Brasília; próximo do vencimento = até 30 dias.
 
 Disponível = físico elegível menos reservas ativas não expiradas. Reservas não alteram físico. Alertas são calculados. Tela atualiza a cada dez segundos e após mutações.
 
@@ -35,6 +35,8 @@ Receita OU controle exige farmacêutico habilitado e ativo antes da confirmaçã
 IA recebe IDs conhecidos na conversa e retorna ação estruturada validada. Pode buscar, criar pedido, reservar após confirmação dos itens e consultar pedido da própria conversa. Não confirma pagamento, confere receita, cancela venda ou ajusta estoque. Falha de sistema não é apresentada como esgotamento.
 
 Busca normaliza nome, princípio, genérico, concentração, apresentação, EAN, SKU e aliases. Ambiguidade pede escolha. Nenhuma equivalência terapêutica é inferida. Servidor monta preço/saldo a partir da consulta atual; sem resposta comercial livre do modelo.
+
+O prompt salvo no chatbot da instância compõe a classificação do atendimento junto ao contrato obrigatório do sistema. O modelo Atende Aí Pharma é carregado por ação explícita no painel; criar ou carregar abre um rascunho e só salvar o aplica à instância selecionada. Não substitui prompts existentes automaticamente. A recuperação consulta diretamente o catálogo PostgreSQL, sem depender de uma base vetorial para preço ou saldo. Respostas identificam embalagens e distinguem indisponibilidade de produto ausente; falha de consulta não vira esgotamento. Esclarecimentos perguntam somente o campo necessário. O modelo da farmácia desativa a pergunta automática do nome: identificação não é exigida para consultar preço ou saldo, mas nomes informados espontaneamente continuam sendo lembrados. Chatbots anteriores preservam a opção ligada quando ela não foi definida. A saudação usa a persona configurada; dúvidas clínicas seguem a transferência humana configurada, sem confirmar encaminhamento indisponível.
 
 Interesse fica na conversa existente. Pedido cria oportunidade; fechamento avulso no CRM é bloqueado. Venda ganha e cancelamento perde negociação, preservando histórico original auditável.
 

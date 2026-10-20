@@ -5,6 +5,7 @@ import { chatbotExample } from "@/lib/chatbots/defaults";
 import type { ChatbotPersistido } from "@/lib/chatbots/server-repository";
 import { type Chatbot } from "@/lib/chatbots/schema";
 import { ChatbotEditor } from "./editor";
+import { criarChatbotFarmacia } from "@/lib/farmacia/prompt";
 
 export function ChatbotsPage() {
   const [itens, setItens] = useState<ChatbotPersistido[] | null>(null);
@@ -66,7 +67,10 @@ export function ChatbotsPage() {
     <section className="page-head"><div><h1>Chatbots de IA</h1><p>Configure as instruções prioritárias do agente no WhatsApp.</p></div><button className="primary" data-new-bot disabled={saving || !instancia} onClick={() => {
       if (!discard()) return;
       setEditor({ registro: null, bot: { ...structuredClone(chatbotExample), id: crypto.randomUUID(), identifier: "", persona: "", mission: "", context: "", personalities: ["Profissional"] } });
-    }}>+ Novo chatbot de IA</button></section>
+    }}>+ Novo chatbot de IA</button><button className="secondary" disabled={saving || !instancia} onClick={()=>{
+      if (!discard()) return;
+      setEditor({registro:null,bot:criarChatbotFarmacia(crypto.randomUUID(),instancia)});
+    }}>Criar agente Atende Aí Pharma</button></section>
     <article className="panel form-panel"><h2>Seus assistentes</h2><p className="bot-local-note">Cada número possui seu próprio prompt e configurações, salvos no servidor.</p>
       <label>Número / instância<select value={instancia} disabled={saving || !!editor} onChange={event => {
         if (!discard()) return;

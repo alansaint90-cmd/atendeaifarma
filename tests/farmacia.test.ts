@@ -38,7 +38,7 @@ test("farmácia: catálogo real, transações, receita, idempotência e CRM",asy
       assert.equal(await saldo(id),25);
       assert.equal((await historicoProduto(banco,admin,id)).movimentos.length,1);
       const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo:"Cadastro integrado",pedidoId:"",itens:[]},randomUUID());
-      assert.match(String(resposta),/R\$ 12,90/);assert.match(String(resposta),/25 unidade/);
+      assert.match(String(resposta),/R\$ 12,90/);assert.match(String(resposta),/25 embalagens/);
       await assert.rejects(salvarProduto(banco,admin,{...dados,estoqueInicial:{...dados.estoqueInicial,quantidade:26}}),/outros dados/);
       await assert.rejects(salvarProduto(banco,admin,{...dados,estoqueInicial:{...dados.estoqueInicial,validade:null}}),/validade/);
       await client.query("ALTER TABLE atendeia_produtos_lotes ADD CONSTRAINT teste_rollback CHECK (codigo<>'FALHA-TESTE')");
@@ -51,7 +51,7 @@ test("farmácia: catálogo real, transações, receita, idempotência e CRM",asy
     await t.test("A/C: consulta usa preço cadastrado e não altera saldo",async()=>{
       const id=await produto();await entrada(id,25);
       const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo:"Dipirona 500",pedidoId:"",itens:[]},randomUUID());
-      assert.match(String(resposta),/R\$ 8,90/);assert.match(String(resposta),/25 unidade/);assert.equal(await saldo(id),25);
+      assert.match(String(resposta),/R\$ 8,90/);assert.match(String(resposta),/25 embalagens/);assert.equal(await saldo(id),25);
       assert.equal((await client.query("SELECT id FROM atendeia_pedidos")).rows.length,0);
     });
     await t.test("B/G: esgotados, vencidos, bloqueados e inativos não ficam disponíveis",async()=>{
@@ -141,6 +141,17 @@ test("farmácia: catálogo real, transações, receita, idempotência e CRM",asy
     });
   }finally{await client.close();}
 });
+test("interpretação da farmácia recebe o prompt salvo do atendimento",async()=>{
+  const config={OPENAI_API_KEY:"teste",OPENAI_MODEL:"teste",AI_SYSTEM_PROMPT:"ATENDIMENTO PERSONALIZADO DA FARMÁCIA"} as AgentConfig;
+  let corpo:{instructions:string}|undefined;
+  const request:typeof fetch=async(_url,inicio)=>{
+    corpo=JSON.parse(String(inicio?.body));
+    return Response.json({status:"completed",output:[{type:"function_call",name:"atender_farmacia",arguments:JSON.stringify({acao:"buscar",termo:"Dipirona",pedidoId:"",itens:[]})}]});
+  };
+  await interpretarIntencao(config,[],"Tem dipirona?",{conversaId:randomUUID(),contatoId:randomUUID(),produtos:[],pedidos:[]},request);
+  assert.ok(corpo?.instructions.includes(config.AI_SYSTEM_PROMPT),"O prompt salvo precisa chegar à classificação da mensagem.");
+});
+
 test("IA rejeita resposta livre e ferramenta de confirmação de pagamento",async()=>{
   const config={OPENAI_API_KEY:"teste",OPENAI_MODEL:"teste"} as AgentConfig;
   const contexto={conversaId:randomUUID(),contatoId:randomUUID(),produtos:[],pedidos:[]};

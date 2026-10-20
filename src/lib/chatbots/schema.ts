@@ -10,6 +10,7 @@ export const chatbotSchema = z.object({
   openingMessages: z.array(z.string().trim().min(1).max(2000).refine(texto => !/\[(?:NOME|NOME DO CLIENTE)\]|\{NOME\}/iu.test(texto), "A abertura deve perguntar o nome, sem marcadores como [NOME].")).max(2).optional(),
   fallback: z.string().max(10000), delay: z.number().int().min(0).max(3600),
   agendaConsultas: z.boolean().optional(),
+  perguntarNome: z.boolean().optional(),
   transferMedia: z.boolean(), transferHuman: z.boolean(),
   destination: z.enum(["Atendimento humano", "Comercial", "Suporte", "Financeiro"]),
   transferNotice: z.string().max(10000), closingPhrase: z.string().max(500),

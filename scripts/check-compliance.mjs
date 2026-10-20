@@ -12,11 +12,9 @@
  *
  * Exit code: 1 se houver ERROS, 0 caso contrario (avisos nao falham).
  */
-
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, extname, relative, basename, resolve } from "node:path";
 import { colunasDasFabricas } from "./colunas-fabricas.mjs";
-
 const ROOT = process.cwd();
 const MAX_LINES = 500;
 
@@ -351,12 +349,10 @@ function analyzeFile(file) {
       }
     }
   });
-
   if (CODE_EXT.has(ext)) {
     checkDrizzleTables(content, rel, findings);
     checkSoftDeleteFilter(content, rel, findings);
   }
-
   if (["src/app/api/settings/integrations/route.ts", "src/app/api/settings/agent/route.ts"].includes(rel)) {
     const get = content.match(/export\s+async\s+function\s+GET\s*\([^)]*\)\s*\{([\s\S]*?)(?=\nexport\s+(?:async\s+)?function\s+|$)/)?.[1] ?? "";
     if (!/await\s+administradorHttp\s*\(\s*\)/.test(get)) {
@@ -364,7 +360,6 @@ function analyzeFile(file) {
         msg: "A leitura de Configurações deve exigir super administrador via administradorHttp()." });
     }
   }
-
   if (rel === "src/lib/chatbots/defaults.ts" && !/context\s*:\s*["']{2}/.test(content)) {
     findings.push({ level: "error", id: "prompt-legado", file: rel, line: 1,
       msg: "O modelo inicial do chatbot não pode trazer um roteiro comercial embutido." });
@@ -401,9 +396,13 @@ function analyzeFile(file) {
     findings.push({ level: "error", id: "estoque-real", file: rel, line: 1,
       msg: "O agente deve exigir estoque real e confirmação autorizada." });
   }
-  if (rel === "src/lib/agent/processor.ts" && (!/\bextrairNomeInformado\b[\s\S]*\brespostaComNome\b/.test(content) || !/turno.revisao === revisao/.test(content) || !/await port.registrarParte/.test(content))) {
+  if (rel === "src/lib/farmacia/interpretar.ts" && (!/instrucoesInterpretacaoFarmacia\(config\.AI_SYSTEM_PROMPT/.test(content) || !/parallel_tool_calls\s*:\s*false/.test(content) || !/tool_choice\s*:\s*\{type:"function",name:"atender_farmacia"\}/.test(content) || !/strict\s*:\s*true/.test(content))) {
+    findings.push({ level: "error", id: "farmacia-prompt", file: rel, line: 1,
+      msg: "O agente da farmácia deve usar o prompt salvo com uma operação estrita, sem resposta comercial livre." });
+  }
+  if (rel === "src/lib/agent/processor.ts" && (!/\bextrairNomeInformado\b[\s\S]*\brespostaComNome\b/.test(content) || !/turno.revisao === revisao/.test(content) || !/await port.registrarParte/.test(content) || !/config\.perguntarNome/.test(content))) {
     findings.push({ level: "error", id: "nome-cliente", file: rel, line: 1,
-      msg: "O processador deve tratar o nome, filtrar revisões antigas e registrar cada balão da abertura antes de continuar." });
+      msg: "O processador deve respeitar a configuração de perguntar nome, filtrar revisões antigas e registrar cada balão da abertura." });
   }
   if (rel === "src/lib/agent/store.ts" && !/\bcontactName\b[\s\S]*\brememberName\b/.test(content)) {
     findings.push({ level: "error", id: "nome-cliente", file: rel, line: 1,

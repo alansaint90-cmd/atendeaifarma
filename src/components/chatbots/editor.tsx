@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { chatbotSchema, personalities, type Chatbot } from "@/lib/chatbots/schema";
+import { promptAtendimentoFarmacia } from "@/lib/farmacia/prompt";
 
 interface Props { initial: Chatbot; creating: boolean; onSave: (bot: Chatbot) => void; onClose: () => void; error: string }
 export function ChatbotEditor({ initial, creating, onSave, onClose, error }: Props) {
@@ -33,9 +34,11 @@ export function ChatbotEditor({ initial, creating, onSave, onClose, error }: Pro
           <fieldset className="bot-personalities"><legend>Personalidade (escolha até 3)</legend><div>{personalities.map(value => <label key={value}><input name="personalities" type="checkbox" checked={draft.personalities.includes(value)} disabled={draft.personalities.length >= 3 && !draft.personalities.includes(value)} onChange={e => update("personalities", e.target.checked ? [...draft.personalities, value] : draft.personalities.filter(item => item !== value))} /><span>{value}</span></label>)}</div></fieldset>
         </div>{textField("mission", "Missão do chatbot", 2)}<details className="bot-examples"><summary>Exemplos de missão (para copiar e alterar)</summary><p>Atender clientes, esclarecer dúvidas sobre produtos e serviços e orientar cada pessoa até a melhor solução.</p><button type="button" className="secondary" onClick={() => update("mission", "Atender clientes, esclarecer dúvidas sobre produtos e serviços e orientar cada pessoa até a melhor solução.")}>Usar exemplo</button></details></section>
         <section className="bot-section"><h2>Contexto e conhecimento do chatbot</h2><p>Inclua o prompt e todas as informações que o assistente precisa conhecer.</p>{textField("context", "Contexto geral", 12)}{textField("fallback", "Como agir se não tiver a resposta?", 2)}
+          <details className="bot-examples"><summary>Prompt Atende Aí Pharma</summary><p>Atendimento no WhatsApp com consulta ao estoque real, pedidos e encaminhamento ao farmacêutico. Carregar substitui o contexto desta edição e desativa a pergunta automática do nome; a alteração só é aplicada ao salvar.</p><button className="secondary" type="button" onClick={()=>setDraft(atual=>({...atual,context:promptAtendimentoFarmacia,perguntarNome:false}))}>Carregar prompt da farmácia</button></details>
           <details className="bot-examples"><summary>Exemplos de textos (para copiar e alterar)</summary><p>Não tenho essa informação no momento. Posso ajudar com outro assunto ou encaminhar você para nossa equipe?</p><button className="secondary" type="button" onClick={() => update("fallback", "Não tenho essa informação no momento. Posso ajudar com outro assunto ou encaminhar você para nossa equipe?")}>Usar exemplo</button></details>
         </section>
         <section className="bot-section"><h2>Abertura da conversa</h2><p>Opcional: até duas mensagens separadas, enviadas literalmente ao receber apenas uma saudação no primeiro contato. Deixe ambas vazias para usar o prompt.</p>
+          <label><input type="checkbox" checked={draft.perguntarNome!==false} onChange={e=>update("perguntarNome",e.target.checked)}/> Perguntar automaticamente o nome do cliente</label>
           {[0, 1].map(indice => <label key={indice}>Mensagem de abertura {indice + 1}<textarea rows={3} maxLength={2000} value={draft.openingMessages?.[indice] ?? ""} onChange={event => {
             const mensagens = [...(draft.openingMessages ?? ["", ""])]; mensagens[indice] = event.target.value;
             update("openingMessages", mensagens);

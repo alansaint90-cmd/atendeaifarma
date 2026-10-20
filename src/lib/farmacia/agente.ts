@@ -10,11 +10,15 @@ import { criarPedido, executarPedido } from "./pedidos";
 import { listarPedidos } from "./consultas";
 import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
+import { personaDoAgente } from "../agent/nome";
 const sistema={sistema:true} as const;
 export function respostaProduto(produtos:Produto[],total:number) {
   if(!produtos.length)return "Não encontrei esse produto no catálogo. Informe o nome, a concentração ou o código de barras. Posso encaminhar a consulta à equipe.";
-  const lista=produtos.slice(0,8).map((p,i)=>`${i+1}. ${p.nome} ${p.concentracao} — ${p.apresentacao}, ${p.embalagem} por embalagem.\n${p.disponivel>0 ? `R$ ${(p.promocional??p.preco).replace(".",",")} · ${p.disponivel} unidade(s) disponíveis.` : "Indisponível para venda neste momento."}${p.receita||p.controle ? "\nExige conferência humana de receita pelo farmacêutico antes da liberação." : ""}`);
-  return `${lista.join("\n\n")}\n\n${total>1 ? "Qual apresentação você deseja?" : "Deseja registrar um pedido?"} Valores e saldo consultados agora; disponibilidade sujeita à reserva.`;
+  const lista=produtos.slice(0,8).map((p,i)=>`${i+1}. ${p.nome} ${p.concentracao} — ${p.apresentacao}, ${p.embalagem} por embalagem.\nR$ ${(p.promocional??p.preco).replace(".",",")} por embalagem · ${p.disponivel>0 ? `${p.disponivel} embalagens disponíveis.` : "Indisponível para venda neste momento."}${p.receita||p.controle ? "\nExige conferência humana de receita pelo farmacêutico antes da liberação." : ""}`);
+  const proximo=produtos.slice(0,8).some(p=>p.disponivel>0)
+    ? total>1 ? "Qual apresentação você deseja?" : "Deseja registrar um pedido?"
+    : "Deseja falar com a equipe da farmácia sobre a possibilidade de reposição?";
+  return `${lista.join("\n\n")}\n\n${proximo} Valores e saldo consultados agora; disponibilidade sujeita à reserva.`;
 }
 async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMessage):Promise<ContextoFarmacia> {
   const [c]=linhas<{id:string;contato_id:string}>(await banco.execute(sql`SELECT c.id,c.contact_id contato_id FROM atendeia_conversations c JOIN atendeia_channels ch ON ch.id=c.channel_id
@@ -28,8 +32,13 @@ async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMess
 export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,intencao:unknown,identidade:string):Promise<RespostaGerada> {
   const a=intencaoSchema.parse(intencao);
   if(a.acao==="humano")return {transferir:true};
-  if(a.acao==="saudacao")return "Olá! Sou o assistente comercial da farmácia. Qual produto e apresentação você procura?";
-  if(a.acao==="esclarecer")return "Informe o produto, a concentração, a apresentação e quantas embalagens deseja. Para dúvidas sobre tratamento ou receita, nossa equipe farmacêutica pode ajudar.";
+  if(a.acao==="saudacao")return "Olá! Sou a assistente virtual do Atende Aí Pharma. Qual medicamento ou produto você procura?";
+  if(a.acao==="esclarecer")return {
+    produto:"Qual medicamento ou produto você procura?",concentracao:"Qual concentração você procura?",
+    apresentacao:"Qual apresentação você procura?",quantidade:"Quantas embalagens você deseja?",
+    escolha:"Qual das apresentações consultadas você deseja?",
+    "":"Informe o produto, a concentração, a apresentação e quantas embalagens deseja. Para dúvidas sobre tratamento ou receita, nossa equipe farmacêutica pode ajudar.",
+  }[a.campo];
   if(a.acao==="buscar") {
     if(a.termo.trim().length<2)return "Qual medicamento ou produto você deseja consultar?";
     const r=await consultarProdutos(banco,sistema,{termo:a.termo});
@@ -54,11 +63,17 @@ export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,i
   const [p]=(await listarPedidos(banco,sistema,{id:a.pedidoId})).pedidos;
   return `Pedido ${p.numero}: ${p.status.split("_").join(" ")}. Total: R$ ${p.total.replace(".",",")}.${p.expira ? ` Reserva válida até ${new Date(p.expira).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"})} (Brasília).` : ""}${p.status==="aguardando_pagamento" ? " A equipe precisa conferir o pagamento antes de confirmar a venda." : ""}`;
 }
-export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage) {
+export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage,request=fetch) {
   return async(config:AgentConfig,historico:Turn[],texto:string):Promise<RespostaGerada>=>{
     try {
       const contexto=await contextoDaConversa(banco,instancia,m);
-      return await atenderIntencao(banco,contexto,await interpretarIntencao(config,historico,texto,contexto),m.identity);
+      const intencao=await interpretarIntencao(config,historico,texto,contexto,request);
+      if(intencao.acao==="saudacao") {
+        const persona=personaDoAgente(config.AI_SYSTEM_PROMPT);
+        return persona ? `Olá! Sou ${persona}, assistente virtual do Atende Aí Pharma. Qual medicamento ou produto você procura?` : await atenderIntencao(banco,contexto,intencao,m.identity);
+      }
+      if(intencao.acao==="humano"&&config.atendimento?.transferHuman===false)return "Essa solicitação precisa da avaliação da equipe da farmácia. O encaminhamento automático está indisponível neste canal; procure o atendimento da farmácia para continuar.";
+      return await atenderIntencao(banco,contexto,intencao,m.identity);
     }catch(e){
       if(e instanceof ErroDeNegocio)return `${e.message} Nossa equipe pode ajudar a concluir o atendimento.`;
       return "Não consegui consultar o sistema agora. Não posso confirmar preço, disponibilidade ou pedido. Tente novamente ou solicite atendimento humano.";

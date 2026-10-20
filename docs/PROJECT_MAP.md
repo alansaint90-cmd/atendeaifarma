@@ -6,7 +6,7 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 184 |
+| Arquivos TS/TSX | 185 |
 | Tabelas (Drizzle) | 43 |
 | Server Actions (arquivos) | 14 |
 | Rotas de API | 7 |
@@ -190,6 +190,7 @@ lib/
     crm.ts
     interpretar.ts
     pedidos.ts
+    prompt.ts
     transacoes.ts
     validacao.ts
   followups/

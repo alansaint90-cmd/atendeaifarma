@@ -70,7 +70,7 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
       const confirmadoNoHistorico = historico.some(turno => turno.role === "user" && mesmoNome(extrairNomeInformado(turno.content, []), salvo));
       const nome = informado ?? (mesmoNome(salvo, persona) && !confirmadoNoHistorico ? null : salvo);
       if (informado && port.rememberName) await port.rememberName(informado);
-      const instrucoes = `${instrucoesComNome(config.AI_SYSTEM_PROMPT, nome, historico.length === 0)}\nNão use o nome da assistente como rótulo ou prefixo das mensagens. Preserve a apresentação natural no início da conversa.`;
+      const instrucoes = `${instrucoesComNome(config.AI_SYSTEM_PROMPT, nome, historico.length === 0, config.perguntarNome !== false)}\nNão use o nome da assistente como rótulo ou prefixo das mensagens. Preserve a apresentação natural no início da conversa.`;
       // Preservar o histórico armazenado, mas não ensinar novamente uma persona ou roteiro antigo.
       const contextoAtual = persona ? historico.filter(turno => turno.role === "user" || turno.revisao === revisao) : historico;
       const saudacao = /^(?:oi+|ol[aá]+|bom dia|boa tarde|boa noite)[\s!.😊👋]*$/iu.test((transcript ?? message.text).trim());
@@ -92,7 +92,7 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
         transferencia = true;
         reply = config.atendimento.transferNotice.replace(/\[(?:NOME|NOME DO CLIENTE)\]|\{NOME\}/giu, nome?.split(" ")[0] ?? "").trim()
           || "Vou encaminhar seu atendimento para nossa equipe.";
-      } else reply = partes ? gerada : removerRotuloDaPersona(respostaComNome(gerada, nome), persona);
+      } else reply = partes ? gerada : removerRotuloDaPersona(respostaComNome(gerada, nome, config.perguntarNome !== false), persona);
       if (consulta) partes = mensagensDaConsulta(reply);
     }
     catch (error) {
@@ -105,7 +105,7 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
   }
   if (!await port.enabled()) return "pausada";
   if (!state.partes && !state.transferencia && /\[(?:NOME|NOME DO CLIENTE)\]|\{NOME\}/iu.test(state.reply!)) {
-    state = { ...state, reply: respostaComNome(state.reply!, await port.contactName?.() ?? null) };
+    state = { ...state, reply: respostaComNome(state.reply!, await port.contactName?.() ?? null, config.perguntarNome !== false) };
     await port.write(state);
   }
   const semRotulo = state.transferencia || state.partes || state.consulta ? state.reply! : removerRotuloDaPersona(state.reply!, personaDoAgente(config.AI_SYSTEM_PROMPT));

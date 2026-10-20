@@ -166,6 +166,8 @@ Instalação isolada por farmácia. Reutilizar o schema ativo e a conexão postg
 
 Consulte docs/adr/0014-farmacia.md e docs/regras-negocio.md. PostgreSQL 16 real é obrigatório para teste de concorrência; PGlite é apenas validação complementar.
 
+O interpretador da farmácia deve receber o prompt salvo do chatbot da instância e manter o contrato de operações estritas: uma chamada de atender_farmacia, sem SQL ou resposta comercial livre. O modelo de prompt Atende Aí Pharma só é carregado por ação explícita e não substitui automaticamente configurações existentes. Preço e disponibilidade de cada resposta vêm da consulta atual ao PostgreSQL. O processador respeita perguntarNome: false no modelo da farmácia, sem acrescentar identificação às consultas de produto; a extração de nomes espontâneos continua ativa.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
