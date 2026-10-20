@@ -6,7 +6,7 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 190 |
+| Arquivos TS/TSX | 191 |
 | Tabelas (Drizzle) | 43 |
 | Server Actions (arquivos) | 14 |
 | Rotas de API | 7 |
@@ -193,6 +193,7 @@ lib/
     importacao-validacao.ts
     importacao.ts
     interpretar.ts
+    ordenacao.ts
     pedidos.ts
     planilha.ts
     prompt.ts

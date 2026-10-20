@@ -17,14 +17,12 @@ import { join, extname, relative, basename, resolve } from "node:path";
 import { colunasDasFabricas } from "./colunas-fabricas.mjs";
 const ROOT = process.cwd();
 const MAX_LINES = 500;
-
 /**
  * Excecao de caminho do limite de linhas. `src/components/ui/` e codigo de
  * terceiro vendorizado pelo CLI do shadcn, que a regra proibe editar. Vale SO
  * para `arquivo-grande` — as demais regras continuam valendo la dentro.
  */
 const ISENTOS_DE_TAMANHO = ["src/components/ui/"];
-
 const IGNORE_DIRS = new Set([
   "node_modules", ".next", ".git", "dist", "build", "coverage",
   ".turbo", "out", ".vercel", ".lixo-quarentena",
@@ -423,6 +421,8 @@ function analyzeFile(file) {
 
   if ((rel === "src/lib/farmacia/agente.ts" && (!/disponibilidade:"disponivel"/.test(content) || !/mensagens:\[/.test(content) || !/ofertados/.test(content))) || (rel === "src/lib/farmacia/catalogo.ts" && !/const identificador\s*=\s*termos\.length===1/.test(content)))
     findings.push({ level:"error", id:"farmacia-oferta-disponivel", file:rel, line:1, msg:"Oferta exige disponíveis, contexto dos ofertados, CTA separado e busca composta sem fragmentos de SKU/EAN." });
+  if (rel === "src/lib/farmacia/catalogo.ts" && (!/const ordem = sql`\$\{chaveAlfabetica\(sql`nome`\)/.test(content) || /filtro\.ordenar/.test(content)))
+    findings.push({ level:"error", id:"farmacia-ordem-alfabetica", file:rel, line:1, msg:"Estoque deve manter ordem alfabética normalizada antes da paginação, sem alternativa por quantidade." });
   if (rel === "src/lib/farmacia/importacao.ts" && !/importacaoSchema\.parse[\s\S]*banco\.transaction[\s\S]*travarEstoque\(tx\)[\s\S]*autorizar\(tx[\s\S]*salvarProdutoNaTransacao\(tx/.test(content)) {
     findings.push({ level:"error", id:"farmacia-importacao", file:rel, line:1, msg:"Importação exige validação, transação única, trava, autorização e cadastro auditado compartilhado." });
   }

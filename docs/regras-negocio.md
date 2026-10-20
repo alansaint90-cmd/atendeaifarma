@@ -16,6 +16,8 @@ Gestor pode importar Excel .xlsx de até 2 MB e 200 produtos em uma única aba, 
 
 Disponível = físico elegível menos reservas ativas não expiradas. Reservas não alteram físico. Alertas são calculados. Tela atualiza a cada dez segundos e após mutações.
 
+O estoque permanece em ordem alfabética A–Z por nome, independentemente da sequência de cadastro, edição, importação ou quantidade disponível. A comparação normaliza Unicode, ignora maiúsculas/minúsculas e acentos portugueses, preservando a grafia exibida. Empates usam concentração, apresentação, SKU e ID, para manter a paginação estável. A ordem é aplicada no PostgreSQL antes de LIMIT/OFFSET, incluindo filtros e novas atualizações. A opção de ordenar por quantidade foi removida da tela; o parâmetro legado ainda é aceito pela validação, mas não altera a ordem.
+
 Gerente altera cadastro e ajusta inventário; operador registra entrada. Ajuste exige motivo, versão e saldo não inferior às reservas. Edição do produto exige versão original e invalida conferências farmacêuticas pendentes. Não há exclusão física ou edição de movimentos.
 
 ## Pedidos

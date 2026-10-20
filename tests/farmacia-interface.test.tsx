@@ -25,6 +25,7 @@ test('estoque mostra preço real e distingue físico, reservado e disponível',a
   a.carregarProdutos.mockResolvedValue({ok:true,dados:{total:1,produtos:[{id:'p',nome:'Dipirona',principio:'Dipirona',sku:'DIP',concentracao:'500 mg',apresentacao:'comprimidos',embalagem:10,preco:'8.90',promocional:null,disponivel:2,fisico:5,reservado:3,validade:'2099-12-31',vencendo:false,vencido:false,ativo:true,minimo:3,receita:false,controle:''}]}});
   render(<EstoquePage gestor={false}/>);
   expect(await screen.findByText('R$ 8,90')).toBeInTheDocument();
+  expect(screen.getByText('Ordem alfabética (A–Z)')).toBeInTheDocument();expect(screen.queryByLabelText('Ordenar')).not.toBeInTheDocument();
   expect(screen.getByText('2 disponíveis')).toBeInTheDocument();expect(screen.getByText('5 físicos · 3 reservados')).toBeInTheDocument();
   expect(screen.queryByRole('button',{name:'+ Novo produto'})).not.toBeInTheDocument();expect(screen.getAllByText('Estoque baixo').length).toBeGreaterThan(0);
 });

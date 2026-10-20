@@ -5,6 +5,7 @@ import { linhas, type BancoSql, type TransacaoSql } from "../db/porta";
 import { ErroDeNegocio } from "../acao";
 import { buscaSchema, salvarProdutoSchema, entradaSchema, ajusteSchema } from "./validacao";
 import { auditar, autorizar, elegivel, hoje, reservaAtiva, travarEstoque, type AtorFarmacia } from "./comum";
+import { chaveAlfabetica } from "./ordenacao";
 
 export interface Produto {
   id:string; nome:string; principio:string; generico:string; fabricante:string; categoria:string; concentracao:string;
@@ -43,7 +44,7 @@ export async function consultarProdutos(banco: BancoSql, ator: AtorFarmacia, ent
           WHERE r.lote_id=l.id AND ${reservaAtiva}) r ON true WHERE l.produto_id=p.id AND l.is_deleted=false
       ) s ON true WHERE p.is_deleted=false AND ${texto} AND ${categorias})`;
     const [contagem] = linhas<{total:number}>(await tx.execute(sql`${base} SELECT count(*)::int total FROM catalogo WHERE ${condicao}`));
-    const ordem = filtro.ordenar === "quantidade" ? sql`disponivel,nome,id` : sql`nome,id`;
+    const ordem = sql`${chaveAlfabetica(sql`nome`)},${chaveAlfabetica(sql`concentracao`)},${chaveAlfabetica(sql`apresentacao`)},sku COLLATE "C",id`;
     const produtos = linhas<Produto>(await tx.execute(sql`${base} SELECT * FROM catalogo WHERE ${condicao} ORDER BY ${ordem} LIMIT 40 OFFSET ${(filtro.pagina-1)*40}`));
     return {produtos,total:contagem.total};
   });

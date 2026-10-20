@@ -137,6 +137,7 @@ try {
   const CHECAGENS = [
     ["oferta sem filtro de disponíveis e CTA separado reprova", reprova("farmacia/agente.ts", "farmacia-oferta-disponivel")],
     ["busca sem separar identificador de apresentação reprova", reprova("farmacia/catalogo.ts", "farmacia-oferta-disponivel")],
+    ["estoque sem ordem alfabética normalizada reprova", reprova("farmacia/catalogo.ts", "farmacia-ordem-alfabetica")],
     ["importação sem transação única e validação reprova", reprova("farmacia/importacao.ts", "farmacia-importacao")],
     ["consulta sem validação, trava e auditoria reprova", reprova("consultas/repository.ts", "consulta-confirmacao")],
     ["escolha sem preservar data e horário permitido reprova", reprova("consultas/fluxo.ts", "consulta-escolha")],
