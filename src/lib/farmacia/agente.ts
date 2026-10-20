@@ -12,13 +12,18 @@ import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
 import { personaDoAgente } from "../agent/nome";
 const sistema={sistema:true} as const;
-export function respostaProduto(produtos:Produto[],total:number) {
+export function respostaProduto(produtos:Produto[],total:number):RespostaGerada {
   if(!produtos.length)return "Não encontrei esse produto no catálogo. Informe o nome, a concentração ou o código de barras. Posso encaminhar a consulta à equipe.";
-  const lista=produtos.slice(0,8).map((p,i)=>`${i+1}. ${p.nome} ${p.concentracao} — ${p.apresentacao}, ${p.embalagem} por embalagem.\nR$ ${(p.promocional??p.preco).replace(".",",")} por embalagem · ${p.disponivel>0 ? `${p.disponivel} embalagens disponíveis.` : "Indisponível para venda neste momento."}${p.receita||p.controle ? "\nExige conferência humana de receita pelo farmacêutico antes da liberação." : ""}`);
-  const proximo=produtos.slice(0,8).some(p=>p.disponivel>0)
-    ? total>1 ? "Qual apresentação você deseja?" : "Deseja registrar um pedido?"
-    : "Deseja falar com a equipe da farmácia sobre a possibilidade de reposição?";
-  return `${lista.join("\n\n")}\n\n${proximo} Valores e saldo consultados agora; disponibilidade sujeita à reserva.`;
+  const disponiveis=produtos.filter(p=>p.ativo&&p.disponivel>0).slice(0,8);
+  if(!disponiveis.length)return "No momento não temos esse produto disponível para venda. Gostaria de falar com a equipe da farmácia?";
+  const lista=disponiveis.map(p=>{
+    const embalagem=p.embalagem>1&&!/\d/.test(p.apresentacao)?` (${p.embalagem} unidades por embalagem)`:"";
+    const descricao=[p.nome,p.concentracao,p.apresentacao].filter(Boolean).join(" — ");
+    return `${descricao}${embalagem}, por R$ ${(p.promocional??p.preco).replace(".",",")}.${p.receita||p.controle?" A liberação exige conferência de receita pelo farmacêutico.":""}`;
+  });
+  const oferta=lista.length===1?`Temos sim ${lista[0]}`:`Temos estas opções disponíveis:\n${lista.map(t=>`• ${t}`).join("\n")}`;
+  return {mensagens:[`${oferta}${total>8?"\nHá outras apresentações disponíveis. Informe a concentração ou apresentação que procura.":""}`,
+    "Gostaria de fazer o seu pedido ou acrescentar mais alguma coisa?"]};
 }
 async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMessage):Promise<ContextoFarmacia> {
   const [c]=linhas<{id:string;contato_id:string}>(await banco.execute(sql`SELECT c.id,c.contact_id contato_id FROM atendeia_conversations c JOIN atendeia_channels ch ON ch.id=c.channel_id
@@ -41,9 +46,11 @@ export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,i
   }[a.campo];
   if(a.acao==="buscar") {
     if(a.termo.trim().length<2)return "Qual medicamento ou produto você deseja consultar?";
-    const r=await consultarProdutos(banco,sistema,{termo:a.termo});
+    const disponiveis=await consultarProdutos(banco,sistema,{termo:a.termo,disponibilidade:"disponivel"});
+    const r=disponiveis.total?disponiveis:await consultarProdutos(banco,sistema,{termo:a.termo});
+    const ofertados=r.produtos.filter(p=>p.ativo&&p.disponivel>0).slice(0,8);
     await banco.transaction(async tx=>{
-      for(const produto of r.produtos.slice(0,8).length ? r.produtos.slice(0,8) : [null]) await tx.execute(sql`INSERT INTO atendeia_produtos_consultas(conversa_id,produto_id,termo,chave,modified_by)
+      for(const produto of ofertados.length ? ofertados : [null]) await tx.execute(sql`INSERT INTO atendeia_produtos_consultas(conversa_id,produto_id,termo,chave,modified_by)
         VALUES (${contexto.conversaId},${produto?.id??null},${a.termo},${`${identidade}:${produto?.id??"sem_resultado"}`},${systemUserId}) ON CONFLICT DO NOTHING`);
     });
     return respostaProduto(r.produtos,r.total);

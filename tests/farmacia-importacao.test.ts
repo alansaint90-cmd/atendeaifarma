@@ -11,6 +11,7 @@ import { consultarProdutos } from "../src/lib/farmacia/catalogo";
 import { atenderIntencao } from "../src/lib/farmacia/agente";
 import { linhaImportacaoSchema } from "../src/lib/farmacia/importacao-validacao";
 import { lerPlanilha, modeloPlanilha, colunasPlanilha } from "../src/lib/farmacia/planilha";
+import { textoResposta } from "./helpers/resposta-farmacia";
 
 const item = (dados:Record<string,unknown>={}) => linhaImportacaoSchema.parse({linha:2,nome:"Dipirona",concentracao:"500 mg",
   apresentacao:"caixa com 10 comprimidos",preco:"8,90",quantidade:25,lote:"L-01",validade:"2099-12-31",receita:false,
@@ -63,7 +64,7 @@ test("Importação: transação auditada, permissões, repetição e consulta pe
       assert.equal((await client.query("SELECT id FROM atendeia_audit_logs WHERE action='produto_criado' AND modified_by=$1",[admin.userId])).rows.length,2);
       const produtos=await consultarProdutos(banco,admin,{termo:"Dipirona"});assert.equal(produtos.produtos[0].disponivel,25);
       const resposta=await atenderIntencao(banco,{conversaId:conversa,contatoId:contato,produtos:[],pedidos:[]},{acao:"buscar",termo:"Dipirona 500",pedidoId:"",itens:[]},randomUUID());
-      assert.match(String(resposta),/R\$ 8,90/);assert.match(String(resposta),/25 embalagens/);
+      assert.match(textoResposta(resposta),/R\$ 8,90/);assert.doesNotMatch(textoResposta(resposta),/25 embalagens/);
     });
     await t.test("erro na última linha desfaz cadastros, estoque e auditoria anteriores",async()=>{
       const antes=(await client.query("SELECT id FROM atendeia_audit_logs")).rows.length;

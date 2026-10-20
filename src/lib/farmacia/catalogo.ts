@@ -18,9 +18,12 @@ export async function consultarProdutos(banco: BancoSql, ator: AtorFarmacia, ent
     await autorizar(tx,ator,"visualizador",true);
     // Pontuação textual determinística; nenhuma equivalência terapêutica é inferida.
     const termos = filtro.termo.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/\p{M}/gu,"").split(/\s+/).filter(Boolean);
-    const campo = sql`translate(lower(concat_ws(' ',p.nome,p.principio,p.generico,p.concentracao,p.apresentacao,p.ean,p.sku,p.aliases)), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')`;
+    const campo = sql`translate(lower(concat_ws(' ',p.nome,p.principio,p.generico,p.concentracao,p.apresentacao,p.aliases)), 'áàâãäéèêëíìîïóòôõöúùûüç', 'aaaaaeeeeiiiiooooouuuuc')`;
     const filtros = termos.map(termo => sql`position(${termo} in ${campo})>0`);
-    const texto = filtros.length ? sql.join(filtros,sql` AND `) : sql`true`;
+    // Números da apresentação não podem coincidir com trechos de UUID/SKU ou EAN.
+    const identificador = termos.length===1 && !/^\d+$/.test(termos[0])
+      ? sql`position(lower(${filtro.termo}) in lower(p.sku))>0` : sql`lower(p.sku)=lower(${filtro.termo})`;
+    const texto = filtros.length ? sql`((${sql.join(filtros,sql` AND `)}) OR ${identificador} OR p.ean=${filtro.termo})` : sql`true`;
     const categorias = filtro.categoria ? sql`p.categoria=${filtro.categoria}` : sql`true`;
     const condicao = {
       todos:sql`true`, disponivel:sql`disponivel>0`, baixo:sql`disponivel>0 AND disponivel<=minimo`, esgotado:sql`disponivel=0`,

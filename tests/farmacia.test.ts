@@ -14,6 +14,7 @@ import {assumirConversa,atendimentoHumanoAtivo,enviarManual} from "../src/lib/fa
 import {receberOperacao} from "../src/lib/operacao/receber";
 import type {AgentConfig} from "../src/lib/agent/config";
 import type {ProdutoEntrada} from "../src/lib/farmacia/validacao";
+import {textoResposta} from "./helpers/resposta-farmacia";
 
 test("farmácia: catálogo real, transações, receita, idempotência e CRM",async t=>{
   const client=new PGlite();const banco=drizzle(client);const admin={userId:randomUUID(),papel:"admin" as const};const operador={userId:randomUUID(),papel:"operador" as const};
@@ -38,7 +39,7 @@ test("farmácia: catálogo real, transações, receita, idempotência e CRM",asy
       assert.equal(await saldo(id),25);
       assert.equal((await historicoProduto(banco,admin,id)).movimentos.length,1);
       const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo:"Cadastro integrado",pedidoId:"",itens:[]},randomUUID());
-      assert.match(String(resposta),/R\$ 12,90/);assert.match(String(resposta),/25 embalagens/);
+      assert.match(textoResposta(resposta),/R\$ 12,90/);assert.doesNotMatch(textoResposta(resposta),/25 embalagens/);
       await assert.rejects(salvarProduto(banco,admin,{...dados,estoqueInicial:{...dados.estoqueInicial,quantidade:26}}),/outros dados/);
       await assert.rejects(salvarProduto(banco,admin,{...dados,estoqueInicial:{...dados.estoqueInicial,validade:null}}),/validade/);
       await client.query("ALTER TABLE atendeia_produtos_lotes ADD CONSTRAINT teste_rollback CHECK (codigo<>'FALHA-TESTE')");
@@ -51,13 +52,13 @@ test("farmácia: catálogo real, transações, receita, idempotência e CRM",asy
     await t.test("A/C: consulta usa preço cadastrado e não altera saldo",async()=>{
       const id=await produto();await entrada(id,25);
       const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo:"Dipirona 500",pedidoId:"",itens:[]},randomUUID());
-      assert.match(String(resposta),/R\$ 8,90/);assert.match(String(resposta),/25 embalagens/);assert.equal(await saldo(id),25);
+      assert.match(textoResposta(resposta),/R\$ 8,90/);assert.doesNotMatch(textoResposta(resposta),/25 embalagens/);assert.equal(await saldo(id),25);
       assert.equal((await client.query("SELECT id FROM atendeia_pedidos")).rows.length,0);
     });
     await t.test("B/G: esgotados, vencidos, bloqueados e inativos não ficam disponíveis",async()=>{
       const id=await produto({nome:"Esgotado"});let r=await consultarProdutos(banco,operador,{termo:"Esgotado"});assert.equal(r.produtos[0].disponivel,0);
       await entrada(id,2,"2020-01-01");r=await consultarProdutos(banco,operador,{termo:"Esgotado"});assert.equal(r.produtos[0].disponivel,0);assert.equal(r.produtos[0].vencido,true);
-      const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo:"Esgotado",pedidoId:"",itens:[]},randomUUID());assert.match(String(resposta),/Indisponível/);
+      const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo:"Esgotado",pedidoId:"",itens:[]},randomUUID());assert.match(textoResposta(resposta),/não temos.*disponível/i);
       await assert.rejects(pedido(id),/Quantidade indisponível/);
       const inativo=await produto({nome:"Inativo",ativo:false});await entrada(inativo,3);assert.equal((await consultarProdutos(banco,operador,{termo:"Inativo"})).produtos[0].disponivel,0);
     });

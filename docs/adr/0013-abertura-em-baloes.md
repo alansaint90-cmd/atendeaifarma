@@ -17,3 +17,10 @@ envio ou falha de registro termina como incerta, sem repetição automática.
 Alteração de configuração após envio parcial não reinicia a abertura. Pausa humana
 pode interromper a sequência; não existe garantia de cancelamento de chamada externa
 já iniciada. Follow-up só é programado após a resposta completa.
+
+O domínio da farmácia também pode devolver `{ mensagens: string[] }`, limitado pelo
+processador a três textos não vazios de até 6.000 caracteres. A oferta e o CTA usam
+dois balões redigidos pelo servidor com dados do catálogo, sem nova chamada ao modelo.
+Reutilizam partes e IDs do diário existente, pausa antes de cada envio e proteção
+contra entrega incerta. O histórico guarda os textos na ordem; não há nova fila ou
+alteração de schema. Aberturas, respostas simples e transferência mantêm seus fluxos.

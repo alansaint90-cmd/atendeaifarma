@@ -43,6 +43,8 @@ const arquivoLongo = (linhas) =>
 const QUATRO = 'created_at: x, updated_at: x, deleted_at: x, is_deleted: x';
 
 const CASOS = {
+  "src/lib/farmacia/agente.ts": "export function responder(produtos) { return produtos.map(p => p.nome); }",
+  "src/lib/farmacia/catalogo.ts": "export function buscar(termo) { return consultarNomeESkuJuntos(termo); }",
   "src/lib/farmacia/importacao.ts": "export async function importarProdutos() { return 'importado'; }",
   "src/lib/consultas/fluxo.ts": "export function escolher() { return 'qualquer data'; }",
   "src/lib/consultas/repository.ts": "export async function reservarConsulta() { return 'confirmada'; }",
@@ -133,6 +135,8 @@ try {
 
   /** @type {[string, () => void][]} */
   const CHECAGENS = [
+    ["oferta sem filtro de disponíveis e CTA separado reprova", reprova("farmacia/agente.ts", "farmacia-oferta-disponivel")],
+    ["busca sem separar identificador de apresentação reprova", reprova("farmacia/catalogo.ts", "farmacia-oferta-disponivel")],
     ["importação sem transação única e validação reprova", reprova("farmacia/importacao.ts", "farmacia-importacao")],
     ["consulta sem validação, trava e auditoria reprova", reprova("consultas/repository.ts", "consulta-confirmacao")],
     ["escolha sem preservar data e horário permitido reprova", reprova("consultas/fluxo.ts", "consulta-escolha")],

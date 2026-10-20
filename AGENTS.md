@@ -170,6 +170,8 @@ O interpretador da farmácia deve receber o prompt salvo do chatbot da instânci
 
 Cadastro rápido mantém os detalhes opcionais recolhidos e gera SKU se vazio. Importação Excel cadastra somente novos produtos, até 200 linhas por arquivo de 2 MB, com prévia e confirmação bloqueada por três segundos. Exige classificação de receita explícita, lote e validade quando aplicável. Validação, autorização, trava de estoque, gravação e auditoria compartilham uma única transação; erro desfaz todo o arquivo e repetição da mesma confirmação não duplica saldo. Não atualiza cadastro existente nem importa fórmulas.
 
+Oferta no WhatsApp consulta primeiro as apresentações disponíveis, antes da paginação, e só registra no contexto as opções efetivamente oferecidas. Consulta específica não troca concentração ou apresentação; números de uma consulta composta não podem coincidir com trechos de SKU/EAN para simular a apresentação solicitada. Oferta informa identificação e preço, sem lotes nem saldo interno; CTA é um segundo balão validado pelo processador, com checkpoint, registro de ID e verificação de pausa por parte. Sem disponibilidade, não oferece compra nem revela preço de cadastro inativo ou sem saldo.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

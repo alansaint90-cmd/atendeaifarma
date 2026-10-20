@@ -421,6 +421,8 @@ function analyzeFile(file) {
       msg: "Configurações não pode exibir nem editar o prompt legado do orquestrador." });
   }
 
+  if ((rel === "src/lib/farmacia/agente.ts" && (!/disponibilidade:"disponivel"/.test(content) || !/mensagens:\[/.test(content) || !/ofertados/.test(content))) || (rel === "src/lib/farmacia/catalogo.ts" && !/const identificador\s*=\s*termos\.length===1/.test(content)))
+    findings.push({ level:"error", id:"farmacia-oferta-disponivel", file:rel, line:1, msg:"Oferta exige disponíveis, contexto dos ofertados, CTA separado e busca composta sem fragmentos de SKU/EAN." });
   if (rel === "src/lib/farmacia/importacao.ts" && !/importacaoSchema\.parse[\s\S]*banco\.transaction[\s\S]*travarEstoque\(tx\)[\s\S]*autorizar\(tx[\s\S]*salvarProdutoNaTransacao\(tx/.test(content)) {
     findings.push({ level:"error", id:"farmacia-importacao", file:rel, line:1, msg:"Importação exige validação, transação única, trava, autorização e cadastro auditado compartilhado." });
   }

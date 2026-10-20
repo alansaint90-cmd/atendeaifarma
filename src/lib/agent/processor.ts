@@ -5,6 +5,7 @@ import { ProviderError, type Turn, type RespostaGerada } from "./providers";
 import { extrairNomeInformado, instrucoesComNome, respostaComNome, personaDoAgente, mesmoNome, removerRotuloDaPersona } from "./nome";
 import { deveConsultarAgenda } from "../consultas/intencao";
 import { mensagensDaConsulta } from "../consultas/fluxo";
+import { z } from "zod";
 
 export interface DeliveryState { status: "gerando" | "gerada" | "enviando" | "enviada" | "incerta" | "falhou"; attempts: number; reply?: string; partes?: string[]; providerIds?: string[]; transcript?: string; code?: string; configHash?: string; providerId?: string; transferencia?: boolean; consulta?: boolean }
 export interface ProcessingPort {
@@ -82,6 +83,10 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
       const gerada = cadastro ?? (partes ? partes.join("\n\n") : message.midia && config.atendimento?.transferMedia ? { transferir: true as const }
         : await port.generate({ ...config, AI_SYSTEM_PROMPT: instrucoes }, contextoAtual, transcript ?? message.text));
       if (cadastro) { consulta = true; partes = undefined; reply = cadastro; }
+      else if (typeof gerada !== "string" && "mensagens" in gerada) {
+        partes = z.array(z.string().trim().min(1).max(6000)).min(1).max(3).parse(gerada.mensagens);
+        reply = partes.join("\n\n");
+      }
       else if (typeof gerada !== "string" && "agendar" in gerada) {
         if (!config.agendaConsultas || !port.cadastroConsulta) throw new ProviderError("agenda_indisponivel");
         const inicio = await port.cadastroConsulta(transcript ?? message.text, true);
