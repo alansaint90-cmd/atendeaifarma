@@ -53,6 +53,8 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--marca-acao); }
 .message.agent, .bubble.agent, .bubble.bot { background: #eeebff; }
 .auth-shell { background: #f9fafc; grid-template-columns: minmax(0, 1fr); justify-items: center; }
 .auth-panel { width: min(100%, 560px); padding: clamp(28px, 4vw, 64px); }
+.auth-panel > .marca.large { align-items: flex-start; }
+.auth-panel > .marca.large .marca-textos { padding-top: 18px; }
 .auth-panel h1 { letter-spacing: -1.5px; font-size: clamp(30px, 3vw, 42px); }
 .form-card > [role="alert"] { margin: 0; padding: 12px 14px; border: 1px solid #f5b6b8; border-radius: 10px; background: #fff0f1; color: #9f2027; font-weight: 700; line-height: 1.45; }
 .auth-preview { position: relative; overflow: hidden; min-height: 100vh; padding: clamp(32px, 5vw, 88px); color: white; background: radial-gradient(ellipse at 80% 0%, #6338d766, transparent 52%), radial-gradient(ellipse at 0% 100%, #06b6d42e, transparent 50%), #080d20; }
