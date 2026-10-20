@@ -136,6 +136,7 @@ try {
   /** @type {[string, () => void][]} */
   const CHECAGENS = [
     ["oferta sem filtro de disponíveis e CTA separado reprova", reprova("farmacia/agente.ts", "farmacia-oferta-disponivel")],
+    ["pedido sem fluxo persistido reprova", reprova("farmacia/agente.ts", "farmacia-pedido-cliente")],
     ["busca sem separar identificador de apresentação reprova", reprova("farmacia/catalogo.ts", "farmacia-oferta-disponivel")],
     ["estoque sem ordem alfabética normalizada reprova", reprova("farmacia/catalogo.ts", "farmacia-ordem-alfabetica")],
     ["importação sem transação única e validação reprova", reprova("farmacia/importacao.ts", "farmacia-importacao")],

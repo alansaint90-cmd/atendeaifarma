@@ -2,11 +2,13 @@ import { z } from "zod";
 import type { AgentConfig } from "../agent/config";
 import { ProviderError, type Turn } from "../agent/providers";
 import { instrucoesInterpretacaoFarmacia } from "./prompt";
-export const intencaoSchema=z.strictObject({acao:z.enum(["buscar","criar_pedido","reservar","consultar_pedido","humano","saudacao","esclarecer"]),
+import { pagamentoSchema } from "./pagamento";
+const acoes=["buscar","criar_pedido","reservar","consultar_pedido","humano","saudacao","esclarecer","adicionar","finalizar","pagamento"] as const;
+export const intencaoSchema=z.strictObject({acao:z.enum(acoes),pagamento:pagamentoSchema.nullable().default(null),
   termo:z.string().max(120),pedidoId:z.string().max(36),campo:z.enum(["","produto","concentracao","apresentacao","quantidade","escolha"]).default(""),itens:z.array(z.strictObject({produtoId:z.uuid(),quantidade:z.number().int().min(1).max(10000)})).max(50)});
-export interface ContextoFarmacia { conversaId:string;contatoId:string;produtos:{id:string;nome:string;concentracao:string;apresentacao:string}[];pedidos:{id:string;numero:string;status:string}[] }
+export interface ContextoFarmacia { conversaId:string;contatoId:string;produtos:{id:string;nome:string;concentracao:string;apresentacao:string}[];pedidos:{id:string;numero:string;status:string;etapa?:string;pagamento?:string|null}[] }
 export async function interpretarIntencao(config:AgentConfig,historico:Turn[],texto:string,contexto:ContextoFarmacia,request=fetch) {
-  const properties={acao:{type:"string",enum:["buscar","criar_pedido","reservar","consultar_pedido","humano","saudacao","esclarecer"]},termo:{type:"string"},pedidoId:{type:"string"},campo:{type:"string",enum:["","produto","concentracao","apresentacao","quantidade","escolha"]},itens:{type:"array",items:{type:"object",properties:{produtoId:{type:"string"},quantidade:{type:"integer"}},required:["produtoId","quantidade"],additionalProperties:false}}};
+  const properties={acao:{type:"string",enum:acoes},pagamento:{anyOf:[{type:"null"},{type:"object",properties:{forma:{type:"string",enum:["pix","dinheiro","cartao"]},troco:{type:"string",enum:["pendente","nao","sim"]},valor:{type:"string"}},required:["forma","troco","valor"],additionalProperties:false}]},termo:{type:"string"},pedidoId:{type:"string"},campo:{type:"string",enum:["","produto","concentracao","apresentacao","quantidade","escolha"]},itens:{type:"array",items:{type:"object",properties:{produtoId:{type:"string"},quantidade:{type:"integer"}},required:["produtoId","quantidade"],additionalProperties:false}}};
   let response:Response;
   try { response=await request("https://api.openai.com/v1/responses",{method:"POST",redirect:"error",signal:AbortSignal.timeout(45000),headers:{Authorization:`Bearer ${config.OPENAI_API_KEY}`,"Content-Type":"application/json"},
     body:JSON.stringify({model:config.OPENAI_MODEL,store:false,max_output_tokens:900,parallel_tool_calls:false,tool_choice:{type:"function",name:"atender_farmacia"},

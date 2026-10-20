@@ -16,6 +16,7 @@ Reutilizar Next App Router, React, TypeScript, Drizzle/postgres-js, Evolution, R
 - Modelo usa função estrita; servidor redige fatos comerciais. tool_choice nomeado, strict e parallel_tool_calls=false seguem [documentação oficial](https://developers.openai.com/api/docs/guides/function-calling).
 - Devolução entregue vai para quarentena bloqueada. Sem reembolso ou liberação sanitária automática.
 - Oportunidade acompanha venda/cancelamento; fechamento manual avulso bloqueado.
+- Preferência de pagamento e etapa comercial do WhatsApp usam eventos auditados existentes, sem nova tabela ou status financeiro. O contexto é reconstruído pelo pedido da conversa; eventos recebem instantes crescentes por pedido sob a trava transacional para desempatar operações no mesmo milissegundo. Acréscimos reaproveitam a validação do cadastro de pedido e uma chave com assinatura dos itens, sem duplicar o pedido ou aceitar a mesma operação com outros dados.
 - Tema da base, modal de três segundos, erro explícito e atualização de dez segundos. Prévia clínica indisponível.
 
 ## Limites

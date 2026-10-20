@@ -1,18 +1,35 @@
 import { randomUUID, createHash } from "node:crypto";
+import { z } from "zod";
 import { sql } from "drizzle-orm";
 import { linhas, type BancoSql, type TransacaoSql } from "../db/porta";
 import { ErroDeNegocio } from "../acao";
 import { centavos, decimal, novoPedidoSchema, comandoPedidoSchema, habilitacaoSchema } from "./validacao";
 import { autorizar, evento, auditar, elegivel, reservaAtiva, travarEstoque, type AtorFarmacia } from "./comum";
 import { reservarItens, confirmarItens, cancelarItens } from "./transacoes";
-import { criarNegociacao, sincronizarNegociacao } from "./crm";
+import { criarNegociacao, sincronizarNegociacao, atualizarValorNegociacao } from "./crm";
 
 export interface PedidoInterno { id:string; status:string; contato_id:string; conversa_id:string|null; total:string; confirmado_em:string|null; conferido_por:string|null }
-export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: unknown) {
+export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: unknown, acrescentarId?: string) {
   const v = novoPedidoSchema.parse(entrada);
+  if(acrescentarId)z.uuid().parse(acrescentarId);
   if (new Set(v.itens.map(i=>i.produtoId)).size!==v.itens.length) throw new ErroDeNegocio("Agrupe as quantidades do mesmo produto.");
+  const operacao=createHash("sha256").update(v.chave).digest("hex");
+  const assinatura=createHash("sha256").update(JSON.stringify([...v.itens].sort((a,b)=>a.produtoId.localeCompare(b.produtoId)))).digest("hex");
+  const chaveAcrescimo=`acrescentar:${operacao}:${assinatura}`;
   return banco.transaction(async tx => {
     await travarEstoque(tx); const autor = await autorizar(tx,ator,"operador",true);
+    if(acrescentarId) {
+      const [anterior]=linhas<{id:string}>(await tx.execute(sql`SELECT id FROM atendeia_pedidos WHERE id=${acrescentarId} AND contato_id=${v.contatoId} AND conversa_id=${v.conversaId} AND status IN ('aguardando_confirmacao','aguardando_pagamento') AND is_deleted=false FOR UPDATE`));
+      if(!anterior)throw new ErroDeNegocio("Pedido indisponível para acrescentar itens.");
+      const [repeticao]=linhas<{chave:string}>(await tx.execute(sql`SELECT chave FROM atendeia_pedidos_eventos WHERE pedido_id=${anterior.id} AND starts_with(chave,${`acrescentar:${operacao}:`}) AND is_deleted=false`));
+      if(repeticao){if(repeticao.chave!==chaveAcrescimo)throw new ErroDeNegocio("Operação já utilizada com outros itens.");return anterior.id;}
+      const anteriores=linhas<{produtoId:string;quantidade:number}>(await tx.execute(sql`SELECT produto_id "produtoId",quantidade FROM atendeia_pedidos_itens WHERE pedido_id=${anterior.id} AND is_deleted=false`));
+      const somados=new Map(anteriores.map(i=>[i.produtoId,i.quantidade]));
+      for(const i of v.itens)somados.set(i.produtoId,(somados.get(i.produtoId)??0)+i.quantidade);
+      v.itens=[...somados].map(([produtoId,quantidade])=>({produtoId,quantidade}));
+      novoPedidoSchema.parse(v);
+      await tx.execute(sql`UPDATE atendeia_pedidos_reservas SET status='liberada',updated_at=clock_timestamp(),modified_by=${autor} WHERE pedido_id=${anterior.id} AND status='ativa' AND is_deleted=false`);
+    }
     const [repetido] = linhas<{id:string;contato_id:string;conversa_id:string|null}>(await tx.execute(sql`SELECT id,contato_id,conversa_id FROM atendeia_pedidos WHERE chave=${v.chave} AND is_deleted=false`));
     if (repetido) {
       const anteriores=linhas<{produtoId:string;quantidade:number}>(await tx.execute(sql`SELECT produto_id "produtoId",quantidade FROM atendeia_pedidos_itens WHERE pedido_id=${repetido.id} AND is_deleted=false ORDER BY produto_id`));
@@ -35,7 +52,14 @@ export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: 
       total += centavos(p.preco)*BigInt(item.quantidade);
       itens.push({produtoId:p.id,quantidade:item.quantidade,preco:p.preco,descricao:`${p.nome} ${p.concentracao} — ${p.apresentacao}, ${p.embalagem} por embalagem`});
     }
-    const id = randomUUID(); const numero = `F-${id.slice(0,8).toUpperCase()}-${id.slice(9,13).toUpperCase()}`;
+    const id = acrescentarId??randomUUID(); const numero = `F-${id.slice(0,8).toUpperCase()}-${id.slice(9,13).toUpperCase()}`;
+    if(acrescentarId) {
+      await tx.execute(sql`UPDATE atendeia_pedidos SET total=${decimal(total)},status='aguardando_confirmacao',conferido_por=NULL,conferencia=NULL,updated_at=clock_timestamp(),modified_by=${autor} WHERE id=${id} AND is_deleted=false`);
+      for(const i of itens)await tx.execute(sql`INSERT INTO atendeia_pedidos_itens(pedido_id,produto_id,quantidade,preco,descricao,modified_by) VALUES (${id},${i.produtoId},${i.quantidade},${i.preco},${i.descricao},${autor}) ON CONFLICT (pedido_id,produto_id) DO UPDATE SET quantidade=EXCLUDED.quantidade,preco=EXCLUDED.preco,descricao=EXCLUDED.descricao,updated_at=clock_timestamp(),modified_by=EXCLUDED.modified_by`);
+      await evento(tx,autor,id,"itens_acrescentados","Itens acrescentados; aguarda nova confirmação.",chaveAcrescimo);
+      await atualizarValorNegociacao(tx,autor,id);
+      return id;
+    }
     await tx.execute(sql`INSERT INTO atendeia_pedidos(id,numero,contato_id,conversa_id,responsavel_id,status,origem,total,chave,modified_by)
       VALUES (${id},${numero},${v.contatoId},${v.conversaId},${"sistema" in ator ? null : autor},'aguardando_confirmacao',${"sistema" in ator ? "whatsapp_ia" : "painel"},${decimal(total)},${v.chave},${autor})`);
     for (const i of itens) await tx.execute(sql`INSERT INTO atendeia_pedidos_itens(pedido_id,produto_id,quantidade,preco,descricao,modified_by) VALUES (${id},${i.produtoId},${i.quantidade},${i.preco},${i.descricao},${autor})`);

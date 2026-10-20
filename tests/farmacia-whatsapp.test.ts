@@ -153,5 +153,28 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.match(r.texto,/encaminhamento automático está indisponível/);
       assert.equal(transferencias,antes);
     });
+    await t.test("pedido confirma, acrescenta no mesmo registro e pergunta pagamento sem expor códigos",async()=>{
+      const r=await atender("Quero uma embalagem de dipirona",{acao:"criar_pedido",itens:[{produtoId:id,quantidade:1}]});
+      assert.equal(r.mensagens.length,2);assert.match(r.mensagens[0],/Pedido registrado:.*Dipirona.*R\$ 9,50/s);
+      assert.equal(r.mensagens[1],"Confirma os itens para fazer a compra?");
+      assert.doesNotMatch(r.texto,/F-[A-Z0-9-]+|válida até|temporariamente/);
+      const p=(await cliente.query<{id:string;numero:string}>("SELECT id,numero FROM atendeia_pedidos")).rows[0];
+      assert.equal((await atender("Sim",{acao:"reservar",pedidoId:p.id})).texto,"Itens confirmados. Deseja acrescentar mais alguma coisa?");
+      assert.equal((await atender("Sim",{acao:"adicionar",pedidoId:p.id})).texto,"Qual produto você deseja acrescentar ao pedido?");
+      const acrescimo=await atender("Mais uma dipirona",{acao:"criar_pedido",itens:[{produtoId:id,quantidade:1}]});
+      assert.match(acrescimo.texto,/2 ×.*Total: R\$ 19,00/s);
+      assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,1);
+      await atender("Sim",{acao:"reservar",pedidoId:p.id});
+      const fim=await atender("Não, só isso",{acao:"finalizar",pedidoId:p.id});
+      assert.deepEqual(fim.mensagens,["Pedido registrado, aguardando pagamento.","Qual forma de pagamento você prefere: Pix, dinheiro ou cartão?"]);
+      const dinheiro=await atender("Dinheiro",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"dinheiro",troco:"pendente",valor:"0.00"}});
+      assert.match(dinheiro.texto,/na entrega.*precisar de troco/s);
+      assert.match((await atender("Sim",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"dinheiro",troco:"sim",valor:"0.00"}})).texto,/qual valor/);
+      assert.match((await atender("Para 50 reais",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"dinheiro",troco:"sim",valor:"50.00"}})).texto,/Troco para R\$ 50,00/);
+      assert.match((await atender("Prefiro cartão",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"cartao",troco:"pendente",valor:"0.00"}})).texto,/maquininha/);
+      assert.doesNotMatch((await atender("Como está meu pedido?",{acao:"consultar_pedido",pedidoId:p.id})).texto,new RegExp(`${p.numero}|válida até`));
+      assert.equal((await consultarProdutos(banco,admin,{termo:"DIP-30-TESTE"})).produtos[0].fisico,28);
+      assert.equal((await cliente.query<{status:string}>("SELECT status FROM atendeia_pedidos WHERE id=$1",[p.id])).rows[0].status,"aguardando_pagamento");
+    });
   } finally {await cliente.close();}
 });

@@ -162,6 +162,8 @@ Tarefa que toca login ou conta: siga também `docs/seguranca-login.md`.
 
 ## Escopo da farmácia
 
+Pedido no WhatsApp não expõe número interno ou prazo de reserva. Confirma itens, pergunta acréscimos e só depois pergunta pagamento em balão separado. Acréscimos atualizam o mesmo pedido, revalidam preços/saldo, liberam reserva anterior e exigem nova confirmação. Preferência Pix/dinheiro/cartão e troco são eventos auditados do pedido; não confirmam pagamento, venda ou baixa. Pix usa apenas FARMACIA_PIX_CHAVE configurada; sem chave solicita equipe. Dinheiro e cartão são combinados para entrega, com troco e maquininha registrados.
+
 Instalação isolada por farmácia. Reutilizar o schema ativo e a conexão postgres-js, não os modelos de referência de usuários/auditoria. Regras clínicas e comerciais de outros projetos não se aplicam. Histórico de migrações herdado é imutável; não importar dados, prompts ou credenciais da aplicação original. Novos módulos usam src/lib/farmacia. Valores e disponibilidade vêm do PostgreSQL; somente humano autorizado confirma a venda; somente farmacêutico habilitado confere receitas. Toda mutação de estoque toma a trava transacional antes das linhas. Movimentações e eventos são históricos e não podem ser removidos pela aplicação.
 
 Consulte docs/adr/0014-farmacia.md e docs/regras-negocio.md. PostgreSQL 16 real é obrigatório para teste de concorrência; PGlite é apenas validação complementar.

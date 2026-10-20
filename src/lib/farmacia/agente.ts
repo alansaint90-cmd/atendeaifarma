@@ -11,6 +11,7 @@ import { listarPedidos } from "./consultas";
 import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
 import { personaDoAgente } from "../agent/nome";
+import { registrarEtapaPedido, respostaPagamento } from "./pagamento";
 const sistema={sistema:true} as const;
 export function respostaProduto(produtos:Produto[],total:number):RespostaGerada {
   if(!produtos.length)return "Não encontrei esse produto no catálogo. Informe o nome, a concentração ou o código de barras. Posso encaminhar a consulta à equipe.";
@@ -31,7 +32,10 @@ async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMess
   if(!c)throw new ErroDeNegocio("Conversa indisponível.");
   const produtos=linhas<ContextoFarmacia["produtos"][number]>(await banco.execute(sql`SELECT DISTINCT p.id,p.nome,p.concentracao,p.apresentacao FROM atendeia_produtos_consultas q
     JOIN atendeia_produtos p ON p.id=q.produto_id WHERE q.conversa_id=${c.id} AND q.created_at>now()-interval '24 hours' AND q.is_deleted=false AND p.is_deleted=false LIMIT 40`));
-  const pedidos=linhas<ContextoFarmacia["pedidos"][number]>(await banco.execute(sql`SELECT id,numero,status FROM atendeia_pedidos WHERE conversa_id=${c.id} AND is_deleted=false ORDER BY created_at DESC LIMIT 10`));
+  const pedidos=linhas<ContextoFarmacia["pedidos"][number]>(await banco.execute(sql`SELECT p.id,p.numero,p.status,
+    (SELECT tipo FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.is_deleted=false ORDER BY e.created_at DESC,e.id DESC LIMIT 1) etapa,
+    (SELECT detalhe FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.tipo='pagamento' AND e.is_deleted=false ORDER BY e.created_at DESC,e.id DESC LIMIT 1) pagamento
+    FROM atendeia_pedidos p WHERE p.conversa_id=${c.id} AND p.is_deleted=false ORDER BY p.created_at DESC,p.id LIMIT 10`));
   return {conversaId:c.id,contatoId:c.contato_id,produtos,pedidos};
 }
 export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,intencao:unknown,identidade:string):Promise<RespostaGerada> {
@@ -57,18 +61,27 @@ export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,i
   }
   if(a.acao==="criar_pedido") {
     if(!a.itens.length||a.itens.some(i=>!contexto.produtos.some(p=>p.id===i.produtoId)))return "Consulte primeiro os produtos e escolha a apresentação desejada.";
-    const id=await criarPedido(banco,sistema,{contatoId:contexto.contatoId,conversaId:contexto.conversaId,chave:`ia:${identidade}`,itens:a.itens});
+    const pendente=contexto.pedidos.find(p=>["aguardando_confirmacao","aguardando_pagamento"].includes(p.status)&&(!a.pedidoId||p.id===a.pedidoId));
+    if(a.pedidoId&&!pendente)return "Não encontrei esse pedido em andamento neste atendimento. Nossa equipe pode ajudar.";
+    const id=await criarPedido(banco,sistema,{contatoId:contexto.contatoId,conversaId:contexto.conversaId,chave:`ia:${identidade}`,itens:a.itens},pendente?.id);
     const [p]=(await listarPedidos(banco,sistema,{id})).pedidos;
-    return `Pedido ${p.numero} registrado:\n${p.itens.map(i=>`${i.quantidade} × ${i.descricao} — R$ ${i.preco.replace(".",",")} cada`).join("\n")}\nTotal: R$ ${p.total.replace(".",",")}.\nConfirma esses itens para reservar temporariamente? A venda e o pagamento ainda não foram confirmados.${p.itens.some(i=>i.receita) ? " A liberação exige conferência do farmacêutico." : ""}`;
+    return {mensagens:[`Pedido registrado:\n${p.itens.map(i=>`${i.quantidade} × ${i.descricao} — R$ ${i.preco.replace(".",",")} cada`).join("\n")}\nTotal: R$ ${p.total.replace(".",",")}.${p.itens.some(i=>i.receita)?" A liberação exige conferência do farmacêutico.":""}`,"Confirma os itens para fazer a compra?"]};
   }
   if(!contexto.pedidos.some(p=>p.id===a.pedidoId))return "Não encontrei esse pedido neste atendimento. Nossa equipe pode ajudar.";
   if(a.acao==="reservar") {
     const hash=createHash("sha256").update(`reserva:${identidade}`).digest("hex");
     const chave=`${hash.slice(0,8)}-${hash.slice(8,12)}-4${hash.slice(13,16)}-8${hash.slice(17,20)}-${hash.slice(20,32)}`;
     await executarPedido(banco,sistema,{id:a.pedidoId,acao:"reservar",chave,referencia:"Itens confirmados no WhatsApp"});
+    return "Itens confirmados. Deseja acrescentar mais alguma coisa?";
+  }
+  if(a.acao==="adicionar"||a.acao==="finalizar"||a.acao==="pagamento") {
+    await registrarEtapaPedido(banco,{id:a.pedidoId,conversaId:contexto.conversaId,chave:identidade,etapa:a.acao,...(a.acao==="pagamento"?{pagamento:a.pagamento}:{} )});
+    if(a.acao==="adicionar")return "Qual produto você deseja acrescentar ao pedido?";
+    if(a.acao==="pagamento")return respostaPagamento(a.pagamento!);
+    return {mensagens:["Pedido registrado, aguardando pagamento.","Qual forma de pagamento você prefere: Pix, dinheiro ou cartão?"]};
   }
   const [p]=(await listarPedidos(banco,sistema,{id:a.pedidoId})).pedidos;
-  return `Pedido ${p.numero}: ${p.status.split("_").join(" ")}. Total: R$ ${p.total.replace(".",",")}.${p.expira ? ` Reserva válida até ${new Date(p.expira).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo"})} (Brasília).` : ""}${p.status==="aguardando_pagamento" ? " A equipe precisa conferir o pagamento antes de confirmar a venda." : ""}`;
+  return `Seu pedido está ${p.status.split("_").join(" ")}. Total: R$ ${p.total.replace(".",",")}.${p.status==="aguardando_pagamento"?" O pagamento será conferido pela equipe.":""}`;
 }
 export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage,request=fetch) {
   return async(config:AgentConfig,historico:Turn[],texto:string):Promise<RespostaGerada>=>{

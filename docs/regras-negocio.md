@@ -22,6 +22,8 @@ Gerente altera cadastro e ajusta inventário; operador registra entrada. Ajuste 
 
 ## Pedidos
 
+No WhatsApp, o resumo mostra produtos, especificação, quantidade, preços e total, sem código interno nem prazo da reserva. Pergunta a confirmação dos itens em outro balão. Depois da confirmação, pergunta se deseja acrescentar produtos: sim continua no mesmo pedido; não encerra os itens e envia “Pedido registrado, aguardando pagamento.” e a pergunta Pix/dinheiro/cartão em balões separados. Acréscimos revalidam todo o carrinho, liberam reservas antigas e exigem nova confirmação, sem duplicar eventos repetidos. Preferências e troco persistem como eventos auditados e aparecem no histórico do painel. Pix envia somente FARMACIA_PIX_CHAVE e recebedor opcional FARMACIA_PIX_RECEBEDOR; sem configuração, solicita a equipe. Dinheiro: pagamento na entrega, pergunta necessidade de troco e valor. Cartão: maquininha acompanha o entregador. Nenhuma escolha ou comprovante confirma pagamento nem baixa estoque. A expiração da reserva continua existindo no sistema.
+
 Pedido nasce aguardando confirmação, com preço do servidor, contato existente e itens únicos. Não reserva nem baixa. Confirmação dos itens cria reserva FEFO (menor validade elegível primeiro), com FARMACIA_RESERVA_MINUTOS de 1 a 120, padrão 15.
 
 Preço alterado antes da reserva exige recriar pedido. Após reserva, preço do pedido é preservado. Expiração libera disponibilidade imediatamente; renovar exige nova validação. Falha em qualquer item desfaz toda a transação.

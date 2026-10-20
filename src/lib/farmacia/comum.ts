@@ -24,7 +24,8 @@ export async function auditar(tx: TransacaoSql, autor: string, id: string, acao:
     VALUES (${acao},'farmacia',${id},'["operacao"]'::jsonb,${autor})`);
 }
 export async function evento(tx: TransacaoSql, autor: string, id: string, tipo: string, detalhe: string, chave: string) {
-  await tx.execute(sql`INSERT INTO atendeia_pedidos_eventos(pedido_id,tipo,detalhe,chave,modified_by) VALUES (${id},${tipo},${detalhe},${chave},${autor})`);
+  await tx.execute(sql`INSERT INTO atendeia_pedidos_eventos(pedido_id,tipo,detalhe,chave,modified_by,created_at)
+    VALUES (${id},${tipo},${detalhe},${chave},${autor},greatest(clock_timestamp(),(SELECT max(created_at)+interval '1 millisecond' FROM atendeia_pedidos_eventos WHERE pedido_id=${id} AND is_deleted=false)))`);
   await auditar(tx,autor,id,`pedido_${tipo}`);
 }
 export const hoje = sql`(now() AT TIME ZONE 'America/Sao_Paulo')::date`;

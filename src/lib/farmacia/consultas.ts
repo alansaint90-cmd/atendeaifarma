@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { linhas, type BancoSql } from "../db/porta";
 import { autorizar, elegivel, reservaAtiva, hoje, type AtorFarmacia } from "./comum";
+import { descreverPagamento } from "./pagamento";
 
 export interface PedidoLista { id:string; numero:string; cliente:string; telefone:string|null; total:string; status:string; origem:string; responsavel:string|null; data:string; conferencia:string|null; expira:string|null; conversaId:string|null; itens:{produtoId:string;descricao:string;quantidade:number;preco:string;receita:boolean}[]; eventos:{tipo:string;detalhe:string;data:string;autor:string}[] }
 export async function listarPedidos(banco:BancoSql,ator:AtorFarmacia,entrada:unknown) {
@@ -19,6 +20,7 @@ export async function listarPedidos(banco:BancoSql,ator:AtorFarmacia,entrada:unk
         FROM atendeia_pedidos_itens i JOIN atendeia_produtos pr ON pr.id=i.produto_id WHERE i.pedido_id=${p.id} AND i.is_deleted=false ORDER BY i.id`));
       p.eventos=linhas(await tx.execute(sql`SELECT e.tipo,e.detalhe,e.created_at::text data,u.name autor FROM atendeia_pedidos_eventos e JOIN atendeia_users u ON u.id=e.modified_by
         WHERE e.pedido_id=${p.id} AND e.is_deleted=false ORDER BY e.created_at,e.id`));
+      p.eventos=p.eventos.map(e=>e.tipo==="pagamento"?{...e,detalhe:descreverPagamento(e.detalhe)}:e);
     }
     return {pedidos,total:c.total};
   });

@@ -2,6 +2,11 @@ import { sql } from "drizzle-orm";
 import { linhas,type TransacaoSql } from "../db/porta";
 import { auditar } from "./comum";
 // Chamado dentro da mesma transação de pedido/estoque. Não usa o fechamento manual.
+export async function atualizarValorNegociacao(tx:TransacaoSql,autor:string,pedidoId:string) {
+  const [o]=linhas<{id:string}>(await tx.execute(sql`UPDATE atendeia_funis_oportunidades SET valor=(SELECT total FROM atendeia_pedidos WHERE id=${pedidoId} AND is_deleted=false),updated_at=clock_timestamp(),modified_by=${autor}
+    WHERE id=(SELECT oportunidade_id FROM atendeia_pedidos WHERE id=${pedidoId} AND is_deleted=false) AND status='aberta' AND is_deleted=false RETURNING id`));
+  if(o)await auditar(tx,autor,o.id,"crm_pedido_atualizado");
+}
 export async function criarNegociacao(tx:TransacaoSql,autor:string,pedidoId:string) {
   const [p]=linhas<{numero:string;total:string;contato_id:string;conversa_id:string|null}>(await tx.execute(sql`SELECT numero,total,contato_id,conversa_id FROM atendeia_pedidos WHERE id=${pedidoId} AND is_deleted=false`));
   await tx.execute(sql`INSERT INTO atendeia_funis(nome,modified_by) VALUES ('Vendas da farmácia',${autor}) ON CONFLICT DO NOTHING`);
