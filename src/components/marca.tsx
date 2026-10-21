@@ -1,11 +1,11 @@
 import { useId } from "react";
 
-interface MarcaProps { grande?: boolean; clara?: boolean; slogan?: boolean }
+interface MarcaProps { grande?: boolean; clara?: boolean }
 
 /** Versão vetorial da marca de referência, legível também no menu recolhido. */
-export function Marca({ grande = false, clara = false, slogan = false }: MarcaProps) {
+export function Marca({ grande = false, clara = false }: MarcaProps) {
   const gradiente = useId();
-  return <div className={`marca${grande ? " large" : ""}${clara ? " marca-clara" : ""}`} aria-label="Atende Aí Farmácia">
+  return <div className={`marca${grande ? " large" : ""}${clara ? " marca-clara" : ""}`} aria-label="Atende Farma">
     <svg className="marca-simbolo" width="48" height="54" viewBox="0 0 96 108" aria-hidden="true">
       <defs><linearGradient id={gradiente} x1="0" y1="1" x2="1" y2="0"><stop stopColor="#8B5CF6" /><stop offset=".48" stopColor="#6366F1" /><stop offset="1" stopColor="#06B6D4" /></linearGradient></defs>
       <path d="M49 25V13" stroke="#8B5CF6" strokeWidth="7" strokeLinecap="round" />
@@ -14,8 +14,7 @@ export function Marca({ grande = false, clara = false, slogan = false }: MarcaPr
       <rect x="17" y="38" width="62" height="45" rx="18" fill="#0F172A" />
       <path d="M29 59c0-9 12-9 12 0m14 0c0-9 12-9 12 0M41 70c4 4 10 4 14 0" fill="none" stroke={`url(#${gradiente})`} strokeWidth="5" strokeLinecap="round" />
     </svg>
-    <span className="marca-textos"><span className="marca-nome">Atende <span className="marca-ia">Aí</span></span><small>Farmácia</small>
-      {slogan && <span className="marca-slogan">Atendimento inteligente,<br />resultados reais.</span>}
+    <span className="marca-textos"><span className="marca-nome">Atende <span className="marca-ia">Farma</span></span><small>Farmácia</small>
     </span>
   </div>;
 }

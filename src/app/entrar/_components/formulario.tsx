@@ -69,7 +69,7 @@ export function FormularioLogin() {
   }
 
   return <section className="form-card">
-    <h1>Entrar no Atende AI</h1>
+    <h1>Entrar no Atende Farma</h1>
     <p>Acesse com seu e-mail e senha.</p>
     {erro && <p role="alert">{erro}</p>}
     <form onSubmit={e => { e.preventDefault(); void entrar(); }}>
