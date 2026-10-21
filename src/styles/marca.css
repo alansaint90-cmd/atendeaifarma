@@ -19,11 +19,14 @@ body { font-family: var(--font-inter), "Segoe UI", Arial, sans-serif; }
 a { color: var(--marca-acao); }
 .marca { display: flex; align-items: center; color: var(--text); gap: 10px; flex-shrink: 0; }
 .marca-simbolo { flex: 0 0 auto; width: 44px; height: 50px; }
-.marca-textos { display: flex; flex-direction: column; gap: 10px; }
-.marca-nome { font-weight: 800; font-size: 28px; letter-spacing: 0; line-height: 1; white-space: nowrap; }
+.marca-textos { display: flex; flex-direction: column; gap: 6px; }
+.marca-nome { font-weight: 600; font-size: 24px; letter-spacing: -.035em; line-height: 1.15; white-space: nowrap; }
 .marca-ia { color: var(--marca-acao); }
-.marca.large .marca-simbolo { width: 68px; height: 76px; }
-.marca.large .marca-nome { font-size: clamp(24px, 3vw, 46px); letter-spacing: 0; }
+@supports (background-clip: text) {
+  .marca-ia { background: linear-gradient(115deg, #6d28d9, #7c3aed 48%, #4f46e5); background-clip: text; -webkit-text-fill-color: transparent; }
+}
+.marca.large .marca-simbolo { width: 52px; height: 58px; }
+.marca.large .marca-nome { font-size: clamp(23px, 2.4vw, 32px); }
 .marca-clara { color: #fff; }
 .marca-clara .marca-ia { color: #a78bfa; }
 .sidebar .marca { padding: 0 16px 8px; }
@@ -52,7 +55,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--marca-acao); }
 .auth-shell { background: #f9fafc; grid-template-columns: minmax(0, 1fr); justify-items: center; }
 .auth-panel { width: min(100%, 560px); padding: clamp(28px, 4vw, 64px); }
 .auth-panel > .marca.large { align-items: flex-start; }
-.auth-panel > .marca.large .marca-textos { padding-top: 18px; }
+.auth-panel > .marca.large .marca-textos { padding-top: 12px; }
 .auth-panel h1 { letter-spacing: -1.5px; font-size: clamp(30px, 3vw, 42px); }
 .form-card > [role="alert"] { margin: 0; padding: 12px 14px; border: 1px solid #f5b6b8; border-radius: 10px; background: #fff0f1; color: #9f2027; font-weight: 700; line-height: 1.45; }
 .auth-preview { position: relative; overflow: hidden; min-height: 100vh; padding: clamp(32px, 5vw, 88px); color: white; background: radial-gradient(ellipse at 80% 0%, #6338d766, transparent 52%), radial-gradient(ellipse at 0% 100%, #06b6d42e, transparent 50%), #080d20; }
@@ -73,7 +76,7 @@ input[type="checkbox"], input[type="range"] { accent-color: var(--marca-acao); }
   .topbar { flex-direction: row; align-items: center; }
   .top-actions { margin-left: auto; }
   .sidebar .marca .marca-textos { display: flex; }
-  .sidebar .marca .marca-nome, .sidebar .marca .marca-ia { font-size: 25px; }
+  .sidebar .marca .marca-nome, .sidebar .marca .marca-ia { font-size: 22px; }
   .sidebar-collapsed .sidebar .marca .marca-textos { display: none; }
 }
 
