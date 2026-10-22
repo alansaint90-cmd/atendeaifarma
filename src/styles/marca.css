@@ -22,6 +22,7 @@ a { color: var(--marca-acao); }
 .marca-textos { display: flex; flex-direction: column; gap: 6px; }
 .marca-textos > small { font-size: clamp(9px, .8vw, 10px); font-weight: 400; line-height: 1.4; letter-spacing: -.01em; white-space: nowrap; color: var(--muted); }
 .marca-nome { font-weight: 600; font-size: 24px; letter-spacing: -.035em; line-height: 1.15; white-space: nowrap; }
+.marca-atende { font-weight: 800; letter-spacing: 0; }
 .marca-ia { color: var(--marca-acao); }
 @supports (background-clip: text) {
   .marca-ia { background: linear-gradient(115deg, #6d28d9, #7c3aed 48%, #4f46e5); background-clip: text; -webkit-text-fill-color: transparent; }

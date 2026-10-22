@@ -14,7 +14,7 @@ export function Marca({ grande = false, clara = false }: MarcaProps) {
       <rect x="17" y="38" width="62" height="45" rx="18" fill="#0F172A" />
       <path d="M29 59c0-9 12-9 12 0m14 0c0-9 12-9 12 0M41 70c4 4 10 4 14 0" fill="none" stroke={`url(#${gradiente})`} strokeWidth="5" strokeLinecap="round" />
     </svg>
-    <span className="marca-textos"><span className="marca-nome">Atende <span className="marca-ia">Farma</span></span><small>Atendimento inteligente, resultados reais</small>
+    <span className="marca-textos"><span className="marca-nome"><span className="marca-atende">Atende</span> <span className="marca-ia">Farma</span></span><small>Atendimento inteligente, resultados reais</small>
     </span>
   </div>;
 }
