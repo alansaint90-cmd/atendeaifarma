@@ -6,12 +6,12 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 192 |
+| Arquivos TS/TSX | 196 |
 | Tabelas (Drizzle) | 43 |
 | Server Actions (arquivos) | 14 |
 | Rotas de API | 7 |
 | Paginas | 5 |
-| Componentes | 30 |
+| Componentes | 32 |
 
 ## Arvore (profundidade 3)
 
@@ -53,6 +53,9 @@ components/
   consultas/
     paciente-form.tsx
     page.tsx
+  conversas/
+    avatar.tsx
+    caixa-entrada.tsx
   farmacia/
     atendimento.tsx
     comum.tsx
@@ -209,6 +212,8 @@ lib/
     atribuir-ia.ts
     consultas.ts
     evento.ts
+    fotos.ts
+    limites.ts
     painel.ts
     receber.ts
     transferir.ts
@@ -231,6 +236,7 @@ styles/
   automation.css
   base.css
   conta-menu.css
+  conversas.css
   design-juliana.css
   farmacia.css
   features.css

@@ -23,7 +23,7 @@ const webhookSchema = z.object({
   webhookBase64: z.boolean().optional(),
 });
 type Webhook = z.infer<typeof webhookSchema>;
-const eventosNecessarios = ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"];
+const eventosNecessarios = ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE", "CONTACTS_UPSERT", "CONTACTS_UPDATE"];
 export class ErroWebhookEvolution extends Error {}
 
 export async function sincronizarWebhooksConfigurados(values: unknown, origin: string, request: typeof fetch = fetch) {

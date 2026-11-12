@@ -16,7 +16,7 @@ test("sincronização confirma os três chips e informa falha parcial", async ()
   const request: typeof fetch = async (url, init) => {
     if (init?.method === "POST") { salvos.push(String(url)); return Response.json({ ok: true }); }
     return Response.json({ url: `${origin}/api/webhooks/evolution`, enabled: true,
-      events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"],
+      events: ["MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE", "CONTACTS_UPSERT", "CONTACTS_UPDATE"],
       headers: { "x-webhook-secret": values.EVOLUTION_WEBHOOK_SECRET } });
   };
   const configuracao = { ...values, EVOLUTION_SECOND_INSTANCE_NAME: "segundo", EVOLUTION_THIRD_INSTANCE_NAME: "levaelava" };
@@ -42,7 +42,7 @@ test("sincronização envia cabeçalho secreto, preserva eventos e confirma leit
     return Response.json(calls.length === 1
       ? { url: "https://antigo.example.test", events: ["CONTACTS_UPDATE"], headers: { "X-Existing": "valor" } }
       : { url: `${origin}/api/webhooks/evolution`, enabled: true, webhookByEvents: false, webhookBase64: false,
-        events: ["CONTACTS_UPDATE", "MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"],
+        events: ["CONTACTS_UPDATE", "MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE", "CONTACTS_UPSERT"],
         headers: { "X-Existing": "valor", "x-webhook-secret": values.EVOLUTION_WEBHOOK_SECRET } });
   };
   await sincronizarWebhookEvolution({ ...values, REDIS_URL: "redis://localhost:6379", AI_ENABLED: "false" }, origin, request);
@@ -55,7 +55,7 @@ test("sincronização envia cabeçalho secreto, preserva eventos e confirma leit
   assert.equal(body.webhook.url, `${origin}/api/webhooks/evolution`);
   assert.equal(body.webhook.byEvents, false);
   assert.equal(body.webhook.base64, false);
-  assert.deepEqual(body.webhook.events, ["CONTACTS_UPDATE", "MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE"]);
+  assert.deepEqual(body.webhook.events, ["CONTACTS_UPDATE", "MESSAGES_UPSERT", "MESSAGES_UPDATE", "CONNECTION_UPDATE", "CONTACTS_UPSERT"]);
 });
 
 test("sincronização recusa configuração incompleta e não confirma cabeçalho ausente", async () => {

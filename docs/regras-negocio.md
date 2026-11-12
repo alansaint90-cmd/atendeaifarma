@@ -58,6 +58,10 @@ Follow-ups/agendamentos preservados usam texto humano. Configure retomadas insti
 
 ## Indicadores e privacidade
 
+A listagem de contatos mostra até 150 registros recentes e informa o total de cadastros vivos, sem impor limite de armazenamento. Conversas apresentam lista de contatos, nome, foto quando disponível (iniciais como alternativa), prévia e canal à esquerda, e histórico com resposta manual à direita. No celular, as duas áreas alternam com retorno à lista. Atualização ocorre a cada dez segundos e por botão; mensagens novas não deslocam a leitura de quem subiu no histórico. Mantêm-se 50 conversas recentes e 50 mensagens por conversa, com indicação desse recorte. O componente visual em src/components/conversas não depende da farmácia e pode ser reutilizado nos outros sistemas com seus próprios adaptadores de dados e envio. Não implanta mudanças automaticamente em outros repositórios.
+
+Fotos são URLs HTTPS recebidas nos eventos contacts.upsert/contacts.update da Evolution pelo webhook autenticado da instância. Atualizam somente contatos vivos já vinculados ao canal; LID sem telefone não é inferido, URL inválida é ignorada e repetição não reaudita a mesma foto. A alteração tem trava por versão e auditoria na mesma transação. O navegador exibe a imagem sem enviar referência; URL expirada ou foto ausente usa iniciais. Não baixa mídia nem cria contatos apenas para foto. Após implantação, sincronizar o webhook pelo painel inclui os dois eventos de contato.
+
 Dashboard usa dados persistidos. Faturamento = vendas confirmadas não canceladas, não liquidação bancária ou escrituração fiscal. Atendimentos IA = conversas distintas com saída bot. Consultas agrupam evento sem multiplicar por apresentações.
 
 Autorização/validação no servidor; chaves privadas criptografadas. Pedidos não armazenam anexos de receita. Auditoria identifica operação/responsável sem copiar mensagens. Retenção, base legal, contratos com operadores e procedimentos sanitários precisam ser definidos pela operação antes da produção; não há certificação automática de conformidade.

@@ -3,6 +3,7 @@ import { systemUserId } from "../db/bootstrap";
 import { linhas, type BancoSql, type TransacaoSql } from "../db/porta";
 import type { EvolutionEvent } from "../evolution/schema";
 import { mensagensOperacionais } from "./evento";
+import { receberFotosContatos } from "./fotos";
 
 async function auditar(tx: TransacaoSql, entidade: string, id: string, campos: string[]) {
   await tx.execute(sql`INSERT INTO atendeia_audit_logs(action,entity_type,entity_id,changed_fields,modified_by)
@@ -11,6 +12,7 @@ async function auditar(tx: TransacaoSql, entidade: string, id: string, campos: s
 
 /** O recibo e os dados são confirmados juntos; uma repetição nunca abre outra conversa. */
 export async function receberOperacao(banco: BancoSql, evento: EvolutionEvent) {
+  if (evento.event === "contacts.upsert" || evento.event === "contacts.update") return receberFotosContatos(banco, evento);
   const mensagens = mensagensOperacionais(evento);
   if (!mensagens.length) return;
   await banco.transaction(async tx => {

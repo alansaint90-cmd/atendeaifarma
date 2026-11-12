@@ -30,9 +30,7 @@ const IGNORE_DIRS = new Set([
   "migrations", "drizzle", // SQL gerado por drizzle-kit
 ]);
 
-const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
-const JSX_EXT = new Set([".tsx", ".jsx"]);
-const SQL_EXT = new Set([".sql"]);
+const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]); const JSX_EXT = new Set([".tsx", ".jsx"]); const SQL_EXT = new Set([".sql"]);
 
 // Os proprios scripts de auditoria contem os padroes proibidos como DEFINICAO
 // de regra (ex.: o regex que detecta Prisma). Nunca auto-sinalizar.
@@ -427,6 +425,8 @@ function analyzeFile(file) {
   if (rel === "src/lib/farmacia/importacao.ts" && !/importacaoSchema\.parse[\s\S]*banco\.transaction[\s\S]*travarEstoque\(tx\)[\s\S]*autorizar\(tx[\s\S]*salvarProdutoNaTransacao\(tx/.test(content)) {
     findings.push({ level:"error", id:"farmacia-importacao", file:rel, line:1, msg:"Importação exige validação, transação única, trava, autorização e cadastro auditado compartilhado." });
   }
+  if ((rel === "src/lib/operacao/limites.ts" && !/LIMITE_CONTATOS\s*=\s*150\b/.test(content)) || (rel === "src/lib/operacao/consultas.ts" && !/LIMIT \$\{LIMITE_CONTATOS\}/.test(content)))
+    findings.push({level:"error",id:"contatos-limite-150",file:rel,line:1,msg:"Listagem deve usar o limite compartilhado de 150 contatos, preservando o total de cadastros."});
   return findings;
 }
 

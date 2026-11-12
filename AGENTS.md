@@ -162,6 +162,8 @@ Tarefa que toca login ou conta: siga também `docs/seguranca-login.md`.
 
 ## Escopo da farmácia
 
+Conversas usam componente compartilhável em duas colunas, com lista, foto ou iniciais, histórico e resposta por actions autenticadas. No celular, lista e conversa alternam com botão de voltar. Contatos exibem até 150 registros recentes, sem limitar o cadastro ou ocultar o total. Fotos HTTPS recebidas em eventos autenticados da Evolution atualizam apenas contatos vivos vinculados à instância, com versão e auditoria; evento de foto não cria contato nem dispara atendimento.
+
 Pedido no WhatsApp não expõe número interno ou prazo de reserva. Confirma itens, pergunta acréscimos e só depois pergunta pagamento em balão separado. Acréscimos atualizam o mesmo pedido, revalidam preços/saldo, liberam reserva anterior e exigem nova confirmação. Preferência Pix/dinheiro/cartão e troco são eventos auditados do pedido; não confirmam pagamento, venda ou baixa. Pix usa apenas FARMACIA_PIX_CHAVE configurada; sem chave solicita equipe. Dinheiro e cartão são combinados para entrega, com troco e maquininha registrados.
 
 Instalação isolada por farmácia. Reutilizar o schema ativo e a conexão postgres-js, não os modelos de referência de usuários/auditoria. Regras clínicas e comerciais de outros projetos não se aplicam. Histórico de migrações herdado é imutável; não importar dados, prompts ou credenciais da aplicação original. Novos módulos usam src/lib/farmacia. Valores e disponibilidade vêm do PostgreSQL; somente humano autorizado confirma a venda; somente farmacêutico habilitado confere receitas. Toda mutação de estoque toma a trava transacional antes das linhas. Movimentações e eventos são históricos e não podem ser removidos pela aplicação.

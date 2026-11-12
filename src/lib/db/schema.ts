@@ -57,7 +57,7 @@ export const departmentMembers = pgTable("atendeia_department_members", {
 
 export const contacts = pgTable("atendeia_contacts", {
   id: id(), name: text("name").notNull(), phone: text("phone"), email: text("email"),
-  source: text("source"), leadStatus: text("lead_status").notNull().default("novo"),
+  source: text("source"), fotoUrl: text("foto_url"), leadStatus: text("lead_status").notNull().default("novo"),
   score: integer("score").notNull().default(0), notes: text("notes"), ...audit(),
 }, t => [
   uniqueIndex("atendeia_contact_phone_active").on(t.phone).where(sql`${t.isDeleted} = false`),

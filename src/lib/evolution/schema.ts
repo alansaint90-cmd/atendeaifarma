@@ -11,7 +11,7 @@ export type WebhookConfig = z.infer<typeof webhookConfigSchema>;
 
 export const evolutionEventSchema = z.object({
   event: z.string().max(80).transform(value => value.toLowerCase().replaceAll("_", ".").replaceAll("-", "."))
-    .pipe(z.enum(["messages.upsert", "messages.update", "connection.update"])),
+    .pipe(z.enum(["messages.upsert", "messages.update", "connection.update", "contacts.upsert", "contacts.update"])),
   instance: z.string().min(1).max(100).regex(/^[\p{L}\p{N}_. -]+$/u),
   date_time: z.string().min(1).max(64).optional(),
   data: z.union([z.record(z.string(), z.unknown()), z.array(z.record(z.string(), z.unknown())).max(1000)]),

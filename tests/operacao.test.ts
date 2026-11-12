@@ -34,6 +34,20 @@ test("operacional grava dados reais, deduplica, audita e respeita exclusão lóg
       const auditorias = await cliente.query<{ quantidade: number }>("SELECT count(*)::int quantidade FROM atendeia_audit_logs WHERE is_deleted=false");
       assert.equal(auditorias.rows[0].quantidade, 6);
     });
+    await t.test("foto autenticada respeita instância, protocolo, repetição e exclusão lógica", async () => {
+      const contato={remoteJid:"5571999999999@s.whatsapp.net",profilePicUrl:"https://example.invalid/avatar.jpg"};
+      const foto:EvolutionEvent={event:"contacts.update",instance:"teste",data:contato};
+      await receberOperacao(banco,foto);await receberOperacao(banco,foto);
+      assert.equal((await consultarOperacao(banco)).conversas[0].fotoUrl,contato.profilePicUrl);
+      assert.equal((await cliente.query<{total:number}>("SELECT count(*)::int total FROM atendeia_audit_logs WHERE action='contato_foto_atualizada' AND is_deleted=false")).rows[0].total,1);
+      await receberOperacao(banco,{...foto,instance:"outra",data:{...contato,profilePicUrl:"https://example.invalid/outra.jpg"}});
+      await receberOperacao(banco,{...foto,data:{...contato,profilePicUrl:"javascript:foto"}});
+      await receberOperacao(banco,{...foto,data:{...contato,remoteJid:"1111111111@lid"}});
+      assert.equal((await consultarOperacao(banco)).conversas[0].fotoUrl,contato.profilePicUrl);
+      await receberOperacao(banco,{...foto,data:{...contato,profilePicUrl:null}});
+      assert.equal((await consultarOperacao(banco)).conversas[0].fotoUrl,null);
+      assert.equal((await consultarOperacao(banco)).totalContatos,1);
+    });
     await t.test("saída não renomeia contato; replay após fechamento não reabre conversa", async () => {
       const dado = mensagem("saida-1", true); dado.messageTimestamp += 1;
       await receberOperacao(banco, { event: "messages.upsert", instance: "teste", data: dado });
@@ -49,6 +63,13 @@ test("operacional grava dados reais, deduplica, audita e respeita exclusão lóg
       resumo = await consultarOperacao(banco);
       assert.equal(resumo.totalContatos, 0); assert.equal(resumo.abertas, 0); assert.equal(resumo.conversas.length, 0);
       assert.ok(resumo.volume.every(dia => dia.total === 0));
+    });
+    await t.test("exibe 150 contatos recentes sem limitar o cadastro e ignora excluídos", async () => {
+      await cliente.query("INSERT INTO atendeia_contacts(name,source,created_at,modified_by) SELECT 'Contato '||n,'Teste',now()-n*interval '1 second',(SELECT id FROM atendeia_users WHERE is_deleted=false LIMIT 1) FROM generate_series(1,151) n");
+      const resumo = await consultarOperacao(banco);
+      assert.equal(resumo.totalContatos,151);assert.equal(resumo.contatos.length,150);
+      assert.equal(resumo.contatos[0].nome,'Contato 1');assert.equal(resumo.contatos.at(-1)?.nome,'Contato 150');
+      assert.ok(!resumo.contatos.some(c=>c.nome==='Contato de teste'));
     });
     await t.test("falha reverte recibo e histórico juntos", async () => {
       await cliente.exec("CREATE FUNCTION falhar_mensagem() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'falha de teste'; END $$; CREATE TRIGGER falhar BEFORE INSERT ON atendeia_messages FOR EACH ROW EXECUTE FUNCTION falhar_mensagem();");

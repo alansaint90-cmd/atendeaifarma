@@ -31,7 +31,7 @@ aparecem quando a Evolution envia o respectivo messages.upsert, não só pela ch
 
 O painel exibe um snapshot consistente do banco e atualização manual. Banco vazio
 mostra zero/listas vazias; falta de autenticação ou erro não se apresenta como zero.
-Listas limitam a 100 contatos recentes, 50 conversas e 50 mensagens por conversa;
+Listas limitam a 150 contatos recentes, 50 conversas e 50 mensagens por conversa;
 contadores agregam todos os registros vivos. A caixa de entrada é consulta, sem
 simular envios ou transferências. Os demais módulos não integrados exibem seu estado
 de indisponibilidade, sem equipe, campanhas ou assinaturas inventadas.

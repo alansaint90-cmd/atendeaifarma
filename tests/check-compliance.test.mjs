@@ -43,6 +43,8 @@ const arquivoLongo = (linhas) =>
 const QUATRO = 'created_at: x, updated_at: x, deleted_at: x, is_deleted: x';
 
 const CASOS = {
+  "src/lib/operacao/limites.ts": "export const LIMITE_CONTATOS = 100;",
+  "src/lib/operacao/consultas.ts": "export const listar = () => 'LIMIT 100';",
   "src/lib/farmacia/agente.ts": "export function responder(produtos) { return produtos.map(p => p.nome); }",
   "src/lib/farmacia/catalogo.ts": "export function buscar(termo) { return consultarNomeESkuJuntos(termo); }",
   "src/lib/farmacia/importacao.ts": "export async function importarProdutos() { return 'importado'; }",
@@ -137,6 +139,8 @@ try {
   const CHECAGENS = [
     ["oferta sem filtro de disponíveis e CTA separado reprova", reprova("farmacia/agente.ts", "farmacia-oferta-disponivel")],
     ["pedido sem fluxo persistido reprova", reprova("farmacia/agente.ts", "farmacia-pedido-cliente")],
+    ["limite de contatos diferente de 150 reprova", reprova("operacao/limites.ts", "contatos-limite-150")],
+    ["consulta sem limite compartilhado reprova", reprova("operacao/consultas.ts", "contatos-limite-150")],
     ["busca sem separar identificador de apresentação reprova", reprova("farmacia/catalogo.ts", "farmacia-oferta-disponivel")],
     ["estoque sem ordem alfabética normalizada reprova", reprova("farmacia/catalogo.ts", "farmacia-ordem-alfabetica")],
     ["importação sem transação única e validação reprova", reprova("farmacia/importacao.ts", "farmacia-importacao")],
