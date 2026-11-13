@@ -59,6 +59,7 @@ test("resposta manual conserva conversa, texto e chave até confirmar o envio",a
   vi.mocked(assumirAtendimento).mockResolvedValue({ok:true,dados:undefined});
   vi.mocked(enviarMensagemManual).mockResolvedValueOnce({ok:false,erro:"Entrega incerta. Confira antes de reenviar."}).mockResolvedValueOnce({ok:true,dados:undefined});
   render(<AtendimentoManual id="conversa-selecionada" atualizar={vi.fn()}/>);
+  fireEvent.click(screen.getByRole("button",{name:"Ações do atendimento"}));
   fireEvent.click(screen.getByRole("button",{name:"Assumir conversa"}));
   await screen.findByText("Conversa assumida. A IA está pausada.");
   expect(assumirAtendimento).toHaveBeenCalledWith({id:"conversa-selecionada",assumir:true});

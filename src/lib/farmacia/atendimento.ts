@@ -25,7 +25,8 @@ export async function assumirConversa(banco:BancoSql,ator:SessaoAtiva,entrada:un
 export async function enviarManual(banco:BancoSql,ator:SessaoAtiva,entrada:unknown,dependencias:{settings:typeof effectiveSettings;send:typeof sendReply;sendMidia?:typeof enviarMidiaManual}={settings:effectiveSettings,send:sendReply}) {
   const v=z.strictObject({id:z.uuid(),texto:z.string().trim().max(4000),chave:z.uuid(),midia:midiaManualSchema.optional()}).refine(v=>!!v.texto||!!v.midia,"Digite uma mensagem ou anexe um arquivo.").refine(v=>!v.midia||v.midia.tipo!=="audio"||!v.texto,"Envie o áudio separado do texto.").refine(v=>!v.midia||v.texto.length<=1024,"A legenda deve ter até 1024 caracteres.").parse(entrada);
   const midia=v.midia?validarMidiaManual(v.midia):undefined;
-  const conteudo=midia?`${midia.tipo==="audio"?"[Áudio enviado]":"[Imagem enviada]"}${v.texto?` ${v.texto}`:""}`:v.texto;
+  const rotulos={audio:"Áudio",image:"Imagem",video:"Vídeo",document:"Documento"};
+  const conteudo=midia?`[${rotulos[midia.tipo]} ${midia.tipo==="image"?"enviada":"enviado"}]${v.texto?` ${v.texto}`:""}`:v.texto;
   const settings=await dependencias.settings();
   const envio=await banco.transaction(async tx=>{
     const autor=await autorizar(tx,ator);

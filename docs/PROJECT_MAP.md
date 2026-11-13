@@ -6,12 +6,12 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 200 |
+| Arquivos TS/TSX | 201 |
 | Tabelas (Drizzle) | 43 |
 | Server Actions (arquivos) | 14 |
 | Rotas de API | 7 |
 | Paginas | 5 |
-| Componentes | 33 |
+| Componentes | 34 |
 
 ## Arvore (profundidade 3)
 
@@ -63,6 +63,7 @@ components/
     dashboard.tsx
     estoque.tsx
     importar-produtos.tsx
+    menu-compositor.tsx
     pedido-form.tsx
     pedidos.tsx
     produto-form.tsx

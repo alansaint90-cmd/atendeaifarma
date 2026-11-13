@@ -23,11 +23,12 @@ test("seleciona imagem, mostra prévia e conserva anexo e chave após falha ince
 test("validação de canal mostra diagnóstico e arquivo não permitido não habilita envio",async()=>{
   vi.mocked(validarCanalAtendimento).mockResolvedValue({ok:false,erro:"WhatsApp desconectado."});
   render(<AtendimentoManual id="conversa-teste" atualizar={vi.fn()}/>);
+  fireEvent.click(screen.getByRole("button",{name:"Ações do atendimento"}));
   fireEvent.click(screen.getByRole("button",{name:"Validar canal"}));await screen.findByText("WhatsApp desconectado.");
   expect(validarCanalAtendimento).toHaveBeenCalledWith("conversa-teste");
   fireEvent.change(screen.getByLabelText("Arquivo de imagem"),{target:{files:[new File(["<svg/>"],"teste.svg",{type:"image/svg+xml"})]}});
   await screen.findByText(/Escolha uma imagem JPG/);
-  expect(screen.getByRole("button",{name:"Enviar pelo WhatsApp"})).toBeDisabled();
+  expect(screen.queryByRole("button",{name:"Enviar pelo WhatsApp"})).not.toBeInTheDocument();
 });
 test("microfone exige permissão, para a captura e oferece prévia antes de qualquer envio",async()=>{
   const parar=vi.fn();const getUserMedia=vi.fn().mockResolvedValue({getTracks:()=>[{stop:parar}]});
@@ -40,7 +41,7 @@ test("microfone exige permissão, para a captura e oferece prévia antes de qual
   const tela=render(<AtendimentoManual id="conversa-teste" atualizar={vi.fn()}/>);
   fireEvent.click(screen.getByRole("button",{name:"Gravar áudio"}));
   await screen.findByRole("button",{name:"Parar gravação"});expect(getUserMedia).toHaveBeenCalledWith({audio:true});
-  expect(screen.getByRole("button",{name:"Enviar pelo WhatsApp"})).toBeDisabled();
+  expect(screen.queryByRole("button",{name:"Enviar pelo WhatsApp"})).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button",{name:"Parar gravação"}));
   await screen.findByLabelText("Ouvir áudio antes de enviar");await waitFor(()=>expect(parar).toHaveBeenCalled());
   expect(enviarMensagemManual).not.toHaveBeenCalled();

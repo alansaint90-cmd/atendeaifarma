@@ -54,6 +54,26 @@
 .anexo-manual-previa { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:10px; }
 .anexo-manual-previa img { width:100px; height:80px; object-fit:contain; border:1px solid var(--line); border-radius:8px; }
 .anexo-manual-previa audio { max-width:100%; }
+.conversas-caixa .conversas-resposta { padding:6px 12px 10px; border-top:0; background:#f5f2eb; overflow:visible; max-height:none; position:relative; z-index:2; }
+.atendimento-manual .anexo-manual { margin:0; width:100%; }
+.atendimento-manual form { display:block; margin:0; }
+.compositor-acoes { display:flex; align-items:center; gap:6px; min-height:24px; margin-bottom:2px; }
+.compositor-aviso { color:var(--muted); font-size:11px; line-height:1.4; }
+.compositor-menu { position:relative; flex-shrink:0; }
+.atendimento-manual .compositor-acoes > .compositor-menu > button { display:flex; align-items:center; justify-content:center; width:28px; min-height:24px; padding:0; border:0; background:transparent; color:var(--muted); cursor:pointer; }
+.compositor-barra { display:flex; align-items:center; gap:2px; width:100%; min-height:52px; border:1px solid #e6e3df; border-radius:28px; padding:4px 6px; background:var(--surface); box-shadow:0 1px 4px #00000005; }
+.atendimento-manual .compositor-barra button { display:inline-flex; align-items:center; justify-content:center; min-width:40px; width:40px; min-height:40px; padding:0; margin:0; border:0; background:transparent; color:var(--text); cursor:pointer; }
+.atendimento-manual .compositor-barra textarea { flex:1; min-width:0; width:0; height:40px; min-height:40px; max-height:96px; padding:9px 6px; border:0; border-radius:0; background:transparent; font-size:14px; line-height:22px; resize:none; }
+.atendimento-manual .compositor-barra .compositor-enviar { background:var(--marca-acao); color:#fff; border-radius:50%; }
+.compositor-popup { position:absolute; bottom:calc(100% + 8px); left:0; min-width:190px; max-width:calc(100vw - 48px); padding:6px; border:1px solid var(--line); border-radius:14px; background:var(--surface); box-shadow:0 5px 22px #0f172a24; z-index:5; }
+.atendimento-manual .compositor-popup button,.atendimento-manual .compositor-popup a { display:flex; align-items:center; justify-content:flex-start; width:100%; min-height:40px; padding:8px 12px; margin:0; border:0; border-radius:8px; text-align:left; background:transparent; color:var(--text); font-size:13px; text-decoration:none; cursor:pointer; }
+.atendimento-manual .compositor-popup button:hover,.atendimento-manual .compositor-popup a:hover { background:var(--bg); }
+.compositor-popup small { display:block; padding:6px 12px; color:var(--muted); font-size:11px; }
+.compositor-emojis { display:grid; grid-template-columns:repeat(4,40px); }
+.atendimento-manual .compositor-emojis button { justify-content:center; padding:4px; font-size:21px; }
+.anexo-manual-previa { margin:0 0 8px; max-height:110px; overflow:auto; }
+.anexo-manual-previa video { max-width:180px; max-height:100px; }
+@media(max-width:640px) { .atendimento-manual .compositor-barra textarea { font-size:16px; } .compositor-barra { gap:0; padding:4px; } }
 .conversas-vazio { margin:18px; color:var(--muted); font-size:13px; line-height:1.7; }
 .conversas-sem-selecao { flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:30px; text-align:center; background:var(--bg); color:var(--muted); }
 .conversas-sem-selecao h2 { font-size:19px; color:var(--text); }

@@ -1,0 +1,42 @@
+import { afterEach,expect,test,vi } from "vitest";
+import { act,cleanup,fireEvent,render,screen } from "@testing-library/react";
+import { AtendimentoManual } from "@/components/farmacia/atendimento";
+import { assumirAtendimento } from "@/lib/actions/atendimento-farmacia";
+vi.mock("@/lib/actions/atendimento-farmacia",()=>({assumirAtendimento:vi.fn(),enviarMensagemManual:vi.fn(),validarCanalAtendimento:vi.fn()}));
+afterEach(()=>{cleanup();vi.resetAllMocks();vi.useRealTimers();});
+test("barra recolhe ações, oferece só os três anexos pedidos e fecha menu por Escape",()=>{
+  render(<AtendimentoManual id="teste" atualizar={vi.fn()}/>);
+  expect(screen.queryByRole("button",{name:"Assumir conversa"})).not.toBeInTheDocument();
+  expect(screen.getByPlaceholderText("Digite uma mensagem")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button",{name:"Adicionar anexo"}));
+  const grupo=screen.getByRole("group",{name:"Adicionar anexo"});
+  expect(grupo.querySelectorAll("button")).toHaveLength(3);
+  expect(screen.getByRole("button",{name:"Documento"})).toHaveFocus();
+  expect(screen.getByRole("button",{name:"Fotos e vídeos"})).toBeInTheDocument();
+  expect(screen.getByRole("button",{name:"Áudio",exact:true})).toBeInTheDocument();
+  fireEvent.keyDown(document,{key:"Escape"});
+  expect(screen.queryByRole("group",{name:"Adicionar anexo"})).not.toBeInTheDocument();
+  expect(screen.getByRole("button",{name:"Adicionar anexo"})).toHaveFocus();
+});
+test("emoji substitui seleção do texto e o microfone cede lugar ao envio",async()=>{
+  render(<AtendimentoManual id="teste" atualizar={vi.fn()}/>);
+  const campo=screen.getByLabelText("Mensagem do atendente") as HTMLTextAreaElement;
+  expect(screen.getByRole("button",{name:"Gravar áudio"})).toBeInTheDocument();
+  fireEvent.change(campo,{target:{value:"Olá xx"}});campo.setSelectionRange(4,6);
+  fireEvent.click(screen.getByRole("button",{name:"Inserir emoji"}));
+  await act(async()=>{fireEvent.click(screen.getByRole("button",{name:"Inserir 👍"}));});
+  expect(campo).toHaveValue("Olá 👍");expect(campo).toHaveFocus();
+  expect(screen.getByRole("button",{name:"Enviar pelo WhatsApp"})).toBeInTheDocument();
+  expect(screen.queryByRole("button",{name:"Gravar áudio"})).not.toBeInTheDocument();
+});
+test("confirmação some em quatro segundos e erro permanece para conferência",async()=>{
+  vi.useFakeTimers();vi.mocked(assumirAtendimento).mockResolvedValueOnce({ok:true,dados:undefined}).mockResolvedValueOnce({ok:false,erro:"Falha ao devolver."});
+  render(<AtendimentoManual id="teste" atualizar={vi.fn()}/>);
+  fireEvent.click(screen.getByRole("button",{name:"Ações do atendimento"}));
+  await act(async()=>{fireEvent.click(screen.getByRole("button",{name:"Assumir conversa"}));});
+  expect(screen.getByText("Conversa assumida. A IA está pausada.")).toBeInTheDocument();
+  act(()=>vi.advanceTimersByTime(4001));expect(screen.queryByText("Conversa assumida. A IA está pausada.")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button",{name:"Ações do atendimento"}));
+  await act(async()=>{fireEvent.click(screen.getByRole("button",{name:"Devolver à IA"}));});
+  act(()=>vi.advanceTimersByTime(5000));expect(screen.getByText("Falha ao devolver.")).toBeInTheDocument();
+});

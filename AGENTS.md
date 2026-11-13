@@ -162,6 +162,8 @@ Tarefa que toca login ou conta: siga também `docs/seguranca-login.md`.
 
 ## Escopo da farmácia
 
+Compositor compacto mantém Documento (PDF/DOCX), Fotos e vídeos (JPG/PNG/WebP, MP4/WebM) e Áudio no menu +, até 2 MB por arquivo. Emojis inserem no cursor. Microfone cede lugar ao envio quando há conteúdo. Ações de assumir/devolver ficam recolhidas; confirmações desaparecem após quatro segundos e erros permanecem para conferência. Documentos e vídeos usam o mesmo contrato validado, reserva e auditoria da mídia manual.
+
 Envio humano valida somente credenciais Evolution e a instância vinculada, sem exigir IA. Exige sessão, operador ativo e conversa assumida pelo autor. Texto, imagem e áudio compartilham reserva de envio e proteção contra entrega incerta. Mídia até 2 MB é validada por tipo e assinatura, sem URL remota ou armazenamento binário no CRM; histórico guarda marcador/legenda. Gravação exige permissão do microfone da própria origem, para em 60 segundos e oferece prévia antes do envio; libera a captura ao sair. Diagnóstico de canal não envia mensagem nem expõe credenciais.
 
 Dashboard filtra atividade comercial por Hoje, Ontem, 7, 15, 30 dias ou intervalo de até 366 dias, com início inclusivo e fim exclusivo após o último dia em Brasília. Pedidos e pendentes usam criação; vendas, faturamento e ranking usam confirmação; IA usa envio e consultas usam criação. Estoque sempre representa o saldo atual. Servidor valida as datas e a tela descarta respostas de filtros anteriores.
