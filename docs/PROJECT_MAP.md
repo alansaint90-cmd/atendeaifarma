@@ -6,12 +6,12 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 197 |
+| Arquivos TS/TSX | 200 |
 | Tabelas (Drizzle) | 43 |
 | Server Actions (arquivos) | 14 |
 | Rotas de API | 7 |
 | Paginas | 5 |
-| Componentes | 32 |
+| Componentes | 33 |
 
 ## Arvore (profundidade 3)
 
@@ -57,6 +57,7 @@ components/
     avatar.tsx
     caixa-entrada.tsx
   farmacia/
+    anexo-manual.tsx
     atendimento.tsx
     comum.tsx
     dashboard.tsx
@@ -189,6 +190,7 @@ lib/
     agente.ts
     atendimento.ts
     cadastro.ts
+    canal-manual.ts
     catalogo.ts
     comum.ts
     consultas.ts
@@ -196,6 +198,7 @@ lib/
     importacao-validacao.ts
     importacao.ts
     interpretar.ts
+    midia-manual.ts
     ordenacao.ts
     pagamento.ts
     pedidos.ts
@@ -396,7 +399,7 @@ _(colunas nao detectadas)_
 ## Server Actions
 
 - `src/lib/actions/agendamentos.ts`: `carregarAgendamentos()`, `gravarAgendamento()`, `cancelarEnvioAgendado()`
-- `src/lib/actions/atendimento-farmacia.ts`: `assumirAtendimento()`, `enviarMensagemManual()`
+- `src/lib/actions/atendimento-farmacia.ts`: `validarCanalAtendimento()`, `assumirAtendimento()`, `enviarMensagemManual()`
 - `src/lib/actions/chatbots.ts`: `carregarChatbots()`, `salvarChatbot()`
 - `src/lib/actions/consultas.ts`: `carregarResumoAgenda()`, `carregarAgendaConsultas()`, `confirmarConsulta()`, `cancelarConsultaAgendada()`
 - `src/lib/actions/crm.ts`: `carregarCrm()`, `adicionarFunil()`, `adicionarMotivo()`, `modificarMotivo()`, `salvarAcessosFunis()`, `adicionarOportunidade()`, `fecharNegocio()`, `moverNegocio()`

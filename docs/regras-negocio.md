@@ -54,6 +54,10 @@ Interesse fica na conversa existente. Pedido cria oportunidade; fechamento avuls
 
 Humano assume conversa e pausa IA/follow-ups no PostgreSQL. Saídas pelo WhatsApp preservam pausa Redis herdada. Repetição de eventos não duplica contato, mensagem ou pedido. Entrega manual incerta não tem reenvio automático.
 
+Envio manual usa somente URL, chave Evolution e o chip já vinculado à conversa; configurações de OpenAI/Redis e IA desligada não impedem envio humano. Instância não configurada, telefone ausente, operador inativo ou conversa não assumida impedem envio. “Validar canal” consulta a conexão da Evolution sem enviar mensagens e informa configuração ausente, chave recusada ou chip desconectado sem expor segredos.
+
+Atendente pode enviar texto, imagem JPG/PNG/WebP com legenda de até 1024 caracteres ou áudio WebM/Ogg/MP4/MP3/WAV, até 2 MB. O servidor valida tamanho real, base64, tipo e assinatura; não aceita URL remota ou SVG. Microfone pede permissão somente ao clicar, exige navegador compatível em HTTPS/localhost, limita gravação a 60 segundos e libera as faixas ao parar/sair. Permite ouvir o áudio e conferir a imagem antes de clicar em Enviar. Áudio e texto são envios separados. Cancelar/remover anexo não envia nada. Falha incerta preserva rascunho, anexo e chave e não reenvia automaticamente. Arquivos transitam em memória para a Evolution; CRM armazena apenas marcador de imagem/áudio e legenda, sem binário ou link da mídia. Reprodução do arquivo enviado permanece no WhatsApp.
+
 Follow-ups/agendamentos preservados usam texto humano. Configure retomadas institucionais; não fixe preços ou promessas de estoque nesses textos.
 
 ## Indicadores e privacidade

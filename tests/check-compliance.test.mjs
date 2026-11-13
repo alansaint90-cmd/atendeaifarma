@@ -43,6 +43,7 @@ const arquivoLongo = (linhas) =>
 const QUATRO = 'created_at: x, updated_at: x, deleted_at: x, is_deleted: x';
 
 const CASOS = {
+  "src/lib/farmacia/atendimento.ts": "export const enviarManual = () => 'sem validação';",
   "src/lib/farmacia/consultas.ts": "export const painelFarmacia = () => 'sem período';",
   "src/lib/operacao/limites.ts": "export const LIMITE_CONTATOS = 100;",
   "src/lib/operacao/consultas.ts": "export const listar = () => 'LIMIT 100';",
@@ -138,6 +139,7 @@ try {
 
   /** @type {[string, () => void][]} */
   const CHECAGENS = [
+    ["envio humano sem canal próprio e validação de mídia reprova", reprova("farmacia/atendimento.ts", "farmacia-envio-humano")],
     ["dashboard sem período validado em Brasília reprova", reprova("farmacia/consultas.ts", "farmacia-painel-periodo")],
     ["oferta sem filtro de disponíveis e CTA separado reprova", reprova("farmacia/agente.ts", "farmacia-oferta-disponivel")],
     ["pedido sem fluxo persistido reprova", reprova("farmacia/agente.ts", "farmacia-pedido-cliente")],

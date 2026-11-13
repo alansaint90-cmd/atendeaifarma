@@ -46,6 +46,14 @@
 .conversas-resposta textarea { min-height:44px; max-height:120px; resize:vertical; border-radius:12px; font-size:13px; }
 .conversas-resposta form button { min-height:44px; font-size:12px; flex-shrink:0; }
 .conversas-resposta [role=status] { font-size:12px; margin:6px 0; }
+.anexo-manual { margin-bottom:10px; }
+.anexo-manual-botoes { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.anexo-manual-botoes button { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:44px; min-height:44px; border:1px solid var(--line); background:var(--surface); color:var(--text); border-radius:10px; cursor:pointer; }
+.anexo-manual-botoes button[aria-pressed=true] { color:#b42318; background:#fff1f0; }
+.anexo-manual-botoes small { color:var(--muted); font-size:11px; }
+.anexo-manual-previa { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin-top:10px; }
+.anexo-manual-previa img { width:100px; height:80px; object-fit:contain; border:1px solid var(--line); border-radius:8px; }
+.anexo-manual-previa audio { max-width:100%; }
 .conversas-vazio { margin:18px; color:var(--muted); font-size:13px; line-height:1.7; }
 .conversas-sem-selecao { flex:1; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:30px; text-align:center; background:var(--bg); color:var(--muted); }
 .conversas-sem-selecao h2 { font-size:19px; color:var(--text); }

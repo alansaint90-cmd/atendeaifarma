@@ -11,6 +11,7 @@ import {painelFarmacia,listarPedidos} from "../src/lib/farmacia/consultas";
 import {atenderIntencao} from "../src/lib/farmacia/agente";
 import {interpretarIntencao} from "../src/lib/farmacia/interpretar";
 import {assumirConversa,atendimentoHumanoAtivo,enviarManual} from "../src/lib/farmacia/atendimento";
+import { verificarCanalManual } from "../src/lib/farmacia/canal-manual";
 import {receberOperacao} from "../src/lib/operacao/receber";
 import type {AgentConfig} from "../src/lib/agent/config";
 import type {ProdutoEntrada} from "../src/lib/farmacia/validacao";
@@ -126,11 +127,26 @@ test("farmácia: catálogo real, transações, receita, idempotência e CRM",asy
     });
     await t.test("Mensagem manual registra saída uma vez; entrega incerta não é repetida",async()=>{
       await assumirConversa(banco,operador,{id:conversa,assumir:true});let envios=0;
-      const settings=async()=>({EVOLUTION_API_URL:"https://example.invalid",EVOLUTION_API_KEY:"teste-local",EVOLUTION_INSTANCE_NAME:"farmacia-teste"});
+      const settings=async()=>({EVOLUTION_API_URL:"https://example.invalid",EVOLUTION_API_KEY:"teste-local",EVOLUTION_INSTANCE_NAME:"farmacia-teste",AI_ENABLED:"false" as const,OPENAI_API_KEY:"sk-teste",OPENAI_MODEL:"teste",REDIS_URL:"redis://localhost:6379"});
       const dep={settings,send:async()=>{envios++;return "manual-unica";}};const v={id:conversa,texto:"Atendimento humano de teste",chave:randomUUID()};
       await enviarManual(banco,operador,v,dep);await assert.rejects(enviarManual(banco,operador,v,dep),/já foi enviada/);assert.equal(envios,1);
       const incerto={...v,chave:randomUUID()};const falha={settings,send:async()=>{envios++;throw new Error("timeout");}};
       await assert.rejects(enviarManual(banco,operador,incerto,falha),/incerta/);await assert.rejects(enviarManual(banco,operador,incerto,falha),/incerta/);assert.equal(envios,2);
+      await assumirConversa(banco,operador,{id:conversa,assumir:false});
+    });
+    await t.test("envio de mídia exige assumir conversa, não repete e registra apenas marcador e legenda",async()=>{
+      const settings=async()=>({EVOLUTION_API_URL:"https://example.invalid",EVOLUTION_API_KEY:"teste-local",EVOLUTION_INSTANCE_NAME:"farmacia-teste"});
+      const midia={tipo:"image" as const,mime:"image/png" as const,base64:Buffer.from("89504e470d0a1a0a00000000","hex").toString("base64")};
+      const v={id:conversa,texto:"Confira a embalagem",chave:randomUUID(),midia};let chamadas=0;
+      const dep={settings,send:async()=>{throw new Error("Não deve enviar texto");},sendMidia:async()=>{chamadas++;return "midia-manual-teste";}};
+      await assert.rejects(enviarManual(banco,operador,v,dep),/Assuma/);
+      await assumirConversa(banco,operador,{id:conversa,assumir:true});
+      await enviarManual(banco,operador,v,dep);await assert.rejects(enviarManual(banco,operador,v,dep),/já foi enviada/);assert.equal(chamadas,1);
+      const [m]=(await client.query<{content:string;message_type:string}>("SELECT content,message_type FROM atendeia_messages WHERE provider_message_id='midia-manual-teste' AND is_deleted=false")).rows;
+      assert.equal(m.message_type,"image");assert.equal(m.content,"[Imagem enviada] Confira a embalagem");assert.ok(!JSON.stringify(m).includes(midia.base64));
+      assert.match(await verificarCanalManual(banco,operador,conversa,{settings,request:async()=>Response.json({instance:{state:"open"}})}),/conectado/);
+      await assert.rejects(verificarCanalManual(banco,operador,conversa,{settings,request:async()=>Response.json({instance:{state:"close"}})}),/desconectado/);
+      await assert.rejects(verificarCanalManual(banco,operador,conversa,{settings,request:async()=>Response.json({}, {status:401})}),/chave de API/);
       await assumirConversa(banco,operador,{id:conversa,assumir:false});
     });
     await t.test("IA não consulta ou reserva pedido de outra conversa",async()=>{

@@ -15,8 +15,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, extname, relative, basename, resolve } from "node:path";
 import { colunasDasFabricas } from "./colunas-fabricas.mjs";
-const ROOT = process.cwd();
-const MAX_LINES = 500;
+const ROOT = process.cwd(); const MAX_LINES = 500;
 /**
  * Excecao de caminho do limite de linhas. `src/components/ui/` e codigo de
  * terceiro vendorizado pelo CLI do shadcn, que a regra proibe editar. Vale SO
@@ -427,6 +426,7 @@ function analyzeFile(file) {
   if ((rel === "src/lib/operacao/limites.ts" && !/LIMITE_CONTATOS\s*=\s*150\b/.test(content)) || (rel === "src/lib/operacao/consultas.ts" && !/LIMIT \$\{LIMITE_CONTATOS\}/.test(content)))
     findings.push({level:"error",id:"contatos-limite-150",file:rel,line:1,msg:"Listagem deve usar o limite compartilhado de 150 contatos, preservando o total de cadastros."});
   if (rel === "src/lib/farmacia/consultas.ts" && !/periodoFarmaciaSchema\.parse[\s\S]*America\/Sao_Paulo[\s\S]*confirmadoNoPeriodo[\s\S]*sent_at>=/.test(content)) findings.push({level:"error",id:"farmacia-painel-periodo",file:rel,line:1,msg:"Dashboard exige período validado em Brasília e filtros de confirmação e envio."});
+  if (rel === "src/lib/farmacia/atendimento.ts" && (!/configurarCanalManual/.test(content)||!/validarMidiaManual/.test(content)||/agentBaseConfigSchema/.test(content))) findings.push({level:"error",id:"farmacia-envio-humano",file:rel,line:1,msg:"Envio humano exige configuração própria de canal e validação de mídia, sem depender da IA."});
   return findings;
 }
 
