@@ -3,6 +3,7 @@ import { z } from "zod";
 import { linhas, type BancoSql } from "../db/porta";
 import { autorizar, elegivel, reservaAtiva, hoje, type AtorFarmacia } from "./comum";
 import { descreverPagamento } from "./pagamento";
+import { periodoFarmacia, periodoFarmaciaSchema } from "./periodo";
 
 export interface PedidoLista { id:string; numero:string; cliente:string; telefone:string|null; total:string; status:string; origem:string; responsavel:string|null; data:string; conferencia:string|null; expira:string|null; conversaId:string|null; itens:{produtoId:string;descricao:string;quantidade:number;preco:string;receita:boolean}[]; eventos:{tipo:string;detalhe:string;data:string;autor:string}[] }
 export async function listarPedidos(banco:BancoSql,ator:AtorFarmacia,entrada:unknown) {
@@ -25,7 +26,12 @@ export async function listarPedidos(banco:BancoSql,ator:AtorFarmacia,entrada:unk
     return {pedidos,total:c.total};
   });
 }
-export async function painelFarmacia(banco:BancoSql,ator:AtorFarmacia) {
+export async function painelFarmacia(banco:BancoSql,ator:AtorFarmacia,entrada:unknown=periodoFarmacia("hoje")) {
+  const periodo=periodoFarmaciaSchema.parse(entrada);
+  const inicio=sql`(${periodo.inicio}::date::timestamp AT TIME ZONE 'America/Sao_Paulo')`;
+  const fim=sql`((${periodo.fim}::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')`;
+  const criadoNoPeriodo=sql`created_at>=${inicio} AND created_at<${fim}`;
+  const confirmadoNoPeriodo=sql`confirmado_em>=${inicio} AND confirmado_em<${fim}`;
   return banco.transaction(async tx=>{
     await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     await autorizar(tx,ator,"operador");
@@ -37,15 +43,15 @@ export async function painelFarmacia(banco:BancoSql,ator:AtorFarmacia) {
         WHERE p.is_deleted=false GROUP BY p.id)
       SELECT count(*)::int total,count(*) FILTER(WHERE saldo>0)::int disponiveis,count(*) FILTER(WHERE ativo AND saldo=0)::int esgotados,
       count(*) FILTER(WHERE saldo>0 AND saldo<=minimo)::int baixos,count(*) FILTER(WHERE vencendo AND ativo)::int vencendo FROM saldos`));
-    const [vendas]=linhas<{pedidos:number;confirmados:number;pendentes:number;faturamento:string}>(await tx.execute(sql`SELECT count(*)::int pedidos,
-      count(*) FILTER(WHERE confirmado_em IS NOT NULL AND status<>'cancelado')::int confirmados,
-      count(*) FILTER(WHERE status IN ('novo','aguardando_confirmacao','aguardando_pagamento'))::int pendentes,
-      coalesce(sum(total) FILTER(WHERE confirmado_em IS NOT NULL AND status<>'cancelado'),0)::text faturamento FROM atendeia_pedidos WHERE is_deleted=false`));
-    const [atendimento]=linhas<{consultas:number;atendimentos:number}>(await tx.execute(sql`SELECT (SELECT count(DISTINCT split_part(chave,':',1))::int FROM atendeia_produtos_consultas WHERE is_deleted=false) consultas,
-      (SELECT count(DISTINCT conversation_id)::int FROM atendeia_messages WHERE sender_type='bot' AND direction='outbound' AND is_deleted=false) atendimentos`));
+    const [vendas]=linhas<{pedidos:number;confirmados:number;pendentes:number;faturamento:string}>(await tx.execute(sql`SELECT count(*) FILTER(WHERE ${criadoNoPeriodo})::int pedidos,
+      count(*) FILTER(WHERE ${confirmadoNoPeriodo} AND status<>'cancelado')::int confirmados,
+      count(*) FILTER(WHERE ${criadoNoPeriodo} AND status IN ('novo','aguardando_confirmacao','aguardando_pagamento'))::int pendentes,
+      coalesce(sum(total) FILTER(WHERE ${confirmadoNoPeriodo} AND status<>'cancelado'),0)::text faturamento FROM atendeia_pedidos WHERE is_deleted=false`));
+    const [atendimento]=linhas<{consultas:number;atendimentos:number}>(await tx.execute(sql`SELECT (SELECT count(DISTINCT split_part(chave,':',1))::int FROM atendeia_produtos_consultas WHERE is_deleted=false AND ${criadoNoPeriodo}) consultas,
+      (SELECT count(DISTINCT conversation_id)::int FROM atendeia_messages WHERE sender_type='bot' AND direction='outbound' AND is_deleted=false AND sent_at>=${inicio} AND sent_at<${fim}) atendimentos`));
     const maisVendidos=linhas<{nome:string;quantidade:number}>(await tx.execute(sql`SELECT p.nome,sum(i.quantidade)::int quantidade FROM atendeia_pedidos_itens i
       JOIN atendeia_pedidos o ON o.id=i.pedido_id JOIN atendeia_produtos p ON p.id=i.produto_id
-      WHERE i.is_deleted=false AND o.is_deleted=false AND p.is_deleted=false AND o.confirmado_em IS NOT NULL AND o.status<>'cancelado'
+      WHERE i.is_deleted=false AND o.is_deleted=false AND p.is_deleted=false AND o.confirmado_em>=${inicio} AND o.confirmado_em<${fim} AND o.status<>'cancelado'
       GROUP BY p.id,p.nome ORDER BY quantidade DESC,p.nome LIMIT 10`));
     return {estoque,vendas,atendimento,maisVendidos,atualizadoEm:new Date().toISOString()};
   });

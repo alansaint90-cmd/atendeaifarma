@@ -6,7 +6,7 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 196 |
+| Arquivos TS/TSX | 197 |
 | Tabelas (Drizzle) | 43 |
 | Server Actions (arquivos) | 14 |
 | Rotas de API | 7 |
@@ -199,6 +199,7 @@ lib/
     ordenacao.ts
     pagamento.ts
     pedidos.ts
+    periodo.ts
     planilha.ts
     prompt.ts
     transacoes.ts

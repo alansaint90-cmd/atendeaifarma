@@ -43,6 +43,7 @@ const arquivoLongo = (linhas) =>
 const QUATRO = 'created_at: x, updated_at: x, deleted_at: x, is_deleted: x';
 
 const CASOS = {
+  "src/lib/farmacia/consultas.ts": "export const painelFarmacia = () => 'sem período';",
   "src/lib/operacao/limites.ts": "export const LIMITE_CONTATOS = 100;",
   "src/lib/operacao/consultas.ts": "export const listar = () => 'LIMIT 100';",
   "src/lib/farmacia/agente.ts": "export function responder(produtos) { return produtos.map(p => p.nome); }",
@@ -137,6 +138,7 @@ try {
 
   /** @type {[string, () => void][]} */
   const CHECAGENS = [
+    ["dashboard sem período validado em Brasília reprova", reprova("farmacia/consultas.ts", "farmacia-painel-periodo")],
     ["oferta sem filtro de disponíveis e CTA separado reprova", reprova("farmacia/agente.ts", "farmacia-oferta-disponivel")],
     ["pedido sem fluxo persistido reprova", reprova("farmacia/agente.ts", "farmacia-pedido-cliente")],
     ["limite de contatos diferente de 150 reprova", reprova("operacao/limites.ts", "contatos-limite-150")],

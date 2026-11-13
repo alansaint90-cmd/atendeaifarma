@@ -64,4 +64,6 @@ Fotos são URLs HTTPS recebidas nos eventos contacts.upsert/contacts.update da E
 
 Dashboard usa dados persistidos. Faturamento = vendas confirmadas não canceladas, não liquidação bancária ou escrituração fiscal. Atendimentos IA = conversas distintas com saída bot. Consultas agrupam evento sem multiplicar por apresentações.
 
+O dashboard inicia em Hoje e oferece Ontem, 7, 15, 30 dias (incluindo hoje) e Período selecionado com calendário de início/fim e botão Aplicar, até 366 dias. Dias seguem Brasília, do início inclusive até a meia-noite seguinte ao último dia exclusive. Pedidos criados e pendentes usam created_at; vendas, faturamento e ranking usam confirmado_em; consultas usam created_at e atendimentos IA usam sent_at. Estoque mostra o saldo atual e não reconstrói posições históricas. Datas inválidas são recusadas no servidor; mudança de filtro remove os indicadores anteriores e respostas atrasadas não os restauram. A faixa “Todo o período · atualizado em” foi removida.
+
 Autorização/validação no servidor; chaves privadas criptografadas. Pedidos não armazenam anexos de receita. Auditoria identifica operação/responsável sem copiar mensagens. Retenção, base legal, contratos com operadores e procedimentos sanitários precisam ser definidos pela operação antes da produção; não há certificação automática de conformidade.

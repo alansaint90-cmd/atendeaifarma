@@ -31,7 +31,6 @@ const IGNORE_DIRS = new Set([
 ]);
 
 const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]); const JSX_EXT = new Set([".tsx", ".jsx"]); const SQL_EXT = new Set([".sql"]);
-
 // Os proprios scripts de auditoria contem os padroes proibidos como DEFINICAO
 // de regra (ex.: o regex que detecta Prisma). Nunca auto-sinalizar.
 const SKIP_FILES = new Set(["check-compliance.mjs", "project-map.mjs"]);
@@ -427,6 +426,7 @@ function analyzeFile(file) {
   }
   if ((rel === "src/lib/operacao/limites.ts" && !/LIMITE_CONTATOS\s*=\s*150\b/.test(content)) || (rel === "src/lib/operacao/consultas.ts" && !/LIMIT \$\{LIMITE_CONTATOS\}/.test(content)))
     findings.push({level:"error",id:"contatos-limite-150",file:rel,line:1,msg:"Listagem deve usar o limite compartilhado de 150 contatos, preservando o total de cadastros."});
+  if (rel === "src/lib/farmacia/consultas.ts" && !/periodoFarmaciaSchema\.parse[\s\S]*America\/Sao_Paulo[\s\S]*confirmadoNoPeriodo[\s\S]*sent_at>=/.test(content)) findings.push({level:"error",id:"farmacia-painel-periodo",file:rel,line:1,msg:"Dashboard exige período validado em Brasília e filtros de confirmação e envio."});
   return findings;
 }
 

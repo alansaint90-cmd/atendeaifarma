@@ -140,6 +140,21 @@ test("farmácia: catálogo real, transações, receita, idempotência e CRM",asy
       const painel=await painelFarmacia(banco,admin);assert.ok(painel.estoque.total>0);assert.ok(painel.vendas.confirmados>0);assert.match(painel.vendas.faturamento,/\d+\.\d{2}/);
       assert.ok((await listarPedidos(banco,admin,{})).pedidos[0].eventos.length>0);
     });
+    await t.test("Dashboard separa criação de confirmação e respeita limites do dia em Brasília",async()=>{
+      const [pedidoConfirmado]=(await client.query<{id:string}>("SELECT id FROM atendeia_pedidos WHERE confirmado_em IS NOT NULL AND status<>'cancelado' AND is_deleted=false LIMIT 1")).rows;
+      await client.query("UPDATE atendeia_pedidos SET created_at='2020-01-01T03:00:00Z',confirmado_em=CASE WHEN id=$1 THEN '2020-02-02T03:00:00Z'::timestamptz ELSE confirmado_em END",[pedidoConfirmado.id]);
+      const antes=await painelFarmacia(banco,admin,{inicio:"2020-02-01",fim:"2020-02-01"});
+      const dentro=await painelFarmacia(banco,admin,{inicio:"2020-02-02",fim:"2020-02-02"});
+      assert.equal(antes.vendas.confirmados,0);assert.equal(dentro.vendas.confirmados,1);assert.equal(dentro.vendas.pedidos,0);
+      assert.ok(dentro.maisVendidos.length>0);assert.deepEqual(dentro.estoque,antes.estoque);
+      await client.query("UPDATE atendeia_pedidos SET confirmado_em='2020-02-03T02:59:59.999Z' WHERE id=$1",[pedidoConfirmado.id]);
+      assert.equal((await painelFarmacia(banco,admin,{inicio:"2020-02-02",fim:"2020-02-02"})).vendas.confirmados,1);
+      await client.query("UPDATE atendeia_pedidos SET confirmado_em='2020-02-03T03:00:00Z' WHERE id=$1",[pedidoConfirmado.id]);
+      assert.equal((await painelFarmacia(banco,admin,{inicio:"2020-02-02",fim:"2020-02-02"})).vendas.confirmados,0);
+      await assert.rejects(painelFarmacia(banco,admin,{inicio:"2026-02-30",fim:"2026-03-01"}));
+      await assert.rejects(painelFarmacia(banco,admin,{inicio:"2026-03-02",fim:"2026-03-01"}));
+      await assert.rejects(painelFarmacia(banco,admin,{inicio:"2020-01-01",fim:"2026-03-01"}));
+    });
   }finally{await client.close();}
 });
 test("interpretação da farmácia recebe o prompt salvo do atendimento",async()=>{
