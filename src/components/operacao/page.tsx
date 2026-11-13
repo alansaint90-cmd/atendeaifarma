@@ -37,13 +37,13 @@ function ListaOperacionalPage({ rota }: { rota: string }) {
     return () => { window.clearTimeout(timer); window.clearInterval(atualizacao); invalidarConsulta(); };
   }, [carregar, rotaOperacional, invalidarConsulta]);
   const conversa = dados?.conversas.find(item => item.id === selecionada) ?? dados?.conversas[0];
-  return <div className="page-stack">
+  return <div className={`page-stack${rota === "inbox" ? " pagina-conversas" : ""}`}>
     <section className="page-head"><div><h1>{rota === "contacts" ? "Contatos e leads" : "Caixa de entrada"}</h1>
-      <p>Dados reais do WhatsApp. Nenhum contato ou indicador de demonstração.</p></div></section>
+      {rota !== "inbox" && <p>Dados reais do WhatsApp. Nenhum contato ou indicador de demonstração.</p>}</div></section>
     {erro && <p role="alert">{erro}</p>}
     {!dados && !erro && <p role="status">{ocupado ? "Consultando o banco de dados…" : "Aguardando a consulta dos dados."}</p>}
     {dados && <>
-      <p role="status">Atualizado em {new Date(dados.atualizadoEm).toLocaleString("pt-BR")}.</p>
+      {rota !== "inbox" && <p role="status">Atualizado em {new Date(dados.atualizadoEm).toLocaleString("pt-BR")}.</p>}
       {rota === "contacts" && <article className="panel"><h2>{dados.totalContatos} contatos cadastrados</h2><p>Exibindo os {dados.contatos.length} contatos mais recentes (limite de {LIMITE_CONTATOS}).</p>
         {dados.contatos.length ? <div className="table"><table><thead><tr>{["Nome", "Telefone", "Email", "Origem", "Status"].map(titulo => <th key={titulo}>{titulo}</th>)}</tr></thead>
           <tbody>{dados.contatos.map(contato => <tr key={contato.id}><td>{contato.nome}</td><td>{contato.telefone || "—"}</td><td>{contato.email || "—"}</td><td>{contato.origem || "—"}</td><td>{contato.status}</td></tr>)}</tbody></table></div>

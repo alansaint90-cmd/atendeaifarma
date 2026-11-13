@@ -1,4 +1,7 @@
 /* Estrutura compartilhada; adapta-se às cores de cada instalação Atende Aí. */
+.page-stack.pagina-conversas { gap:12px; }
+.pagina-conversas .page-head h1 { margin:0; }
+.pagina-conversas .conversas-caixa { height:max(440px,calc(100dvh - 180px)); }
 .conversas-caixa { display:grid; grid-template-columns:minmax(270px,340px) minmax(0,1fr); height:clamp(440px,calc(100dvh - 235px),850px); min-width:0; overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--surface); box-shadow:0 4px 20px #0f172a05; }
 .conversas-caixa * { box-sizing:border-box; }
 .conversas-lateral { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:var(--surface); }
