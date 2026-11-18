@@ -1,0 +1,24 @@
+.campanha-editor { display: grid; gap: 1.25rem; }
+.campanha-contatos { border: 1px solid var(--border, #dce1eb); border-radius: 14px; padding: 1rem; min-width: 0; }
+.campanha-lista { max-height: 320px; overflow-y: auto; margin-top: 1rem; }
+.campanha-contato { display: flex; align-items: center; gap: .75rem; min-height: 56px; padding: .6rem; border-bottom: 1px solid var(--border, #dce1eb); cursor: pointer; }
+.campanha-contato input { width: 22px; height: 22px; flex-shrink: 0; }
+.campanha-contato small, .campanha-editor small { display: block; }
+.campanha-preview { border: 1px solid var(--border, #dce1eb); border-radius: 14px; padding: 1rem; display: grid; gap: .75rem; }
+.campanha-preview img { max-width: 100%; max-height: 240px; object-fit: contain; justify-self: start; border-radius: 10px; }
+.campanha-preview audio { max-width: 100%; }
+.campanha-texto { white-space: pre-wrap; overflow-wrap: anywhere; }
+.fila-menu-botao { min-width:44px; min-height:44px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); font-size:24px; cursor:pointer; }
+.fila-opcoes { position:fixed; display:grid; gap:6px; padding:8px; border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--text); box-shadow:0 8px 30px #0f172a24; z-index:1000; max-height:calc(100dvh - 24px); overflow-y:auto; }
+.fila-opcoes button { width:100%; min-height:44px; padding:8px 12px; border:0; border-radius:8px; text-align:left; white-space:normal; background:var(--surface); color:var(--text); cursor:pointer; }
+.fila-opcoes button:hover { background:var(--bg); }
+.fila-opcoes small { padding:6px; color:var(--muted); }
+.fila-tabela table { table-layout:fixed; width:100%; min-width:1050px; }
+.fila-tabela td { vertical-align:top; overflow-wrap:anywhere; white-space:normal; }
+.fila-tabela td small,.fila-tabela td strong { display:block; }
+.fila-tabela .agendamento-mensagem summary { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.fila-tabela .agendamento-mensagem p { white-space:pre-wrap; overflow-wrap:anywhere; }
+.campanha-editor input:not([type=checkbox]),.campanha-editor select,.campanha-editor textarea { width:100%; min-height:44px; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface); color:var(--text); }
+.campanha-editor label { display:grid; gap:7px; font-size:13px; }
+.campanha-editor .campanha-contato { display:flex; }
+@media(max-width:640px) { .campanha-editor .followup-grid { grid-template-columns:1fr; } .campanha-editor .page-head { align-items:stretch; } }

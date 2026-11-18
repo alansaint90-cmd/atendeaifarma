@@ -1,0 +1,20 @@
+import { afterEach, expect, test, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, act } from "@testing-library/react";
+import { CampanhasPage } from "@/components/campanhas/page";
+import { carregarCampanhas, gravarCampanha, iniciarCampanha } from "@/lib/actions/campanhas";
+vi.mock("@/lib/actions/campanhas",()=>({carregarCampanhas:vi.fn(),gravarCampanha:vi.fn(),iniciarCampanha:vi.fn(),cancelarCampanha:vi.fn(),detalharCampanha:vi.fn()}));
+afterEach(()=>{cleanup();vi.clearAllMocks();vi.useRealTimers();});
+test("campanha seleciona somente a base e salva rascunho sem enviar",async()=>{
+ vi.mocked(carregarCampanhas).mockResolvedValue({ok:true,dados:{itens:[],instancias:["teste"],instancia:"teste",ativo:true,contatos:[{id:"a",nome:"Contato anterior",telefone:"+5511999999999"},{id:"b",nome:"Outra pessoa",telefone:"+5511888888888"}]}});
+ vi.mocked(gravarCampanha).mockResolvedValue({ok:true,dados:"id"});
+ render(<CampanhasPage/>);await screen.findByText("Nenhuma campanha criada. Comece em Nova campanha.");
+ fireEvent.click(screen.getByRole("button",{name:"+ Nova campanha"}));
+ expect(screen.queryByLabelText(/Telefone com/)).not.toBeInTheDocument();
+ fireEvent.change(screen.getByLabelText("Nome da campanha"),{target:{value:"Retorno"}});fireEvent.change(screen.getByLabelText("Texto da mensagem"),{target:{value:"Olá!"}});
+ fireEvent.click(screen.getByRole("button",{name:"Selecionar todos (2)"}));expect(screen.getByText("2 de 2 selecionados")).toBeInTheDocument();
+ fireEvent.click(screen.getByLabelText(/Outra pessoa/));expect(screen.getByText("1 de 2 selecionados")).toBeInTheDocument();
+ vi.useFakeTimers();fireEvent.click(screen.getByRole("button",{name:"Salvar rascunho"}));expect(gravarCampanha).not.toHaveBeenCalled();
+ for(let i=0;i<3;i++)await act(()=>vi.advanceTimersByTimeAsync(1000));
+ await act(async()=>{fireEvent.click(screen.getByRole("button",{name:"Confirmar"}));});
+ expect(gravarCampanha).toHaveBeenCalledWith(expect.objectContaining({nome:"Retorno",contatos:["a"],mensagem:"Olá!"}));expect(iniciarCampanha).not.toHaveBeenCalled();
+});

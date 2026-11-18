@@ -2,3 +2,4 @@
 export * from "./usuarios";
 export * from "./auditoria";
 export * from "./agenda-consultas";
+export * from "./campanhas";

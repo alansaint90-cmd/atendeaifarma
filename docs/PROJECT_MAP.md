@@ -6,12 +6,12 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 201 |
-| Tabelas (Drizzle) | 43 |
-| Server Actions (arquivos) | 14 |
+| Arquivos TS/TSX | 217 |
+| Tabelas (Drizzle) | 45 |
+| Server Actions (arquivos) | 16 |
 | Rotas de API | 7 |
 | Paginas | 5 |
-| Componentes | 34 |
+| Componentes | 37 |
 
 ## Arvore (profundidade 3)
 
@@ -44,8 +44,12 @@ app/
   page.tsx
 components/
   agendamentos/
+    central.tsx
+    menu-fila.tsx
     page.tsx
   assinatura/
+    page.tsx
+  campanhas/
     page.tsx
   chatbots/
     editor.tsx
@@ -92,10 +96,12 @@ lib/
   actions/
     agendamentos.ts
     atendimento-farmacia.ts
+    campanhas.ts
     chatbots.ts
     consultas.ts
     crm.ts
     farmacia.ts
+    fila-mensagens.ts
     followups.ts
     operacao.ts
     painel.ts
@@ -105,6 +111,10 @@ lib/
     tags.ts
     usuarios.ts
   agendamentos/
+    fila-followups.ts
+    fila-lote.ts
+    fila-repository.ts
+    fila-schema.ts
     repository.ts
     schema.ts
     worker.ts
@@ -182,12 +192,14 @@ lib/
     icons.ts
     views.ts
   evolution/
+    config-envio.ts
     configurar-webhook.ts
     instancias.ts
     queue.ts
     schema.ts
     webhook.ts
   farmacia/
+    campanhas/
     agente.ts
     atendimento.ts
     cadastro.ts
@@ -240,6 +252,7 @@ lib/
 styles/
   automation.css
   base.css
+  campanhas.css
   conta-menu.css
   conversas.css
   design-juliana.css
@@ -264,6 +277,12 @@ instrumentation.ts
 
 ### `auditoria` — src/lib/db/schema/auditoria.ts
 `id`, `user_id`, `acao`, `tabela`, `registro_id`, `detalhes`, `dados_anteriores`, `dados_novos`, `created_at`
+
+### `atendeia_campanhas` — src/lib/db/schema/campanhas.ts
+`id`, `status`, `modified_by`
+
+### `atendeia_campanhas_destinatarios` — src/lib/db/schema/campanhas.ts
+`id`, `contatoId`, `version`, `modified_by`
 
 ### `atendeia_funis` — src/lib/db/schema/crm.ts
 `id`, `modified_by`
@@ -401,10 +420,12 @@ _(colunas nao detectadas)_
 
 - `src/lib/actions/agendamentos.ts`: `carregarAgendamentos()`, `gravarAgendamento()`, `cancelarEnvioAgendado()`
 - `src/lib/actions/atendimento-farmacia.ts`: `validarCanalAtendimento()`, `assumirAtendimento()`, `enviarMensagemManual()`
+- `src/lib/actions/campanhas.ts`: `carregarCampanhas()`, `gravarCampanha()`, `iniciarCampanha()`, `cancelarCampanha()`, `detalharCampanha()`
 - `src/lib/actions/chatbots.ts`: `carregarChatbots()`, `salvarChatbot()`
 - `src/lib/actions/consultas.ts`: `carregarResumoAgenda()`, `carregarAgendaConsultas()`, `confirmarConsulta()`, `cancelarConsultaAgendada()`
 - `src/lib/actions/crm.ts`: `carregarCrm()`, `adicionarFunil()`, `adicionarMotivo()`, `modificarMotivo()`, `salvarAcessosFunis()`, `adicionarOportunidade()`, `fecharNegocio()`, `moverNegocio()`
 - `src/lib/actions/farmacia.ts`: `importarPlanilha()`, `carregarProdutos()`, `gravarProduto()`, `receberEstoque()`, `ajustarInventario()`, `carregarHistorico()`, `carregarPedidos()`, `registrarPedido()`, `alterarPedido()`, `carregarFarmacia()`, `carregarCadastrosFarmacia()`, `salvarHabilitacao()`
+- `src/lib/actions/fila-mensagens.ts`: `carregarFilaMensagens()`, `alterarFilaMensagens()`
 - `src/lib/actions/followups.ts`: `carregarFollowups()`, `salvarFollowups()`
 - `src/lib/actions/operacao.ts`: `carregarOperacao()`
 - `src/lib/actions/painel.ts`: `carregarPainel()`

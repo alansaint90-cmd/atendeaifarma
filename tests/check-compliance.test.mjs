@@ -43,6 +43,10 @@ const arquivoLongo = (linhas) =>
 const QUATRO = 'created_at: x, updated_at: x, deleted_at: x, is_deleted: x';
 
 const CASOS = {
+  "src/lib/farmacia/campanhas/repository.ts": "export const inseguro = true;",
+  "src/lib/agendamentos/fila-followups.ts": "export const inseguro = true;",
+  "src/lib/agendamentos/fila-repository.ts": "export const inseguro = true;",
+  "src/lib/evolution/config-envio.ts": "export const inseguro = true;",
   "src/lib/farmacia/midia-manual.ts": "export const tipos = ['image','audio'];",
   "src/lib/farmacia/atendimento.ts": "export const enviarManual = () => 'sem validação';",
   "src/lib/farmacia/consultas.ts": "export const painelFarmacia = () => 'sem período';",
@@ -144,6 +148,10 @@ try {
     ["envio humano sem canal próprio e validação de mídia reprova", reprova("farmacia/atendimento.ts", "farmacia-envio-humano")],
     ["dashboard sem período validado em Brasília reprova", reprova("farmacia/consultas.ts", "farmacia-painel-periodo")],
     ["oferta sem filtro de disponíveis e CTA separado reprova", reprova("farmacia/agente.ts", "farmacia-oferta-disponivel")],
+    ["campanha sem elegibilidade e trava reprova", reprova("farmacia/campanhas/repository.ts", "campanha-elegibilidade")],
+    ["follow-up sem fila real e auditoria reprova", reprova("agendamentos/fila-followups.ts", "fila-followup-real")],
+    ["restauração sem cancelamento seguro reprova", reprova("agendamentos/fila-repository.ts", "fila-restauracao-segura")],
+    ["configuração de envio sem projeção e chip reprova", reprova("evolution/config-envio.ts", "envio-configuracao-estrita")],
     ["pedido sem fluxo persistido reprova", reprova("farmacia/agente.ts", "farmacia-pedido-cliente")],
     ["limite de contatos diferente de 150 reprova", reprova("operacao/limites.ts", "contatos-limite-150")],
     ["consulta sem limite compartilhado reprova", reprova("operacao/consultas.ts", "contatos-limite-150")],

@@ -16,6 +16,7 @@ import { followupDaInstancia, settingsDaInstancia } from "../evolution/instancia
 import { followupStore } from "../followups/queue";
 import { configuracaoPermiteFollowup, processFollowup } from "../followups/processor";
 import { executarAgendamentos } from "../agendamentos/worker";
+import { executarCampanhas } from "../farmacia/campanhas/worker";
 import { chatbotDaInstancia } from "../chatbots/server-repository";
 import { db } from "../db/client";
 import { registrarEnvioIa } from "../operacao/atribuir-ia";
@@ -165,6 +166,7 @@ export function startAgentWorker() {
     let processed = false;
     try { await executarAgendamentos(); }
     catch { console.error("Atende AI: falha ao processar agendamentos; confira banco e configuração."); }
+    try { await executarCampanhas(); } catch { console.error("Atende AI: falha ao processar campanhas; confira a fila."); }
     try { processed = Boolean(await runAgentTick()); }
     catch { report("falha de configuração, Redis ou processamento; nova tentativa em 5 segundos"); }
     const timer = setTimeout(() => void loop(), processed ? 100 : 5000);

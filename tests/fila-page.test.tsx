@@ -1,0 +1,41 @@
+import { afterEach,expect,test,vi } from "vitest";
+import { act,cleanup,fireEvent,render,screen,within } from "@testing-library/react";
+import { CentralMensagensPage } from "@/components/agendamentos/central";
+import { carregarFilaMensagens,alterarFilaMensagens } from "@/lib/actions/fila-mensagens";
+import type { MensagemFila } from "@/lib/agendamentos/fila-schema";
+vi.mock("@/lib/actions/fila-mensagens",()=>({carregarFilaMensagens:vi.fn(),alterarFilaMensagens:vi.fn()}));
+vi.mock("@/lib/actions/agendamentos",()=>({carregarAgendamentos:vi.fn(),gravarAgendamento:vi.fn(),cancelarEnvioAgendado:vi.fn()}));
+afterEach(()=>{cleanup();vi.resetAllMocks();vi.useRealTimers();});
+const item=(n:number,origem:MensagemFila["origem"]="campanha"):MensagemFila=>({id:`00000000-0000-4000-8000-${String(n).padStart(12,"0")}`,origem,versao:"0",data:"2026-11-18T15:00:00Z",telefone:`+551199999${String(n).padStart(4,"0")}`,instancia:"Chip teste",mensagem:"Mensagem fictícia",status:"pendente",origemNome:origem==="campanha"?"Campanha teste":origem==="followup"?"Follow-up · etapa 1":"Envio individual",lixeira:false,previsao:origem==="campanha"});
+test("seleção de todo o filtro inclui todas as páginas e informa falhas parciais",async()=>{
+ const itens=Array.from({length:23},(_,n)=>item(n+1));itens.push(item(99,"individual"));
+ vi.mocked(carregarFilaMensagens).mockResolvedValue({ok:true,dados:{itens,avisos:[],ativo:true}});
+ vi.mocked(alterarFilaMensagens).mockResolvedValue({ok:true,dados:{alterados:22,naoAlterados:1,avisos:["O envio já começou."]}});
+ render(<CentralMensagensPage/>);await screen.findByText("24 registros · 0 selecionados");
+ fireEvent.change(screen.getByLabelText("Origem"),{target:{value:"campanha"}});
+ fireEvent.click(screen.getByLabelText("Selecionar todas deste filtro"));
+ expect(screen.getByText("23 registros · 23 selecionados")).toBeInTheDocument();
+ fireEvent.click(screen.getByRole("button",{name:"Opções da lista"}));
+ vi.useFakeTimers();fireEvent.click(screen.getByRole("button",{name:"Cancelar todas deste filtro"}));
+ const dialogo=screen.getByRole("alertdialog");expect(within(dialogo).getByText(/23 registro\(s\)/)).toBeInTheDocument();
+ expect(alterarFilaMensagens).not.toHaveBeenCalled();for(let i=0;i<3;i++)await act(()=>vi.advanceTimersByTimeAsync(1000));
+ await act(async()=>{fireEvent.click(within(dialogo).getByRole("button",{name:"Confirmar"}));});
+ expect(alterarFilaMensagens).toHaveBeenCalledWith({acao:"cancelar",alvos:itens.slice(0,23).map(({id,origem,versao})=>({id,origem,versao}))});
+ expect(screen.getByText(/22 registro\(s\) alterado\(s\). 1 não alterado/)).toBeInTheDocument();
+});
+test("lixeira mostra aviso de restauração sem reenvio e menus ficam fora da tabela",async()=>{
+ const registro={...item(1),status:"cancelado",lixeira:true};
+ vi.mocked(carregarFilaMensagens).mockResolvedValue({ok:true,dados:{itens:[registro],avisos:[],ativo:true}});
+ render(<CentralMensagensPage/>);await screen.findByText("Nenhuma mensagem encontrada. Campanhas aparecem após iniciar o envio; follow-ups aparecem quando entram na fila.");
+ fireEvent.click(screen.getByRole("button",{name:"Lixeira"}));
+ fireEvent.click(screen.getByRole("button",{name:/Opções de Campanha teste/}));
+ const menu=screen.getByRole("group",{name:/Opções de Campanha teste/});expect(menu.closest("table")).toBeNull();
+ fireEvent.click(within(menu).getByRole("button",{name:"Restaurar registro"}));
+ expect(within(screen.getByRole("alertdialog")).getByText(/Nenhum envio será reativado/)).toBeInTheDocument();
+});
+test("follow-up pendente avisa que cancelar encerra o acompanhamento atual",async()=>{
+ vi.mocked(carregarFilaMensagens).mockResolvedValue({ok:true,dados:{itens:[item(1,"followup")],avisos:[],ativo:true}});
+ render(<CentralMensagensPage/>);await screen.findByText("1 registros · 0 selecionados");
+ fireEvent.click(screen.getByRole("button",{name:/Opções de Follow-up/}));fireEvent.click(screen.getByRole("button",{name:"Cancelar envio"}));
+ expect(within(screen.getByRole("alertdialog")).getByText(/acompanhamento atual será encerrado/)).toBeInTheDocument();
+});

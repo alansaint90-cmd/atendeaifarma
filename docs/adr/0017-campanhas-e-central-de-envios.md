@@ -1,0 +1,21 @@
+# ADR 0017 — Campanhas e central de envios
+
+Status: aceito em 2026-11-18.
+
+A referência indicada em atendeclin contém prévias que apontam para componentes do projeto atendeai dr juliana. Adaptamos somente os contratos de campanha e fila ao schema ativo da farmácia. Não copiamos dados, prompts ou credenciais. As tabelas herdadas e os agendamentos individuais existentes permanecem intactos.
+
+Campanhas e destinatários usam tabelas próprias atendeia_campanhas e atendeia_campanhas_destinatarios, criadas pela migração 0016, sem alterar migrações anteriores. O anexo validado, até 2 MB, fica no rascunho PostgreSQL para sobreviver a reinícios; não cria URL pública. Apenas gerentes e proprietários acessam a área. As actions conferem sessão/permissão; cada mutação reconfirma o autor ativo no banco e audita na mesma transação.
+
+Elegibilidade exige mensagem recebida na conversa do número exato e do chip selecionado. O destinatário guarda o telefone original. A criação valida a seleção inteira e o processador repete a consulta antes de cada parte enviada. Alterar o telefone do contato não transfere o histórico para um número novo. Não há importação de destinatários ou campo para telefone avulso em campanhas.
+
+O loop existente processa campanhas independentemente da IA, usando somente a configuração Evolution projetada para o chip. A fila PostgreSQL usa trava transacional por chip, bloqueio de linhas, versão e intervalo mínimo de dez segundos entre reservas de campanhas do mesmo chip. Uma reserva iniciada nunca retorna a pendente: timeout, confirmação ausente ou interrupção levam a entrega incerta, sem repetição automática. Texto com áudio usa duas chamadas; uma falha após a primeira deixa o resultado incerto e não repete o texto. Cancelar campanha ou destinatário altera apenas pendências; não interrompe reservas iniciadas.
+
+A central combina os registros individuais existentes, os destinatários de campanhas iniciadas e os jobs realmente presentes no sorted set de follow-ups. Não materializa etapas futuras. Datas de campanha são estimativas. A consulta administrativa inclui explicitamente registros vivos e na lixeira, sem disponibilizá-los ao processador. Alterações SQL conferem versão sob bloqueio, incrementam versão e registram auditoria atomicamente. Mover uma pendência para a lixeira também a cancela; restaurar só recupera a visualização.
+
+Follow-ups continuam no Redis persistente já utilizado pelo agente. A central toma a mesma concessão exclusiva do processador e compara o digest do job. Um script Lua remove o job e sua entrada na fila, arquiva uma representação cancelada e grava a operação em um stream de auditoria na mesma execução atômica. Restaurar modifica apenas o arquivo administrativo, nunca adiciona job ou entrada à fila. Arquivo e auditoria não expiram automaticamente. Manter AOF e política noeviction continua obrigatório.
+
+Não existe transação distribuída entre PostgreSQL e Redis: a autorização e a intenção são registradas no PostgreSQL antes da operação; o resultado aplicado é auditado atomicamente no próprio Redis. Falha de conexão pode exigir conferência da fila e nunca autoriza afirmar sucesso geral. Redis indisponível deixa a consulta explicitamente parcial e impede ações sobre todos os registros do filtro. Operações por seleção ainda apresentam o resultado de cada origem disponível.
+
+A seleção de todos abrange o filtro inteiro, não somente a página. A confirmação congela IDs/versões e informa o total elegível. Requisições são limitadas a 5.000 registros; lotes maiores são divididos, com contagem de alterações, recusas e resultados sem confirmação. Repetições e alterações concorrentes são recusadas. Menus usam portal para escapar do recorte da tabela. O editor individual permanece acessível na central.
+
+Testes usam telefones fictícios e provedores simulados. PostgreSQL 16 comprova concorrência; Redis real comprova cancelamento e restauração sem reenfileirar. A validação do GitHub executa os dois serviços; implantação permanece manual.

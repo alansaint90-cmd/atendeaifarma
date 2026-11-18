@@ -97,6 +97,7 @@ A matriz operacional vigente substitui os exemplos genéricos acima:
 | --- | --- |
 | Dashboard, contatos e caixa de entrada | operador (SDR) |
 | Tags, follow-ups e agendamentos | admin (Gerente) |
+| Campanhas e central unificada, inclusive lixeira e operações em lote | admin (Gerente) |
 | Configurações, integrações e estado do agente | super_admin |
 | Chatbot IA e prompt do SDR | admin (Gerente) |
 | Sincronizar webhook na Evolution | super_admin |

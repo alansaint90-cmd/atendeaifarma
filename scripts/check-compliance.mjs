@@ -15,6 +15,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, extname, relative, basename, resolve } from "node:path";
 import { colunasDasFabricas } from "./colunas-fabricas.mjs";
+import { regrasCampanhas } from "./regras-campanhas.mjs";
 const ROOT = process.cwd(); const MAX_LINES = 500;
 /**
  * Excecao de caminho do limite de linhas. `src/components/ui/` e codigo de
@@ -33,7 +34,6 @@ const CODE_EXT = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]); const 
 // Os proprios scripts de auditoria contem os padroes proibidos como DEFINICAO
 // de regra (ex.: o regex que detecta Prisma). Nunca auto-sinalizar.
 const SKIP_FILES = new Set(["check-compliance.mjs", "project-map.mjs"]);
-
 /**
  * `vale_em_comentario`: a regra dispara mesmo em linha de comentario.
  * @type {{id:string,level:'error'|'warn',re:RegExp,msg:string,ext?:Set<string>,vale_em_comentario?:boolean}[]}
@@ -313,7 +313,7 @@ function analyzeFile(file) {
     return findings;
   }
   const ext = extname(file);
-  const rel = relative(ROOT, file).replace(/\\/g, "/");
+  const rel = relative(ROOT, file).replace(/\\/g, "/"); findings.push(...regrasCampanhas(rel, content));
   const lines = content.split("\n");
 
   const isentoDeTamanho = ISENTOS_DE_TAMANHO.some((p) => rel.startsWith(p));
@@ -402,7 +402,7 @@ function analyzeFile(file) {
     findings.push({ level: "error", id: "pausa-manual", file: rel, line: 1,
       msg: "O worker deve verificar a pausa por atendimento humano antes de responder." });
   }
-  if ((rel === "src/lib/agent/worker.ts" && (!/settingsDaInstancia\(settings, instancia\)/.test(content) || !/dependencies.chatbot\(instancia\)/.test(content))) || (rel === "src/lib/evolution/instancias.ts" && !/EVOLUTION_THIRD_INSTANCE_NAME[\s\S]*FOLLOW_UP_THIRD_CONFIG/.test(content)) || (rel === "src/lib/agendamentos/worker.ts" && !/settingsDaInstancia\(await configuracoes\(\), instancia\)/.test(content))) {
+    if ((rel === "src/lib/agent/worker.ts" && (!/settingsDaInstancia\(settings, instancia\)/.test(content) || !/dependencies.chatbot\(instancia\)/.test(content))) || (rel === "src/lib/evolution/instancias.ts" && !/EVOLUTION_THIRD_INSTANCE_NAME[\s\S]*FOLLOW_UP_THIRD_CONFIG/.test(content)) || (rel === "src/lib/agendamentos/worker.ts" && !/configuracaoEnvio\(await configuracoes\(\), instancia\)/.test(content))) {
     findings.push({ level: "error", id: "isolamento-instancias", file: rel, line: 1,
       msg: "Os três chips devem ter configuração própria e seleção da origem antes de responder, agendar ou enviar follow-ups." });
   }

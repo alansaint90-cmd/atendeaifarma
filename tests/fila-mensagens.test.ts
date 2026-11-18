@@ -1,0 +1,44 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { applyMigrations } from "../src/lib/db/migrate";
+import { receberOperacao } from "../src/lib/operacao/receber";
+import { criarCampanha, alterarCampanha, contatosElegiveis, reservarEnvio } from "../src/lib/farmacia/campanhas/repository";
+import { salvarAgendamento, reservarAgendamento } from "../src/lib/agendamentos/repository";
+import { listarFilaSql, modificarFilaSql } from "../src/lib/agendamentos/fila-repository";
+import { systemUserId } from "../src/lib/db/bootstrap";
+test("fila unifica origem e lixeira interrompe pendências sem reativar ao restaurar",async()=>{
+ const client=new PGlite();const banco=drizzle(client);
+ try{
+  await applyMigrations(banco);
+  await receberOperacao(banco,{instance:"teste",event:"messages.upsert",data:{key:{id:randomUUID(),fromMe:false,remoteJid:"5511999999999@s.whatsapp.net"},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:"Olá"}}});
+  const contato=(await contatosElegiveis(banco,"teste"))[0];
+  const id=randomUUID();await criarCampanha(banco,{id,nome:"Campanha retorno",instancia:"teste",mensagem:"Mensagem da campanha",arquivo:null,contatos:[contato.id]});
+  assert.equal((await listarFilaSql(banco)).length,0,"Rascunho não está agendado");
+  await alterarCampanha(banco,{id,version:0},"iniciar");
+  const agendamento=await salvarAgendamento(banco,{id:randomUUID(),telefone:contato.telefone,instancia:"teste",mensagem:"Individual",agendadoPara:new Date(Date.now()+3600000).toISOString()});
+  const itens=await listarFilaSql(banco);assert.equal(itens.length,2);assert.equal(itens.find(i=>i.origem==="campanha")?.origemNome,"Campanha retorno");
+  const campanha=itens.find(i=>i.origem==="campanha")!;assert.equal(campanha.previsao,true);await modificarFilaSql(banco,campanha,"lixeira",systemUserId);
+  assert.equal(await reservarEnvio(banco,"teste"),null);
+  let removido=(await listarFilaSql(banco)).find(i=>i.id===campanha.id)!;assert.equal(removido.lixeira,true);assert.equal(removido.status,"cancelado");
+  await assert.rejects(modificarFilaSql(banco,campanha,"cancelar",systemUserId),/mudou/);
+  await modificarFilaSql(banco,removido,"restaurar",systemUserId);removido=(await listarFilaSql(banco)).find(i=>i.id===campanha.id)!;assert.equal(removido.lixeira,false);assert.equal(removido.status,"cancelado");assert.equal(await reservarEnvio(banco,"teste"),null);
+  const individual=itens.find(i=>i.id===agendamento.id)!;await modificarFilaSql(banco,individual,"cancelar",systemUserId);
+  await client.query("UPDATE atendeia_agendamentos SET agendado_para=now()-interval '1 minute' WHERE id=$1",[agendamento.id]);assert.equal(await reservarAgendamento(banco,"teste"),null);
+  const id2=randomUUID();await salvarAgendamento(banco,{id:id2,telefone:contato.telefone,instancia:"teste",mensagem:"Em envio",agendadoPara:new Date(Date.now()+3600000).toISOString()});
+  await client.query("UPDATE atendeia_agendamentos SET agendado_para=now()-interval '1 minute' WHERE id=$1",[id2]);await reservarAgendamento(banco,"teste");
+  const enviando=(await listarFilaSql(banco)).find(i=>i.id===id2)!;await assert.rejects(modificarFilaSql(banco,enviando,"lixeira",systemUserId),/já começou/);
+  await client.query("UPDATE atendeia_agendamentos SET status='enviado' WHERE id=$1",[id2]);const enviado=(await listarFilaSql(banco)).find(i=>i.id===id2)!;await assert.rejects(modificarFilaSql(banco,enviado,"cancelar",systemUserId),/Somente/);
+  await modificarFilaSql(banco,enviado,"lixeira",systemUserId);assert.equal((await listarFilaSql(banco)).find(i=>i.id===id2)?.status,"enviado");
+  await receberOperacao(banco,{instance:"teste",event:"messages.upsert",data:{key:{id:randomUUID(),fromMe:false,remoteJid:"5511888888888@s.whatsapp.net"},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:"Teste fictício"}}});
+  const ambos=await contatosElegiveis(banco,"teste"),dupla=randomUUID();
+  await criarCampanha(banco,{id:dupla,nome:"Destinatários independentes",instancia:"teste",mensagem:"Teste",arquivo:null,contatos:ambos.map(c=>c.id)});
+  await alterarCampanha(banco,{id:dupla,version:0},"iniciar");
+  const pendentes=(await listarFilaSql(banco)).filter(i=>i.origemNome==="Destinatários independentes");assert.equal(pendentes.length,2);
+  await modificarFilaSql(banco,pendentes[0],"cancelar",systemUserId);
+  assert.equal((await listarFilaSql(banco)).find(i=>i.id===pendentes[1].id)?.status,"pendente","Cancelar um destinatário preserva os demais");
+  assert.equal((await reservarEnvio(banco,"teste"))?.id,pendentes[1].id,"Processador usa a fila alterada de verdade");
+ }finally{await client.close();}
+});

@@ -6,6 +6,7 @@ export * from "./schema/identidade";
 export * from "./schema/crm";
 export * from "./schema/agenda-consultas";
 export * from "./schema/farmacia";
+export * from "./schema/campanhas";
 
 const timestamps = () => ({
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
