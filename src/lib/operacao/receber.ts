@@ -32,10 +32,18 @@ export async function receberOperacao(banco: BancoSql, evento: EvolutionEvent) {
       if (contato.length) await auditar(tx, "contato", contato[0].id, ["name", "phone", "source"]);
       else contato = linhas(await tx.execute(sql`SELECT id FROM atendeia_contacts WHERE phone=${mensagem.telefone} AND is_deleted=false`));
       if (!canal[0] || !contato[0]) throw new Error("Registro operacional indisponível.");
-      // Também reconhece mensagens anteriores à instalação do recibo persistente.
+      // Consulta histórica intencional: replay legado não recria uma conversa apagada.
       const existente = linhas(await tx.execute(sql`SELECT m.id FROM atendeia_messages m JOIN atendeia_conversations c ON c.id=m.conversation_id
-        WHERE m.is_deleted=false AND c.is_deleted=false AND c.channel_id=${canal[0].id} AND m.provider_message_id=${mensagem.provedorId} LIMIT 1`));
+        WHERE m.is_deleted=false AND c.channel_id=${canal[0].id} AND m.provider_message_id=${mensagem.provedorId} LIMIT 1`));
       if (existente.length) continue;
+      const apagada = linhas(await tx.execute(sql`SELECT c.id FROM atendeia_conversations c
+        WHERE c.channel_id=${canal[0].id} AND c.remote_jid=${mensagem.jid} AND c.is_deleted=true
+          AND NOT EXISTS (SELECT 1 FROM atendeia_conversations atual WHERE atual.channel_id=c.channel_id AND atual.remote_jid=c.remote_jid
+            AND atual.is_deleted=false AND atual.status<>'closed' AND atual.created_at<c.deleted_at)
+          AND (c.deleted_at>=${mensagem.instante}::timestamptz OR (${mensagem.saida} AND NOT EXISTS (
+            SELECT 1 FROM atendeia_conversations a WHERE a.channel_id=c.channel_id AND a.remote_jid=c.remote_jid
+              AND a.is_deleted=false AND a.status<>'closed'))) LIMIT 1`));
+      if (apagada.length) continue;
       let conversa = linhas<{ id: string; version: number }>(await tx.execute(sql`INSERT INTO atendeia_conversations(channel_id,contact_id,remote_jid,modified_by)
         VALUES (${canal[0].id},${contato[0].id},${mensagem.jid},${systemUserId}) ON CONFLICT DO NOTHING RETURNING id,version`));
       if (conversa.length) await auditar(tx, "conversa", conversa[0].id, ["channel_id", "contact_id", "remote_jid"]);

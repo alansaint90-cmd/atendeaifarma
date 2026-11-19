@@ -1,7 +1,7 @@
 /* Estrutura compartilhada; adapta-se às cores de cada instalação Atende Aí. */
-.page-stack.pagina-conversas { gap:12px; }
-.pagina-conversas .page-head h1 { margin:0; }
-.pagina-conversas .conversas-caixa { height:max(440px,calc(100dvh - 180px)); }
+.workspace .content.content-conversas { padding:12px 14px 8px; gap:0; }
+.page-stack.pagina-conversas { gap:8px; }
+.pagina-conversas .conversas-caixa { height:max(440px,calc(100dvh - 86px)); }
 .conversas-caixa { display:grid; grid-template-columns:minmax(270px,340px) minmax(0,1fr); height:clamp(440px,calc(100dvh - 235px),850px); min-width:0; overflow:hidden; border:1px solid var(--line); border-radius:16px; background:var(--surface); box-shadow:0 4px 20px #0f172a05; }
 .conversas-caixa * { box-sizing:border-box; }
 .conversas-lateral { display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--line); background:var(--surface); }
@@ -28,6 +28,11 @@
 .conversas-canal { font-size:10px; color:var(--muted); }
 .conversas-principal { min-width:0; min-height:0; display:flex; flex-direction:column; }
 .conversas-cabecalho { flex-shrink:0; }
+.conversas-cabecalho > div:not(.conversas-menu) { flex:1; }
+.conversas-cabecalho .conversas-menu { margin-left:auto; flex-shrink:0; }
+.conversas-menu .fila-menu-botao { width:44px; height:44px; border:0; background:transparent; font-size:26px; color:var(--muted); cursor:pointer; }
+.conversas-menu .fila-menu-botao:hover { background:var(--bg); }
+.fila-opcoes .conversas-apagar { color:#b42318; }
 .conversas-voltar { display:none; }
 .conversas-historico { flex:1; min-height:0; overflow:auto; padding:20px 28px; background-color:#f5f2eb; background-image:radial-gradient(#d5cfc344 .8px,transparent .8px); background-size:15px 15px; scroll-padding:16px; }
 .conversas-aviso { margin:0 auto 20px; width:fit-content; border:1px solid #e4dfd5; background:#fffaf0; border-radius:8px; color:#645c4c; padding:6px 12px; text-align:center; font-size:11px; }
@@ -90,4 +95,9 @@
   .conversas-resposta form { flex-wrap:wrap; }
   .conversas-resposta form button { margin-left:auto; }
   .conversas-busca input,.conversas-resposta textarea { font-size:16px; }
+}
+@media(max-width:768px) {
+  .workspace .content.content-conversas { padding:8px; }
+  .pagina-conversas .conversas-caixa { height:max(440px,calc(100dvh - 250px)); }
+  .sidebar-collapsed .pagina-conversas .conversas-caixa { height:max(440px,calc(100dvh - 190px)); }
 }

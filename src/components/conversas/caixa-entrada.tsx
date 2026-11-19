@@ -6,7 +6,7 @@ export interface MensagemConversa { id: string; conteudo: string | null; direcao
 export interface ConversaLista { id: string; nome: string; telefone: string | null; canal: string; status: string; fotoUrl?: string | null; mensagens: MensagemConversa[] }
 interface CaixaEntradaProps {
   conversas: ConversaLista[]; selecionada: string; aoSelecionar: (id: string) => void;
-  resposta?: ReactNode; atualizar: () => void; atualizando?: boolean;
+  resposta?: ReactNode; acoesConversa?: ReactNode; atualizar: () => void; atualizando?: boolean;
 }
 const normalizar = (texto: string) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 const hora = (instante: string) => new Date(instante).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -14,7 +14,7 @@ const dia = (instante: string) => new Date(instante).toLocaleDateString("pt-BR",
 const status: Record<string, string> = { open: "Em atendimento", pending: "Pendente", closed: "Encerrada" };
 
 /** Apresentação compartilhável entre instalações; autenticação e envio ficam no adaptador. */
-export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, atualizar, atualizando = false }: CaixaEntradaProps) {
+export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, acoesConversa, atualizar, atualizando = false }: CaixaEntradaProps) {
   const [busca, definirBusca] = useState("");
   const [aberta, definirAberta] = useState(false);
   const buscaId = useId();
@@ -51,6 +51,7 @@ export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, a
       {conversa ? <><header className="conversas-barra conversas-cabecalho">
         <button type="button" className="conversas-voltar" onClick={() => { definirAberta(false); campoBusca.current?.focus(); }} aria-label="Voltar para a lista de conversas">←</button>
         <AvatarContato nome={conversa.nome} fotoUrl={conversa.fotoUrl} /><div><h2 ref={titulo} tabIndex={-1}>{conversa.nome}</h2><span>{conversa.telefone ?? "Sem telefone"} · {conversa.canal} · {status[conversa.status] ?? conversa.status}</span></div>
+        {acoesConversa}
       </header>
       <div className="conversas-historico" ref={historico} role="region" aria-label={`Histórico de ${conversa.nome}`} tabIndex={0}
         onScroll={e => { const el = e.currentTarget; acompanhar.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>

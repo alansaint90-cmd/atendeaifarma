@@ -21,7 +21,7 @@ export function Workspace({ papel, nome, email, foto, rotaInicial = "dashboard" 
   const [route, setRoute] = useState(rotaInicial);
   const gestor = papel === "admin" || papel === "super_admin";
   return <PainelShell papel={papel} nome={nome} email={email} foto={foto} rota={route} titulo={route === "plans" ? "Minha assinatura" : nav.find(item => item[0] === route)?.[1] ?? "Dashboard"} aoNavegar={setRoute}>
-      <main className="content">
+      <main className={`content${route === "inbox" ? " content-conversas" : ""}`}>
         {/* Keep form drafts mounted across navigation, but hide inactive sections. */}
         {gestor && <><div hidden={route !== "chatbot"} className="page-stack"><ChatbotsPage /></div>
         <div hidden={route !== "followups"}><FollowupsPage ativo={route === "followups"} /></div>
@@ -35,7 +35,7 @@ export function Workspace({ papel, nome, email, foto, rotaInicial = "dashboard" 
         {route === "dashboard" && <FarmaciaDashboard abrir={setRoute} />}
         {route === "estoque" && <EstoquePage gestor={gestor} />}
         {route === "pedidos" && <PedidosPage gestor={gestor} />}
-        {["contacts", "inbox"].includes(route) && <OperacaoPage rota={route} />}
+        {["contacts", "inbox"].includes(route) && <OperacaoPage rota={route} podeApagarConversa={gestor} />}
         {!["dashboard", "contacts", "inbox", "team", "plans", "campaigns"].includes(route) && demoViews[route] && <div className="page-stack demo-view" dangerouslySetInnerHTML={{ __html: demoViews[route]() }} />}
       </main>
   </PainelShell>;

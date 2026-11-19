@@ -1,7 +1,6 @@
 "use client";
 import { useEffect,useState } from "react";
 import { carregarFarmacia } from "@/lib/actions/farmacia";
-import { dinheiro } from "./comum";
 import { periodoFarmacia, periodoFarmaciaSchema, type AtalhoPeriodo } from "@/lib/farmacia/periodo";
 type Painel=Extract<Awaited<ReturnType<typeof carregarFarmacia>>,{ok:true}>["dados"];
 export function FarmaciaDashboard({abrir}:{abrir:(rota:string)=>void}) {
@@ -25,7 +24,7 @@ export function FarmaciaDashboard({abrir}:{abrir:(rota:string)=>void}) {
     </form></div></header>
     {erro&&<p role="alert">{erro}</p>}{!dados&&!erro&&<p role="status">{aplicado?"Carregando indicadores reais…":"Selecione as datas e clique em Aplicar."}</p>}{dados&&<>
       <section className="farmacia-kpis" aria-label="Indicadores de estoque">{[["Produtos cadastrados",dados.estoque.total],["Disponíveis",dados.estoque.disponiveis],["Esgotados",dados.estoque.esgotados],["Estoque baixo",dados.estoque.baixos],["Próximos do vencimento",dados.estoque.vencendo]].map(([titulo,v])=><article className="panel" key={titulo}><span>{titulo}</span><strong>{v}</strong></article>)}</section>
-      <section className="farmacia-kpis" aria-label="Indicadores comerciais">{[["Atendimentos pela IA",dados.atendimento.atendimentos],["Consultas de produtos",dados.atendimento.consultas],["Pedidos criados",dados.vendas.pedidos],["Vendas confirmadas",dados.vendas.confirmados],["Pedidos pendentes",dados.vendas.pendentes],["Faturamento registrado",dinheiro(dados.vendas.faturamento)]].map(([titulo,v])=><article className="panel" key={titulo}><span>{titulo}</span><strong>{v}</strong></article>)}</section>
+      <section className="farmacia-kpis" aria-label="Indicadores comerciais">{[["Atendimentos pela IA",dados.atendimento.atendimentos],["Consultas de produtos",dados.atendimento.consultas],["Pedidos criados",dados.vendas.pedidos],["Vendas confirmadas",dados.vendas.confirmados],["Pedidos pendentes",dados.vendas.pendentes]].map(([titulo,v])=><article className="panel" key={titulo}><span>{titulo}</span><strong>{v}</strong></article>)}</section>
       <div className="grid-2"><section className="panel"><h2>Produtos mais vendidos</h2>{!dados.maisVendidos.length?<p>As vendas confirmadas aparecerão aqui.</p>:<table><thead><tr><th>Produto</th><th>Embalagens</th></tr></thead><tbody>{dados.maisVendidos.map(p=><tr key={p.nome}><td>{p.nome}</td><td>{p.quantidade}</td></tr>)}</tbody></table>}</section><section className="panel"><h2>Acompanhe a operação</h2><p>Reservas não contam como vendas. Cancelamentos são descontados do faturamento registrado.</p><div className="farmacia-toolbar"><button className="primary" onClick={()=>abrir("pedidos")}>Abrir pedidos</button><button className="secondary" onClick={()=>abrir("inbox")}>Ver conversas</button></div></section></div>
     </>}</div>;
 }

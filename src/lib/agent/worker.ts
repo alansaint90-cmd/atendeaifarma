@@ -23,6 +23,7 @@ import { registrarEnvioIa } from "../operacao/atribuir-ia";
 import { pausaManualAtiva, pausarTransferencia } from "./pausa";
 import { transferirAtendimento } from "../operacao/transferir";
 import { deveAguardarResposta } from "./espera";
+import { conversaApagadaAposMensagem } from "../operacao/apagar-conversa";
 
 const streamResult = z.array(z.tuple([z.string(), z.array(z.tuple([z.string(), z.array(z.string())]))]));
 const configurarAgente = (...args: Parameters<typeof configurarBase>) => {
@@ -37,11 +38,13 @@ function report(status: string) {
 }
 
 const dependenciasPadrao = { settings: effectiveSettings, generate: generateReply, send: sendReply,
+  apagada: (instancia: string, numero: string, instante: number, identidade: string) => conversaApagadaAposMensagem(db(), instancia, numero, instante, identidade),
   transferir: (instancia: string, numero: string, destino: string) => transferirAtendimento(db(), instancia, numero, destino),
   registrarEnvio: (instancia: string, id: string) => registrarEnvioIa(db(), instancia, id),
   chatbot: (instancia: string) => chatbotDaInstancia(db(), instancia) };
 export async function runAgentTick(substituicoes: Partial<typeof dependenciasPadrao> = {}) {
   const dependencies = { ...dependenciasPadrao, ...substituicoes,
+    apagada: substituicoes.apagada ?? (Object.keys(substituicoes).length ? async () => false : dependenciasPadrao.apagada),
     chatbot: substituicoes.chatbot ?? (Object.keys(substituicoes).length ? async () => null : dependenciasPadrao.chatbot) };
   const settings = await dependencies.settings();
   if (!settings.REDIS_URL) { report("Redis não configurado"); return; }
@@ -87,10 +90,12 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
         const atendimentoAtivo = async () => {
           const atual = configurarAgente(settingsDaInstancia(await dependencies.settings(), instancia), await dependencies.chatbot(instancia));
           return atual.success && JSON.stringify(atual.data) === JSON.stringify(config.data)
+            && !await dependencies.apagada(instancia, message.number, message.timestamp, message.identity)
             && (Object.keys(substituicoes).length > 0 || !await atendimentoHumanoAtivo(db(), instancia, message.number))
             && !await pausaManualAtiva(client, message.conversation) && await client.get(agentKeys.lock) === token;
         };
-        result = await pausaManualAtiva(client, message.conversation) ? "pausa_manual" : await processMessage(message, config.data, {
+        result = await dependencies.apagada(instancia, message.number, message.timestamp, message.identity) ? "conversa_apagada"
+          : await pausaManualAtiva(client, message.conversation) ? "pausa_manual" : await processMessage(message, config.data, {
           ...store, generate: substituicoes.generate ?? geradorFarmacia(db(), instancia, message), send: dependencies.send, transcribe: transcribeAudio,
           registrarParte: async id => {
             await followups.outgoing(instancia, id);
@@ -104,8 +109,9 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
         });
         if (result === "pausada" && (await pausaManualAtiva(client, message.conversation)
           || (Object.keys(substituicoes).length === 0 && await atendimentoHumanoAtivo(db(), instancia, message.number)))) result = "pausa_manual";
+        if (result === "pausada" && await dependencies.apagada(instancia, message.number, message.timestamp, message.identity)) result = "conversa_apagada";
         const state = await store.read();
-        if (state?.status === "enviada" && state.providerId) {
+        if (state?.status === "enviada" && state.providerId && !await dependencies.apagada(instancia, message.number, message.timestamp, message.identity)) {
           // Estados antigos não registravam cada parte antes da confirmação.
           if (!state.providerIds?.includes(state.providerId)) {
             await dependencies.registrarEnvio(config.data.EVOLUTION_INSTANCE_NAME, state.providerId);
@@ -128,6 +134,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
     const job = await followups.due();
     if (job) {
       const instancia = job.instance ?? settings.EVOLUTION_INSTANCE_NAME ?? "";
+      if (await dependencies.apagada(instancia, job.number, job.started / 1000, job.identity)) { await followups.finish(job, "cancelado"); return; }
       const chatbot = settingsDaInstancia(settings, instancia) ? await dependencies.chatbot(instancia) : null;
       const config = configurarAgente(settingsDaInstancia(settings, instancia), chatbot);
       if (!config.success) { await followups.finish(job, "cancelado"); return; }
@@ -140,6 +147,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
           const currentBot = await dependencies.chatbot(instancia);
           const current = configurarAgente(settingsDaInstancia(currentSettings, instancia), currentBot);
           return current.success && JSON.stringify(current.data) === JSON.stringify(config.data)
+            && !await dependencies.apagada(instancia, job.number, job.started / 1000, job.identity)
             && (Object.keys(substituicoes).length > 0 || !await atendimentoHumanoAtivo(db(), instancia, job.number))
             && configuracaoPermiteFollowup(job, currentFollowup)
             && currentFollowup.instance === config.data.EVOLUTION_INSTANCE_NAME

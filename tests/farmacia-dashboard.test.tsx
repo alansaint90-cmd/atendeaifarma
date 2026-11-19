@@ -10,7 +10,9 @@ const dados={estoque:{total:3,disponiveis:2,esgotados:1,baixos:0,vencendo:0},ven
 test("dashboard oferece todos os períodos e aplica calendário sem a faixa de atualização",async()=>{
   vi.mocked(carregarFarmacia).mockResolvedValue({ok:true,dados});
   render(<FarmaciaDashboard abrir={vi.fn()}/>);
-  await screen.findByText("R$ 12,90");
+  const indicadores = await screen.findByLabelText("Indicadores comerciais");
+  expect(indicadores.querySelectorAll("article")).toHaveLength(5);
+  expect(screen.queryByText("Faturamento registrado", { exact: true })).not.toBeInTheDocument();
   expect(carregarFarmacia).toHaveBeenLastCalledWith(periodoFarmacia("hoje"));
   expect(screen.queryByText(/Todo o período|atualizado em/i)).not.toBeInTheDocument();
   const filtro=screen.getByLabelText("Período comercial");
@@ -19,7 +21,7 @@ test("dashboard oferece todos os períodos e aplica calendário sem a faixa de a
     await waitFor(()=>expect(carregarFarmacia).toHaveBeenLastCalledWith(periodoFarmacia(atalho)));
   }
   fireEvent.change(filtro,{target:{value:"personalizado"}});
-  expect(screen.queryByText("R$ 12,90")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Indicadores comerciais")).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText("De"),{target:{value:"2026-10-01"}});
   fireEvent.change(screen.getByLabelText("Até"),{target:{value:"2026-10-15"}});
   fireEvent.click(screen.getByRole("button",{name:"Aplicar"}));
@@ -32,7 +34,7 @@ test("resposta atrasada não troca os indicadores do período selecionado",async
   render(<FarmaciaDashboard abrir={vi.fn()}/>);
   await waitFor(()=>expect(carregarFarmacia).toHaveBeenCalledTimes(1));
   fireEvent.change(screen.getByLabelText("Período comercial"),{target:{value:"ontem"}});
-  await screen.findByText("R$ 12,90");
-  await act(async()=>{terminar({ok:true,dados:{...dados,vendas:{...dados.vendas,faturamento:"999.00"}}});});
-  expect(screen.queryByText("R$ 999,00")).not.toBeInTheDocument();
+  await screen.findByLabelText("Indicadores comerciais");
+  await act(async()=>{terminar({ok:true,dados:{...dados,estoque:{...dados.estoque,total:999}}});});
+  expect(screen.queryByText("999",{exact:true})).not.toBeInTheDocument();
 });

@@ -15,7 +15,7 @@
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, extname, relative, basename, resolve } from "node:path";
 import { colunasDasFabricas } from "./colunas-fabricas.mjs";
-import { regrasCampanhas } from "./regras-campanhas.mjs";
+import { regrasCampanhas } from "./regras-campanhas.mjs"; import { regrasConversas } from "./regras-conversas.mjs";
 const ROOT = process.cwd(); const MAX_LINES = 500;
 /**
  * Excecao de caminho do limite de linhas. `src/components/ui/` e codigo de
@@ -313,7 +313,7 @@ function analyzeFile(file) {
     return findings;
   }
   const ext = extname(file);
-  const rel = relative(ROOT, file).replace(/\\/g, "/"); findings.push(...regrasCampanhas(rel, content));
+  const rel = relative(ROOT, file).replace(/\\/g, "/"); findings.push(...regrasCampanhas(rel, content), ...regrasConversas(rel, content));
   const lines = content.split("\n");
 
   const isentoDeTamanho = ISENTOS_DE_TAMANHO.some((p) => rel.startsWith(p));

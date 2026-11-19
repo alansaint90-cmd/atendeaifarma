@@ -43,6 +43,9 @@ const arquivoLongo = (linhas) =>
 const QUATRO = 'created_at: x, updated_at: x, deleted_at: x, is_deleted: x';
 
 const CASOS = {
+  "src/lib/operacao/apagar-conversa.ts": "export const inseguro = true;",
+  "src/lib/agent/worker.ts": "export const inseguro = true;",
+  "src/components/operacao/acoes-conversa.tsx": "export const inseguro = true;",
   "src/lib/farmacia/campanhas/repository.ts": "export const inseguro = true;",
   "src/lib/agendamentos/fila-followups.ts": "export const inseguro = true;",
   "src/lib/agendamentos/fila-repository.ts": "export const inseguro = true;",
@@ -144,6 +147,9 @@ try {
 
   /** @type {[string, () => void][]} */
   const CHECAGENS = [
+    ["exclusão sem papel, versão e auditoria reprova", reprova("operacao/apagar-conversa.ts", "conversa-exclusao-segura")],
+    ["agente sem proteção de conversa apagada reprova", reprova("agent/worker.ts", "conversa-exclusao-segura")],
+    ["exclusão sem confirmação bloqueada reprova", reprova("operacao/acoes-conversa.tsx", "conversa-exclusao-segura")],
     ["mídia sem vídeo/documento reprova", reprova("farmacia/midia-manual.ts", "farmacia-envio-humano")],
     ["envio humano sem canal próprio e validação de mídia reprova", reprova("farmacia/atendimento.ts", "farmacia-envio-humano")],
     ["dashboard sem período validado em Brasília reprova", reprova("farmacia/consultas.ts", "farmacia-painel-periodo")],

@@ -6,12 +6,12 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 217 |
+| Arquivos TS/TSX | 219 |
 | Tabelas (Drizzle) | 45 |
 | Server Actions (arquivos) | 16 |
 | Rotas de API | 7 |
 | Paginas | 5 |
-| Componentes | 37 |
+| Componentes | 38 |
 
 ## Arvore (profundidade 3)
 
@@ -74,6 +74,7 @@ components/
   followups/
     page.tsx
   operacao/
+    acoes-conversa.tsx
     page.tsx
     painel.tsx
     proximas-consultas.tsx
@@ -226,6 +227,7 @@ lib/
     schedule.ts
     schema.ts
   operacao/
+    apagar-conversa.ts
     atribuir-ia.ts
     consultas.ts
     evento.ts
@@ -427,7 +429,7 @@ _(colunas nao detectadas)_
 - `src/lib/actions/farmacia.ts`: `importarPlanilha()`, `carregarProdutos()`, `gravarProduto()`, `receberEstoque()`, `ajustarInventario()`, `carregarHistorico()`, `carregarPedidos()`, `registrarPedido()`, `alterarPedido()`, `carregarFarmacia()`, `carregarCadastrosFarmacia()`, `salvarHabilitacao()`
 - `src/lib/actions/fila-mensagens.ts`: `carregarFilaMensagens()`, `alterarFilaMensagens()`
 - `src/lib/actions/followups.ts`: `carregarFollowups()`, `salvarFollowups()`
-- `src/lib/actions/operacao.ts`: `carregarOperacao()`
+- `src/lib/actions/operacao.ts`: `carregarOperacao()`, `apagarConversa()`
 - `src/lib/actions/painel.ts`: `carregarPainel()`
 - `src/lib/actions/perfil.ts`: `carregarMeuPerfil()`, `salvarMeuPerfil()`
 - `src/lib/actions/seguranca.ts`: `trocarMinhaSenha()`, `minhasPasskeys()`, `removerMinhaPasskey()`
