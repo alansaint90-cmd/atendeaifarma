@@ -281,7 +281,7 @@ instrumentation.ts
 `id`, `user_id`, `acao`, `tabela`, `registro_id`, `detalhes`, `dados_anteriores`, `dados_novos`, `created_at`
 
 ### `atendeia_campanhas` — src/lib/db/schema/campanhas.ts
-`id`, `status`, `modified_by`
+`id`, `intervaloSegundos`, `status`, `modified_by`
 
 ### `atendeia_campanhas_destinatarios` — src/lib/db/schema/campanhas.ts
 `id`, `contatoId`, `version`, `modified_by`

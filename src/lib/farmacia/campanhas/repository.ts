@@ -15,7 +15,7 @@ export async function contatosElegiveis(banco: TransacaoSql, instancia: string,c
  AND m.is_deleted=false AND m.direction='inbound') ORDER BY p.name,p.id`));
 }
 export async function listarCampanhas(banco: TransacaoSql): Promise<Campanha[]> {
- return linhas(await banco.execute(sql`SELECT c.id,c.nome,c.instancia,c.mensagem,c.arquivo->>'nome' AS "arquivoNome",c.status,c.version,
+ return linhas(await banco.execute(sql`SELECT c.id,c.nome,c.instancia,c.mensagem,c.intervalo_segundos AS "intervaloSegundos",c.arquivo->>'nome' AS "arquivoNome",c.status,c.version,
  count(d.id)::int total,count(d.id) FILTER(WHERE d.status IN ('pendente','enviando'))::int pendentes,
  count(d.id) FILTER(WHERE d.status='enviado')::int enviados,count(d.id) FILTER(WHERE d.status='incerto')::int incertos,
  count(d.id) FILTER(WHERE d.status='bloqueado')::int bloqueados FROM atendeia_campanhas c
@@ -29,8 +29,8 @@ export async function criarCampanha(banco: BancoSql, entrada: unknown, autor = s
   const elegiveis = await contatosElegiveis(tx, dados.instancia);
   const ids = new Set(dados.contatos); const contatos = elegiveis.filter(c => ids.has(c.id));
   if (contatos.length !== ids.size) throw new ErroDeNegocio("Selecione apenas contatos com mensagem recebida neste chip. Contatos novos não são permitidos.");
-  const inseridos = linhas(await tx.execute(sql`INSERT INTO atendeia_campanhas(id,nome,instancia,mensagem,arquivo,modified_by)
-  VALUES(${dados.id},${dados.nome},${dados.instancia},${dados.mensagem},${JSON.stringify(dados.arquivo)}::jsonb,${autor}) ON CONFLICT(id) DO NOTHING RETURNING id`));
+  const inseridos = linhas(await tx.execute(sql`INSERT INTO atendeia_campanhas(id,nome,instancia,mensagem,arquivo,intervalo_segundos,modified_by)
+  VALUES(${dados.id},${dados.nome},${dados.instancia},${dados.mensagem},${JSON.stringify(dados.arquivo)}::jsonb,${dados.intervaloSegundos},${autor}) ON CONFLICT(id) DO NOTHING RETURNING id`));
   if (!inseridos.length) throw new ErroDeNegocio("Campanha já cadastrada. Atualize a lista.");
   for (const c of contatos) await tx.execute(sql`INSERT INTO atendeia_campanhas_destinatarios(campanha_id,contato_id,telefone,modified_by) VALUES(${dados.id},${c.id},${c.telefone},${autor})`);
   await auditar(tx, dados.id, "campanha_criada", autor); return dados.id;
@@ -54,7 +54,8 @@ export async function reservarEnvio(banco: BancoSql, instancia: string): Promise
   const antigos = linhas<{id:string;campanha_id:string}>(await tx.execute(sql`UPDATE atendeia_campanhas_destinatarios SET status='incerto',codigo_erro='processamento_interrompido',version=version+1,updated_at=clock_timestamp(),modified_by=${systemUserId}
    WHERE is_deleted=false AND status='enviando' AND iniciado_em < now()-interval '5 minutes' RETURNING id,campanha_id`));
   for (const a of antigos) await auditar(tx,a.id,"campanha_envio_incerto",systemUserId);
-  const recentes=linhas(await tx.execute(sql`SELECT d.id FROM atendeia_campanhas_destinatarios d JOIN atendeia_campanhas c ON c.id=d.campanha_id WHERE c.instancia=${instancia} AND c.is_deleted=false AND d.is_deleted=false AND d.iniciado_em>now()-interval '10 seconds' LIMIT 1`));
+  // Consulta histórica de reservas: mover um envio para a lixeira não libera disparos antecipados.
+  const recentes=linhas(await tx.execute(sql`SELECT d.id FROM atendeia_campanhas_destinatarios d JOIN atendeia_campanhas c ON c.id=d.campanha_id WHERE c.instancia=${instancia} AND c.is_deleted IN (false,true) AND d.is_deleted IN (false,true) AND d.iniciado_em>now()-c.intervalo_segundos*interval '1 second' LIMIT 1`));
   if(recentes.length)return null;
   const [c] = linhas<{id:string;instancia:string;mensagem:string;arquivo:ArquivoCampanha|null}>(await tx.execute(sql`SELECT id,instancia,mensagem,arquivo FROM atendeia_campanhas c WHERE c.is_deleted=false AND c.status='ativa' AND c.instancia=${instancia} AND c.proximo_envio<=now()
    AND EXISTS(SELECT 1 FROM atendeia_campanhas_destinatarios d WHERE d.campanha_id=c.id AND d.is_deleted=false AND d.status='pendente') ORDER BY c.proximo_envio,c.id FOR UPDATE SKIP LOCKED LIMIT 1`));
@@ -62,7 +63,7 @@ export async function reservarEnvio(banco: BancoSql, instancia: string): Promise
   const [d] = linhas<{id:string;version:number;contatoId:string;telefone:string}>(await tx.execute(sql`UPDATE atendeia_campanhas_destinatarios SET status='enviando',version=version+1,iniciado_em=now(),updated_at=clock_timestamp(),modified_by=${systemUserId}
    WHERE id=(SELECT id FROM atendeia_campanhas_destinatarios WHERE campanha_id=${c.id} AND is_deleted=false AND status='pendente' ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING id,version,contato_id AS "contatoId",telefone`));
   if (!d) return null;
-  await tx.execute(sql`UPDATE atendeia_campanhas SET proximo_envio=now()+interval '10 seconds',updated_at=clock_timestamp(),modified_by=${systemUserId} WHERE id=${c.id} AND is_deleted=false`);
+  await tx.execute(sql`UPDATE atendeia_campanhas SET proximo_envio=now()+intervalo_segundos*interval '1 second',updated_at=clock_timestamp(),modified_by=${systemUserId} WHERE id=${c.id} AND is_deleted=false`);
   await auditar(tx,d.id,"campanha_envio_iniciado",systemUserId);
   return {...d,campanhaId:c.id,instancia:c.instancia,mensagem:c.mensagem,arquivo:c.arquivo};
  });

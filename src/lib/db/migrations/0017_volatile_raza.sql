@@ -1,0 +1,2 @@
+ALTER TABLE "atendeia_campanhas" ADD COLUMN "intervalo_segundos" integer DEFAULT 10 NOT NULL;--> statement-breakpoint
+ALTER TABLE "atendeia_campanhas" ADD CONSTRAINT "campanha_intervalo" CHECK ("atendeia_campanhas"."intervalo_segundos" BETWEEN 5 AND 3600);

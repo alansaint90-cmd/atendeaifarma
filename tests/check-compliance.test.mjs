@@ -43,6 +43,7 @@ const arquivoLongo = (linhas) =>
 const QUATRO = 'created_at: x, updated_at: x, deleted_at: x, is_deleted: x';
 
 const CASOS = {
+  "src/lib/farmacia/campanhas/schema.ts": "export const intervalo = 0;",
   "src/lib/operacao/apagar-conversa.ts": "export const inseguro = true;",
   "src/lib/agent/worker.ts": "export const inseguro = true;",
   "src/components/operacao/acoes-conversa.tsx": "export const inseguro = true;",
@@ -147,6 +148,7 @@ try {
 
   /** @type {[string, () => void][]} */
   const CHECAGENS = [
+    ["campanha sem limite de intervalo reprova", reprova("farmacia/campanhas/schema.ts", "campanha-intervalo")],
     ["exclusão sem papel, versão e auditoria reprova", reprova("operacao/apagar-conversa.ts", "conversa-exclusao-segura")],
     ["agente sem proteção de conversa apagada reprova", reprova("agent/worker.ts", "conversa-exclusao-segura")],
     ["exclusão sem confirmação bloqueada reprova", reprova("operacao/acoes-conversa.tsx", "conversa-exclusao-segura")],

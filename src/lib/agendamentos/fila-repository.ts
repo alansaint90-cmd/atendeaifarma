@@ -7,7 +7,7 @@ export async function listarFilaSql(banco:BancoSql):Promise<MensagemFila[]> {
  const individuais=linhas<MensagemFila>(await banco.execute(sql`SELECT id,version::text versao,'individual' origem,agendado_para AS data,telefone,instancia,mensagem,status,'Envio individual' AS "origemNome",is_deleted lixeira,false previsao FROM atendeia_agendamentos WHERE is_deleted IN (false,true) ORDER BY agendado_para DESC,id`));
  const campanhas=linhas<MensagemFila>(await banco.execute(sql`WITH fila AS (
  SELECT d.id,d.version::text versao,'campanha' origem,
- CASE WHEN d.status='pendente' THEN greatest(c.proximo_envio,now())+(row_number() OVER(PARTITION BY c.id,d.status ORDER BY d.created_at,d.id)-1)*interval '10 seconds' ELSE coalesce(d.iniciado_em,d.created_at) END AS data,
+ CASE WHEN d.status='pendente' THEN greatest(c.proximo_envio,now())+(row_number() OVER(PARTITION BY c.id,d.status ORDER BY d.created_at,d.id)-1)*c.intervalo_segundos*interval '1 second' ELSE coalesce(d.iniciado_em,d.created_at) END AS data,
  d.telefone,c.instancia,concat_ws(E'\n',nullif(c.mensagem,''),CASE WHEN c.arquivo IS NOT NULL AND c.arquivo<>'null'::jsonb THEN '[Anexo: '||(c.arquivo->>'nome')||']' END) mensagem,
  CASE WHEN c.status='rascunho' AND d.status='pendente' THEN 'rascunho' ELSE d.status END status,c.nome AS "origemNome",d.is_deleted lixeira,(d.status='pendente') previsao
  FROM atendeia_campanhas_destinatarios d JOIN atendeia_campanhas c ON c.id=d.campanha_id WHERE c.is_deleted=false AND c.status<>'rascunho' AND d.is_deleted IN (false,true)) SELECT * FROM fila ORDER BY data DESC,id`));

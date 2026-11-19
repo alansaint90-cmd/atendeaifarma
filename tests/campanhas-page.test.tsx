@@ -10,6 +10,8 @@ test("campanha seleciona somente a base e salva rascunho sem enviar",async()=>{
  const verFila=vi.fn();render(<CampanhasPage aoVerAgendamentos={verFila}/>);await screen.findByText("Nenhuma campanha criada. Comece em Nova campanha.");
  fireEvent.click(screen.getByRole("button",{name:"Ver mensagens agendadas"}));expect(verFila).toHaveBeenCalledOnce();
  fireEvent.click(screen.getByRole("button",{name:"+ Nova campanha"}));
+ const intervalo=screen.getByLabelText(/Intervalo entre envios/);expect(intervalo).toHaveValue(10);
+ fireEvent.change(intervalo,{target:{value:"5"}});
  expect(screen.queryByLabelText(/Telefone com/)).not.toBeInTheDocument();
  fireEvent.change(screen.getByLabelText("Nome da campanha"),{target:{value:"Retorno"}});fireEvent.change(screen.getByLabelText("Texto da mensagem"),{target:{value:"Olá!"}});
  fireEvent.click(screen.getByRole("button",{name:"Selecionar todos (2)"}));expect(screen.getByText("2 de 2 selecionados")).toBeInTheDocument();
@@ -17,5 +19,5 @@ test("campanha seleciona somente a base e salva rascunho sem enviar",async()=>{
  vi.useFakeTimers();fireEvent.click(screen.getByRole("button",{name:"Salvar rascunho"}));expect(gravarCampanha).not.toHaveBeenCalled();
  for(let i=0;i<3;i++)await act(()=>vi.advanceTimersByTimeAsync(1000));
  await act(async()=>{fireEvent.click(screen.getByRole("button",{name:"Confirmar"}));});
- expect(gravarCampanha).toHaveBeenCalledWith(expect.objectContaining({nome:"Retorno",contatos:["a"],mensagem:"Olá!"}));expect(iniciarCampanha).not.toHaveBeenCalled();
+ expect(gravarCampanha).toHaveBeenCalledWith(expect.objectContaining({nome:"Retorno",contatos:["a"],mensagem:"Olá!",intervaloSegundos:5}));expect(iniciarCampanha).not.toHaveBeenCalled();
 });

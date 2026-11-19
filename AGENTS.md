@@ -141,6 +141,9 @@ npm run lixo           # lista arquivos-lixo na raiz (simulação)
 
 - `develop` recebe o trabalho (deploy HML); `master` só por merge validado (deploy PRD).
   NUNCA commitar direto na `master`.
+- Por solicitação do proprietário, ao concluir e validar alterações neste projeto,
+  faça commit e push automaticamente para `develop`, sem pedir nova confirmação.
+  Confira a validação do GitHub. A implantação no servidor permanece manual.
 - Conventional Commits em PT-BR (`docs/git-commits.md`), sem rodapé de coautoria.
 - O pre-commit (`.githooks/pre-commit`) roda o auditor e bloqueia `.env`. Não use
   `--no-verify`. O CI roda tudo de novo.
@@ -186,7 +189,7 @@ Estoque sempre em A–Z pelo nome normalizado, sem distinguir caixa ou acentos p
 
 Oferta no WhatsApp consulta primeiro as apresentações disponíveis, antes da paginação, e só registra no contexto as opções efetivamente oferecidas. Consulta específica não troca concentração ou apresentação; números de uma consulta composta não podem coincidir com trechos de SKU/EAN para simular a apresentação solicitada. Oferta informa identificação e preço, sem lotes nem saldo interno; CTA é um segundo balão validado pelo processador, com checkpoint, registro de ID e verificação de pausa por parte. Sem disponibilidade, não oferece compra nem revela preço de cadastro inativo ou sem saldo.
 
-Campanhas só selecionam números com mensagem recebida no chip escolhido, correlacionando telefone exato da conversa e contato vivo. Telefone é fixado no destinatário e revalidado antes de cada parte enviada; editar cadastro não transfere autorização. Rascunho não envia; início exige confirmação. Anexos JPG/PNG, MP3/OGG e PDF até 2 MB validam assinatura. Fila PostgreSQL tem versões, auditoria, trava por chip e intervalo mínimo de dez segundos; entrega incerta nunca é reenviada automaticamente. Cancelar não interrompe reservas iniciadas. Acesso administrativo somente.
+Campanhas só selecionam números com mensagem recebida no chip escolhido, correlacionando telefone exato da conversa e contato vivo. Telefone é fixado no destinatário e revalidado antes de cada parte enviada; editar cadastro não transfere autorização. Rascunho não envia; início exige confirmação. Anexos JPG/PNG, MP3/OGG e PDF até 2 MB validam assinatura. Fila PostgreSQL tem versões, auditoria, trava por chip e intervalo configurável de 5 a 3.600 segundos por campanha (padrão 10). Reservas históricas, inclusive na lixeira, mantêm a espera do chip sem expor conteúdo; entrega incerta nunca é reenviada automaticamente. Cancelar não interrompe reservas iniciadas. Acesso administrativo somente.
 
 Central unifica individuais existentes, campanhas iniciadas e jobs reais de follow-up, sem inventar etapas futuras. Horários de campanhas são previsões. Cancelamento/lixeira alteram a fila real, destinatário individual não afeta os demais e cancelar follow-up encerra o ciclo atual. Restauração é só visual, sem reativar envio. Seleção de todos considera todo o filtro e confirma quantidade elegível; operações divididas em até 5.000 registros informam falhas parciais e resultados sem confirmação. Consulta de lixeira inclui removidos explicitamente, sem mudar os processadores. Redis usa a trava do agente, CAS e Lua para remover job/fila, arquivar e auditar atomicamente; intenção SQL é separada conforme ADR 0017. Arquivo/auditoria não expiram. Redis indisponível sinaliza lista parcial e impede operações sobre todo o filtro. Testes não disparam para contatos reais.
 

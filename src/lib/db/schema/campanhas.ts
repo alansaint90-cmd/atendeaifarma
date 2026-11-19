@@ -6,9 +6,10 @@ import { STATUS_CAMPANHA,STATUS_DESTINATARIO_CAMPANHA,listaSql } from "./_enums"
 import type { ArquivoCampanha } from "../../farmacia/campanhas/schema";
 export const campanhas = pgTable("atendeia_campanhas", {
  id: uuid("id").primaryKey(), nome: text("nome").notNull(), instancia: text("instancia").notNull(), mensagem: text("mensagem").notNull(), arquivo: jsonb("arquivo").$type<ArquivoCampanha>(),
+ intervaloSegundos: integer("intervalo_segundos").notNull().default(10),
  status: text("status").notNull().default("rascunho"), version: integer("version").notNull().default(0), proximoEnvio: instante("proximo_envio").notNull().defaultNow(), ...colunasAuditoria,
  modified_by: uuid("modified_by").notNull().references(() => users.id, {onDelete: "restrict", onUpdate: "restrict"}),
-}, t => [check("campanha_status", sql`${t.status} IN (${sql.raw(listaSql(STATUS_CAMPANHA))})`)]);
+}, t => [check("campanha_status", sql`${t.status} IN (${sql.raw(listaSql(STATUS_CAMPANHA))})`), check("campanha_intervalo", sql`${t.intervaloSegundos} BETWEEN 5 AND 3600`)]);
 export const campanhaDestinatarios = pgTable("atendeia_campanhas_destinatarios", {
  id: uuid("id").primaryKey().defaultRandom(), campanhaId: uuid("campanha_id").notNull().references(() => campanhas.id, {onDelete: "restrict", onUpdate: "restrict"}),
  contatoId: uuid("contato_id").notNull().references(() => contacts.id, {onDelete: "restrict", onUpdate: "restrict"}), telefone: text("telefone").notNull(), status: text("status").notNull().default("pendente"),
