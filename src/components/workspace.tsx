@@ -27,7 +27,7 @@ export function Workspace({ papel, nome, email, foto, rotaInicial = "dashboard" 
         <div hidden={route !== "followups"}><FollowupsPage ativo={route === "followups"} /></div>
         <div hidden={route !== "tags"}><TagsPage ativo={route === "tags"} /></div>
         <div hidden={route !== "agendamentos"}><CentralMensagensPage ativoNaTela={route === "agendamentos"} /></div>
-        <div hidden={route !== "campaigns"}><CampanhasPage ativoNaTela={route === "campaigns"} /></div>
+        <div hidden={route !== "campaigns"}><CampanhasPage ativoNaTela={route === "campaigns"} aoVerAgendamentos={()=>setRoute("agendamentos")} /></div>
         </>}
         {gestor && route === "team" && <UsuariosPage papel={papel} />}
         {papel === "super_admin" && route === "settings" && <Settings />}

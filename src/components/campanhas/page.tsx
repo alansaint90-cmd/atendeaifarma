@@ -5,7 +5,7 @@ import { carregarCampanhas, gravarCampanha, iniciarCampanha, cancelarCampanha, d
 import { LIMITE_ARQUIVO, tiposArquivo, statusDestinatario, type Campanha, type ContatoCampanha, type DadosCampanha } from "@/lib/farmacia/campanhas/schema";
 import { ModalConfirmacaoBlock } from "../modal-confirmacao-block";
 type Detalhe = {id:string;nome:string;telefone:string;status:string;codigo:string|null};
-export function CampanhasPage({ativoNaTela=true}:{ativoNaTela?:boolean}) {
+export function CampanhasPage({ativoNaTela=true,aoVerAgendamentos}:{ativoNaTela?:boolean;aoVerAgendamentos?:()=>void}) {
  const [itens,setItens]=useState<Campanha[]>([]),[contatos,setContatos]=useState<ContatoCampanha[]>([]),[instancias,setInstancias]=useState<string[]>([]);
  const [instancia,setInstancia]=useState(""),[carregado,setCarregado]=useState(false),[ativo,setAtivo]=useState(false),[ocupado,setOcupado]=useState(false),[erro,setErro]=useState(""),[aviso,setAviso]=useState("");
  const [draft,setDraft]=useState<DadosCampanha|null>(null),[busca,setBusca]=useState(""),[confirmacao,setConfirmacao]=useState<{acao:"salvar"|"iniciar"|"cancelar";item?:Campanha}|null>(null),[detalhes,setDetalhes]=useState<Detalhe[]|null>(null);
@@ -60,6 +60,7 @@ export function CampanhasPage({ativoNaTela=true}:{ativoNaTela?:boolean}) {
     <td><div className="feature-actions">{c.status==="rascunho"&&<button className="primary" disabled={ocupado||!ativo} onClick={()=>setConfirmacao({acao:"iniciar",item:c})}>Iniciar envio</button>}{c.status!=="cancelada"&&(c.status==="rascunho"||c.pendentes>0)&&<button className="secondary" disabled={ocupado} onClick={()=>setConfirmacao({acao:"cancelar",item:c})}>Cancelar campanha</button>}
     <button className="secondary" disabled={ocupado} onClick={async()=>{setOcupado(true);try{const r=await detalharCampanha(c.id);if(r.ok)setDetalhes(r.dados);else setErro(r.erro);}catch{setErro("Não foi possível carregar os destinatários.");}finally{setOcupado(false);}}}>Ver destinatários</button></div></td></tr>)}</tbody></table></div>}
    <p className="followup-note">Envios de campanhas são espaçados em pelo menos 10 segundos por chip. “Enviado” confirma aceitação pela Evolution, não leitura. Entregas incertas não são reenviadas automaticamente.</p>
+   {aoVerAgendamentos&&<button type="button" className="secondary" onClick={aoVerAgendamentos}>Ver mensagens agendadas</button>}
   </article>}
   {detalhes&&<article className="panel"><div className="page-head"><h2>Resultado por contato</h2><button className="secondary" onClick={()=>setDetalhes(null)}>Fechar resultados</button></div><div className="table"><table><thead><tr><th>Contato</th><th>Telefone</th><th>Status</th></tr></thead><tbody>{detalhes.map(d=><tr key={d.id}><td>{d.nome}</td><td>{d.telefone}</td><td>{statusDestinatario[d.status]}{d.codigo&&<small>{d.codigo}</small>}</td></tr>)}</tbody></table></div></article>}
   <ModalConfirmacaoBlock aberto={!!confirmacao} titulo={confirmacao?.acao==="salvar"?"Salvar rascunho":confirmacao?.acao==="iniciar"?"Iniciar campanha":"Cancelar campanha"}

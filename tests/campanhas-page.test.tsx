@@ -7,7 +7,8 @@ afterEach(()=>{cleanup();vi.clearAllMocks();vi.useRealTimers();});
 test("campanha seleciona somente a base e salva rascunho sem enviar",async()=>{
  vi.mocked(carregarCampanhas).mockResolvedValue({ok:true,dados:{itens:[],instancias:["teste"],instancia:"teste",ativo:true,contatos:[{id:"a",nome:"Contato anterior",telefone:"+5511999999999"},{id:"b",nome:"Outra pessoa",telefone:"+5511888888888"}]}});
  vi.mocked(gravarCampanha).mockResolvedValue({ok:true,dados:"id"});
- render(<CampanhasPage/>);await screen.findByText("Nenhuma campanha criada. Comece em Nova campanha.");
+ const verFila=vi.fn();render(<CampanhasPage aoVerAgendamentos={verFila}/>);await screen.findByText("Nenhuma campanha criada. Comece em Nova campanha.");
+ fireEvent.click(screen.getByRole("button",{name:"Ver mensagens agendadas"}));expect(verFila).toHaveBeenCalledOnce();
  fireEvent.click(screen.getByRole("button",{name:"+ Nova campanha"}));
  expect(screen.queryByLabelText(/Telefone com/)).not.toBeInTheDocument();
  fireEvent.change(screen.getByLabelText("Nome da campanha"),{target:{value:"Retorno"}});fireEvent.change(screen.getByLabelText("Texto da mensagem"),{target:{value:"Olá!"}});

@@ -19,7 +19,11 @@ test("PostgreSQL 16: dois processadores não duplicam destinatário e a central 
   for(let i=0;i<2;i++)await receberOperacao(dbA,{event:"messages.upsert",instance:instancia,data:{key:{id:randomUUID(),fromMe:false,remoteJid:`5511${randomInt(100000000,999999999)}@s.whatsapp.net`},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:"Teste fictício"}}});
   const contatos=await contatosElegiveis(dbA,instancia),id=randomUUID();assert.equal(contatos.length,2);
   await criarCampanha(dbA,{id,nome:"Concorrência fictícia",instancia,mensagem:"Não enviar a provedores reais",arquivo:null,contatos:contatos.map(c=>c.id)},autor);
+  assert.equal((await listarFilaSql(dbA)).filter(i=>i.origem==="campanha"&&i.instancia===instancia).length,0);
   await alterarCampanha(dbA,{id,version:0},"iniciar",autor);
+  const iniciada=(await listarFilaSql(dbA)).filter(i=>i.origem==="campanha"&&i.instancia===instancia);
+  assert.equal(iniciada.length,2);
+  assert.ok(iniciada.every(i=>i.origemNome==="Concorrência fictícia"&&i.status==="pendente"&&i.previsao));
   const reservas=await Promise.all([reservarEnvio(dbA,instancia),reservarEnvio(dbB,instancia)]),job=reservas.find(Boolean)!;
   assert.equal(reservas.filter(Boolean).length,1);assert.ok(job);
   const fila=(await listarFilaSql(dbA)).filter(i=>i.origem==="campanha"&&i.instancia===instancia);

@@ -7,6 +7,7 @@ export const nav = [
   ["chatbot", "Agente IA", "spark"],
   ["followups", "Follow-ups automáticos", "clock"],
   ["tags", "Tags e rótulos", "tag"],
+  ["campaigns", "Campanhas", "send"],
   ["agendamentos", "Mensagens agendadas", "clock"],
   ["team", "Equipe", "briefcase"],
   ["settings", "Configurações", "settings"],
