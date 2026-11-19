@@ -9,6 +9,7 @@
 | Cadastro/edição de produto, ajuste, confirmar pagamento ou cancelar | admin |
 | Habilitar/desabilitar farmacêutico | admin |
 | Apagar conversa da caixa de entrada (exclusão lógica auditada) | admin |
+| Excluir contato e arquivar seus atendimentos (exclusão lógica auditada) | admin |
 | Conferir receita | operador E farmacêutico habilitado/ativo |
 | Integrações e chaves privadas | super_admin |
 

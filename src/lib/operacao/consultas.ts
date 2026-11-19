@@ -2,7 +2,7 @@ import { sql } from "drizzle-orm";
 import { linhas, type BancoSql } from "../db/porta";
 import { LIMITE_CONTATOS } from "./limites";
 
-export interface ContatoOperacional { id: string; nome: string; telefone: string | null; email: string | null; origem: string | null; status: string }
+export interface ContatoOperacional { id: string; version: number; nome: string; telefone: string | null; email: string | null; origem: string | null; status: string }
 export interface MensagemOperacional { id: string; conteudo: string | null; direcao: string; instante: string }
 export interface ConversaOperacional { id: string; version: number; nome: string; telefone: string | null; canal: string; status: string; fotoUrl?: string | null; mensagens: MensagemOperacional[] }
 export interface ResumoOperacional {
@@ -30,7 +30,7 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
         count(*) FILTER (WHERE recebeu)::int recebidas, count(*) FILTER (WHERE respondeu)::int respondidas FROM atendimento`))[0];
     const totais = linhas<{ total: number; qualificados: number }>(await tx.execute(sql`SELECT count(*)::int total,
       count(*) FILTER (WHERE lead_status='qualificado')::int qualificados FROM atendeia_contacts WHERE is_deleted=false`))[0];
-    const contatos = linhas<ContatoOperacional>(await tx.execute(sql`SELECT id,name nome,phone telefone,email,source origem,lead_status status
+    const contatos = linhas<ContatoOperacional>(await tx.execute(sql`SELECT id,version,name nome,phone telefone,email,source origem,lead_status status
       FROM atendeia_contacts WHERE is_deleted=false ORDER BY created_at DESC,id LIMIT ${LIMITE_CONTATOS}`));
     const conversas = linhas<Omit<ConversaOperacional, "mensagens">>(await tx.execute(sql`SELECT c.id,c.version,p.name nome,p.phone telefone,ch.name canal,c.status,p.foto_url "fotoUrl"
       FROM atendeia_conversations c JOIN atendeia_contacts p ON p.id=c.contact_id JOIN atendeia_channels ch ON ch.id=c.channel_id

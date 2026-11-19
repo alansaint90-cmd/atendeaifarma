@@ -1,18 +1,19 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { carregarOperacao, apagarConversa } from "@/lib/actions/operacao";
+import { carregarOperacao, apagarConversa, excluirContato } from "@/lib/actions/operacao";
 import type { ResumoOperacional } from "@/lib/operacao/consultas";
 import { PainelOperacionalPage } from "./painel";
 import { AtendimentoManual } from "../farmacia/atendimento";
 import { CaixaEntrada } from "../conversas/caixa-entrada";
 import { LIMITE_CONTATOS } from "@/lib/operacao/limites";
 import { AcoesConversa } from "./acoes-conversa";
+import { AcoesContato } from "./acoes-contato";
 
-export function OperacaoPage({ rota, podeVerAgenda = false, aoVerAgenda, podeApagarConversa = false }: { rota: string; podeVerAgenda?: boolean; aoVerAgenda?: () => void; podeApagarConversa?: boolean }) {
-  return rota === "dashboard" ? <PainelOperacionalPage podeVerAgenda={podeVerAgenda} aoVerAgenda={aoVerAgenda} /> : <ListaOperacionalPage rota={rota} podeApagarConversa={podeApagarConversa} />;
+export function OperacaoPage({ rota, podeVerAgenda = false, aoVerAgenda, podeApagarConversa = false, podeExcluirContato = false }: { rota: string; podeVerAgenda?: boolean; aoVerAgenda?: () => void; podeApagarConversa?: boolean; podeExcluirContato?: boolean }) {
+  return rota === "dashboard" ? <PainelOperacionalPage podeVerAgenda={podeVerAgenda} aoVerAgenda={aoVerAgenda} /> : <ListaOperacionalPage rota={rota} podeApagarConversa={podeApagarConversa} podeExcluirContato={podeExcluirContato} />;
 }
 
-function ListaOperacionalPage({ rota, podeApagarConversa }: { rota: string; podeApagarConversa: boolean }) {
+function ListaOperacionalPage({ rota, podeApagarConversa, podeExcluirContato }: { rota: string; podeApagarConversa: boolean; podeExcluirContato: boolean }) {
   const [dados, definirDados] = useState<ResumoOperacional | null>(null);
   const [ocupado, definirOcupado] = useState(false);
   const [erro, definirErro] = useState("");
@@ -43,6 +44,14 @@ function ListaOperacionalPage({ rota, podeApagarConversa }: { rota: string; pode
       return resultado;
     } finally { apagando.current = false; definirOcupado(false); void carregar(); }
   }
+  async function excluir(entrada: { id: string; version: number }) {
+    apagando.current = true; invalidarConsulta();
+    try {
+      const resultado = await excluirContato(entrada);
+      if (resultado.ok) definirDados(null);
+      return resultado;
+    } finally { apagando.current = false; definirOcupado(false); void carregar(); }
+  }
   const rotaOperacional = rota === "contacts" || rota === "inbox";
   useEffect(() => {
     if (!rotaOperacional) return;
@@ -59,8 +68,8 @@ function ListaOperacionalPage({ rota, podeApagarConversa }: { rota: string; pode
     {dados && <>
       {rota !== "inbox" && <p role="status">Atualizado em {new Date(dados.atualizadoEm).toLocaleString("pt-BR")}.</p>}
       {rota === "contacts" && <article className="panel"><h2>{dados.totalContatos} contatos cadastrados</h2><p>Exibindo os {dados.contatos.length} contatos mais recentes (limite de {LIMITE_CONTATOS}).</p>
-        {dados.contatos.length ? <div className="table"><table><thead><tr>{["Nome", "Telefone", "Email", "Origem", "Status"].map(titulo => <th key={titulo}>{titulo}</th>)}</tr></thead>
-          <tbody>{dados.contatos.map(contato => <tr key={contato.id}><td>{contato.nome}</td><td>{contato.telefone || "—"}</td><td>{contato.email || "—"}</td><td>{contato.origem || "—"}</td><td>{contato.status}</td></tr>)}</tbody></table></div>
+        {dados.contatos.length ? <div className="table"><table><thead><tr>{["Nome", "Telefone", "Email", "Origem", "Status"].map(titulo => <th key={titulo}>{titulo}</th>)}{podeExcluirContato&&<th><span className="sr-only">Opções</span></th>}</tr></thead>
+          <tbody>{dados.contatos.map(contato => <tr key={contato.id}><td>{contato.nome}</td><td>{contato.telefone || "—"}</td><td>{contato.email || "—"}</td><td>{contato.origem || "—"}</td><td>{contato.status}</td>{podeExcluirContato&&<td><AcoesContato id={contato.id} version={contato.version} nome={contato.nome} excluir={excluir}/></td>}</tr>)}</tbody></table></div>
           : <p>Nenhum contato cadastrado. Aguardando mensagens reais.</p>}</article>}
       {rota === "inbox" && <CaixaEntrada conversas={dados.conversas} selecionada={conversa?.id ?? ""} aoSelecionar={selecionar} atualizar={() => void carregar()} atualizando={ocupado}
         acoesConversa={podeApagarConversa && conversa && <AcoesConversa key={conversa.id} id={conversa.id} version={conversa.version} nome={conversa.nome} apagar={apagar} />}

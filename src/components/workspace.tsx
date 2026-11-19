@@ -35,7 +35,7 @@ export function Workspace({ papel, nome, email, foto, rotaInicial = "dashboard" 
         {route === "dashboard" && <FarmaciaDashboard abrir={setRoute} />}
         {route === "estoque" && <EstoquePage gestor={gestor} />}
         {route === "pedidos" && <PedidosPage gestor={gestor} />}
-        {["contacts", "inbox"].includes(route) && <OperacaoPage rota={route} podeApagarConversa={gestor} />}
+        {["contacts", "inbox"].includes(route) && <OperacaoPage rota={route} podeApagarConversa={gestor} podeExcluirContato={gestor} />}
         {!["dashboard", "contacts", "inbox", "team", "plans", "campaigns"].includes(route) && demoViews[route] && <div className="page-stack demo-view" dangerouslySetInnerHTML={{ __html: demoViews[route]() }} />}
       </main>
   </PainelShell>;

@@ -4,6 +4,7 @@ import { linhas, type BancoSql, type TransacaoSql } from "../db/porta";
 import type { EvolutionEvent } from "../evolution/schema";
 import { mensagensOperacionais } from "./evento";
 import { receberFotosContatos } from "./fotos";
+import { travarTelefoneContato } from "./excluir-contato";
 
 async function auditar(tx: TransacaoSql, entidade: string, id: string, campos: string[]) {
   await tx.execute(sql`INSERT INTO atendeia_audit_logs(action,entity_type,entity_id,changed_fields,modified_by)
@@ -16,6 +17,7 @@ export async function receberOperacao(banco: BancoSql, evento: EvolutionEvent) {
   const mensagens = mensagensOperacionais(evento);
   if (!mensagens.length) return;
   await banco.transaction(async tx => {
+    for (const telefone of [...new Set(mensagens.map(m => m.telefone))].sort()) await travarTelefoneContato(tx, telefone);
     for (const mensagem of mensagens) {
       if (mensagem.saida) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${mensagem.instancia} || ':' || ${mensagem.provedorId}, 0))`);
       const recibo = linhas<{ id: string }>(await tx.execute(sql`INSERT INTO atendeia_webhook_recebimentos(identidade,modified_by)
@@ -27,11 +29,7 @@ export async function receberOperacao(banco: BancoSql, evento: EvolutionEvent) {
       if (canal.length) await auditar(tx, "canal", canal[0].id, ["name", "instance_name"]);
       else canal = linhas(await tx.execute(sql`SELECT id FROM atendeia_channels
         WHERE provider='evolution' AND instance_name=${mensagem.instancia} AND is_deleted=false`));
-      let contato = linhas<{ id: string }>(await tx.execute(sql`INSERT INTO atendeia_contacts(name,phone,source,modified_by)
-        VALUES (${mensagem.nome || mensagem.telefone},${mensagem.telefone},'WhatsApp',${systemUserId}) ON CONFLICT DO NOTHING RETURNING id`));
-      if (contato.length) await auditar(tx, "contato", contato[0].id, ["name", "phone", "source"]);
-      else contato = linhas(await tx.execute(sql`SELECT id FROM atendeia_contacts WHERE phone=${mensagem.telefone} AND is_deleted=false`));
-      if (!canal[0] || !contato[0]) throw new Error("Registro operacional indisponível.");
+      if (!canal[0]) throw new Error("Registro operacional indisponível.");
       // Consulta histórica intencional: replay legado não recria uma conversa apagada.
       const existente = linhas(await tx.execute(sql`SELECT m.id FROM atendeia_messages m JOIN atendeia_conversations c ON c.id=m.conversation_id
         WHERE m.is_deleted=false AND c.channel_id=${canal[0].id} AND m.provider_message_id=${mensagem.provedorId} LIMIT 1`));
@@ -44,6 +42,11 @@ export async function receberOperacao(banco: BancoSql, evento: EvolutionEvent) {
             SELECT 1 FROM atendeia_conversations a WHERE a.channel_id=c.channel_id AND a.remote_jid=c.remote_jid
               AND a.is_deleted=false AND a.status<>'closed'))) LIMIT 1`));
       if (apagada.length) continue;
+      let contato = linhas<{ id: string }>(await tx.execute(sql`INSERT INTO atendeia_contacts(name,phone,source,modified_by)
+        VALUES (${mensagem.nome || mensagem.telefone},${mensagem.telefone},'WhatsApp',${systemUserId}) ON CONFLICT DO NOTHING RETURNING id`));
+      if (contato.length) await auditar(tx, "contato", contato[0].id, ["name", "phone", "source"]);
+      else contato = linhas(await tx.execute(sql`SELECT id FROM atendeia_contacts WHERE phone=${mensagem.telefone} AND is_deleted=false FOR UPDATE`));
+      if (!contato[0]) throw new Error("Registro operacional indisponível.");
       let conversa = linhas<{ id: string; version: number }>(await tx.execute(sql`INSERT INTO atendeia_conversations(channel_id,contact_id,remote_jid,modified_by)
         VALUES (${canal[0].id},${contato[0].id},${mensagem.jid},${systemUserId}) ON CONFLICT DO NOTHING RETURNING id,version`));
       if (conversa.length) await auditar(tx, "conversa", conversa[0].id, ["channel_id", "contact_id", "remote_jid"]);
