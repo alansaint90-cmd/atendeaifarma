@@ -9,6 +9,8 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
+    // Serializa o JSDOM no Windows; Linux mantém dois processos como nos testes Node.
+    maxWorkers: process.platform === "win32" ? 1 : 2,
     passWithNoTests: true, // projeto recem-criado ainda nao tem teste
     setupFiles: ["config/vitest.setup.ts"],
     // .mjs de tests/ sao scripts Node (ex.: check-compliance.test.mjs), nao Vitest.
