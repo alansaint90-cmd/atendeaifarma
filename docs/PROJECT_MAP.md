@@ -260,6 +260,7 @@ styles/
   conta-menu.css
   conversas.css
   design-juliana.css
+  farma-pro.css
   farmacia.css
   features.css
   improvements.css
