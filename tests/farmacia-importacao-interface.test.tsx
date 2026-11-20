@@ -1,6 +1,7 @@
 import {afterEach,expect,test,vi} from "vitest";
 import {cleanup,fireEvent,render,screen,waitFor} from "@testing-library/react";
 import {ImportarProdutos} from "@/components/farmacia/importar-produtos";
+import {useState} from "react";
 import {ProdutoForm} from "@/components/farmacia/produto-form";
 const mocks=vi.hoisted(()=>({ler:vi.fn(),importar:vi.fn()}));
 vi.mock("@/lib/farmacia/planilha",()=>({lerPlanilha:mocks.ler,modeloPlanilha:vi.fn()}));
@@ -20,6 +21,15 @@ async function enviar() {
   fireEvent.change(screen.getByLabelText("Arquivo Excel"),{target:{files:[file]}});
   await screen.findByText(/produtos válidos/);
 }
+
+test("importação abre em portal, recebe foco e devolve ao botão ao fechar",async()=>{
+  function Tela(){const [aberto,abrir]=useState(false);return <><button onClick={()=>abrir(true)}>Importar Excel</button>{aberto&&<ImportarProdutos cancelar={()=>abrir(false)} concluido={()=>abrir(false)}/>}</>;}
+  const tela=render(<Tela/>);const botao=screen.getByRole("button",{name:"Importar Excel"});botao.focus();fireEvent.click(botao);
+  const janela=screen.getByRole("dialog",{name:"Importar produtos do Excel"});expect(tela.container).not.toContainElement(janela);
+  expect(screen.getByRole("heading",{name:"Importar produtos do Excel"})).toHaveFocus();
+  fireEvent.keyDown(janela,{key:"Escape"});await waitFor(()=>expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  await waitFor(()=>expect(botao).toHaveFocus());
+});
 test("linha inválida bloqueia o envio inteiro e mostra o erro",async()=>{
   mocks.ler.mockResolvedValue({linhas:[linha],erros:["Linha 3: informe validade"]});
   render(<ImportarProdutos cancelar={()=>{}} concluido={()=>{}}/>);await enviar();
@@ -28,10 +38,11 @@ test("linha inválida bloqueia o envio inteiro e mostra o erro",async()=>{
 });
 test("prévia exige confirmação de três segundos e informa sucesso",async()=>{
   mocks.ler.mockResolvedValue({linhas:[linha],erros:[]});mocks.importar.mockResolvedValue({ok:true,dados:{produtos:1,embalagens:25}});
-  const concluido=vi.fn();render(<ImportarProdutos cancelar={()=>{}} concluido={concluido}/>);await enviar();
+  const concluido=vi.fn(),cancelar=vi.fn();render(<ImportarProdutos cancelar={cancelar} concluido={concluido}/>);await enviar();
   expect(screen.getByText("R$ 8,90")).toBeInTheDocument();fireEvent.click(screen.getByRole("button",{name:"Conferir e importar"}));
   expect(screen.getByRole("alertdialog")).toHaveTextContent("25 embalagens");
   expect(screen.getByRole("button",{name:"Confirmar",exact:true})).toBeDisabled();expect(mocks.importar).not.toHaveBeenCalled();
+  fireEvent.keyDown(screen.getByRole("alertdialog"),{key:"Escape"});expect(cancelar).not.toHaveBeenCalled();expect(screen.getByRole("alertdialog")).toBeInTheDocument();
   await waitFor(()=>expect(screen.getByRole("button",{name:"Confirmar",exact:true})).toBeEnabled(),{timeout:4500});
   fireEvent.click(screen.getByRole("button",{name:"Confirmar",exact:true}));await waitFor(()=>expect(concluido).toHaveBeenCalledOnce());
   expect(mocks.importar).toHaveBeenCalledWith({chave:expect.any(String),linhas:[linha]});

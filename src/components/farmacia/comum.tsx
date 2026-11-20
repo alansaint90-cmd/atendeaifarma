@@ -10,5 +10,5 @@ export function useConfirmacao(aoSucesso:()=>void) {
     onCancelar={()=>definir(null)} onConfirmar={()=>{if(!acao)return;ocupar(true);erroDefinir("");void acao.executar().then(r=>{
       if(r.ok){definir(null);aoSucesso();}else erroDefinir(r.erro);
     }).catch(()=>erroDefinir("Não foi possível confirmar a operação. Recarregue antes de tentar novamente.")).finally(()=>ocupar(false));}} />;
-  return {confirmar:(mensagem:string,executar:()=>Promise<Resultado<unknown>>)=>definir({mensagem,executar}),modal,erro,erroDefinir,ocupado};
+  return {confirmar:(mensagem:string,executar:()=>Promise<Resultado<unknown>>)=>definir({mensagem,executar}),modal,erro,erroDefinir,ocupado,aberto:!!acao};
 }

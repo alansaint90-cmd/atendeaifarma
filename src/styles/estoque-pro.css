@@ -130,3 +130,30 @@ html body .shell.tema-farma-pro .estoque-pro {
     .estoque-paginacao > div { width:100%; justify-content:flex-end; }
   }
 }
+
+.importacao-modal-fundo { position:fixed; inset:0; z-index:40; background:#190b3d80; backdrop-filter:blur(4px); }
+.importacao-modal { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:41; display:flex; flex-direction:column; width:min(1000px,calc(100vw - 40px)); max-height:calc(100dvh - 48px); border:1px solid var(--line); border-radius:20px; background:var(--surface); color:var(--text); box-shadow:0 24px 90px #190b3d55; overflow:hidden; }
+.importacao-modal-cabecalho { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:22px 24px; border-bottom:1px solid var(--line); flex-shrink:0; }
+.importacao-modal-cabecalho h2 { margin:0; font-size:20px; line-height:1.4; letter-spacing:-.4px; }
+.importacao-modal-cabecalho p { margin:6px 0 0; font-size:13px; color:var(--muted); }
+.importacao-modal .importacao-modal-fechar { display:grid; place-items:center; width:40px; min-width:40px; min-height:40px; padding:0; background:var(--surface); color:var(--muted); border-radius:50%; font-size:25px; line-height:1; }
+.importacao-modal .importacao-modal-fechar:hover:not(:disabled) { color:var(--primary); background:var(--accent); }
+.importacao-modal-corpo { padding:22px 24px; min-height:0; overflow:auto; overscroll-behavior:contain; font-size:14px; line-height:1.6; }
+.importacao-modal-corpo > p { margin:0 0 18px; }
+.importacao-modal-corpo .table { max-height:38dvh; border:1px solid var(--line); border-radius:10px; }
+.importacao-modal-corpo table { min-width:760px; }
+.importacao-modal-corpo th { position:sticky; top:0; background:var(--surface-2); z-index:1; }
+.importacao-modal [role=alert] ul { padding-left:20px; }
+.importacao-modal-rodape { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; padding:16px 24px; border-top:1px solid var(--line); flex-shrink:0; background:var(--surface); }
+.importacao-modal :is(.primary,.secondary) { border-radius:999px; min-height:44px; padding:10px 18px; font-weight:600; }
+.importacao-modal .primary { color:#fff; background:var(--pro-gradiente,linear-gradient(90deg,#8635f3,#5c16d6)); }
+.importacao-modal .secondary { background:var(--surface); color:var(--text); }
+@media(max-width:600px) {
+  .importacao-modal { width:calc(100vw - 20px); max-height:calc(100dvh - 24px); border-radius:16px; }
+  .importacao-modal-cabecalho,.importacao-modal-corpo { padding:16px; }
+  .importacao-modal-cabecalho h2 { font-size:18px; }
+  .importacao-modal-rodape { padding:14px 16px; gap:8px; }
+  .importacao-modal-rodape button { flex:1; }
+  .importacao-modal .farmacia-toolbar { align-items:stretch; }
+  .importacao-modal .farmacia-toolbar label { flex-basis:100%; min-width:0; }
+}

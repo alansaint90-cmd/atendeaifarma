@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { Dialog } from "radix-ui";
 import { importarPlanilha } from "@/lib/actions/farmacia";
 import { lerPlanilha, modeloPlanilha, type PreviaPlanilha } from "@/lib/farmacia/planilha";
 import { dinheiro, useConfirmacao } from "./comum";
@@ -10,7 +11,10 @@ export function ImportarProdutos({cancelar,concluido}:{cancelar:()=>void;conclui
   const [ocupado,setOcupado] = useState(false);
   const [chave,setChave] = useState("");
   const revisao = useRef(0);
+  const titulo=useRef<HTMLHeadingElement>(null);
+  const origem=useRef<HTMLElement|null>(null);
   const c = useConfirmacao(concluido);
+  const bloqueado=ocupado||c.ocupado||c.aberto;
   async function selecionar(arquivo:File|undefined) {
     const atual = ++revisao.current;
     setPrevia(null);setErro("");
@@ -33,8 +37,13 @@ export function ImportarProdutos({cancelar,concluido}:{cancelar:()=>void;conclui
     finally {setOcupado(false);}
   }
   const quantidade = previa?.linhas.reduce((s,l)=>s+l.quantidade,0)??0;
-  return <section className="panel farmacia-form" aria-labelledby="titulo-importacao">
-    <h2 id="titulo-importacao">Importar produtos do Excel</h2>
+  return <Dialog.Root open onOpenChange={aberto=>{if(!aberto&&!bloqueado)cancelar();}}><Dialog.Portal>
+    <Dialog.Overlay className="importacao-modal-fundo"/>
+    <Dialog.Content className="farmacia importacao-modal" onOpenAutoFocus={evento=>{origem.current=document.activeElement instanceof HTMLElement?document.activeElement:null;evento.preventDefault();titulo.current?.focus();}}
+      onCloseAutoFocus={evento=>{evento.preventDefault();origem.current?.focus();}}
+      onPointerDownOutside={evento=>evento.preventDefault()} onEscapeKeyDown={evento=>{if(bloqueado)evento.preventDefault();}}>
+    <header className="importacao-modal-cabecalho"><div><Dialog.Title ref={titulo} tabIndex={-1}>Importar produtos do Excel</Dialog.Title><Dialog.Description>Cadastre novos produtos e estoque usando uma planilha.</Dialog.Description></div><button type="button" className="importacao-modal-fechar" aria-label="Fechar importação" disabled={bloqueado} onClick={cancelar}>×</button></header>
+    <div className="importacao-modal-corpo">
     <p>Baixe o modelo, preencha uma linha por produto e envie um arquivo .xlsx com até 200 produtos (2 MB). A primeira linha contém os nomes das colunas.</p>
     <p>Preencha nome, apresentação, preço, quantidade e se exige receita (Sim ou Não). Com estoque, informe lote e validade do medicamento. Concentração ajuda a IA a encontrar a opção correta. SKU e demais detalhes são opcionais.</p>
     <p>A importação cadastra produtos novos. Para repor um produto existente, use “Lotes / entrada”. Uma linha inválida impede a importação inteira.</p>
@@ -46,8 +55,8 @@ export function ImportarProdutos({cancelar,concluido}:{cancelar:()=>void;conclui
     {previa&&<><p role="status">{previa.linhas.length} produtos válidos · {quantidade} embalagens. Confira antes de importar.</p>
       {!!previa.linhas.length&&<div className="table"><table><caption>Prévia dos produtos para cadastro</caption><thead><tr>{["Linha","Produto","Apresentação","Preço","Quantidade","Lote","Validade","Receita / controle"].map(t=><th key={t}>{t}</th>)}</tr></thead>
         <tbody>{previa.linhas.map(l=><tr key={l.linha}><td>{l.linha}</td><td>{l.nome} {l.concentracao}</td><td>{l.apresentacao}</td><td>{dinheiro(l.preco)}</td><td>{l.quantidade}</td><td>{l.lote||"—"}</td><td>{l.validade??"—"}</td><td>{l.receita?"Exige receita":"Não exige receita"}{l.controle&&` · ${l.controle}`}</td></tr>)}</tbody></table></div>}</>}
-    <div className="farmacia-toolbar"><button className="primary" disabled={ocupado||!previa?.linhas.length||!!previa.erros.length||c.ocupado} onClick={()=>{
+    </div><footer className="importacao-modal-rodape"><button className="primary" disabled={ocupado||!previa?.linhas.length||!!previa.erros.length||c.ocupado} onClick={()=>{
       if(previa)c.confirmar(`Cadastrar ${previa.linhas.length} produtos e ${quantidade} embalagens? Nenhum produto existente será atualizado.`,()=>importarPlanilha({chave,linhas:previa.linhas}));
-    }}>Conferir e importar</button><button className="secondary" disabled={ocupado||c.ocupado} onClick={cancelar}>Cancelar importação</button></div>{c.modal}
-  </section>;
+    }}>Conferir e importar</button><button className="secondary" disabled={bloqueado} onClick={cancelar}>Cancelar importação</button></footer>{c.modal}
+    </Dialog.Content></Dialog.Portal></Dialog.Root>;
 }
