@@ -6,7 +6,7 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 224 |
+| Arquivos TS/TSX | 225 |
 | Tabelas (Drizzle) | 45 |
 | Server Actions (arquivos) | 16 |
 | Rotas de API | 7 |
@@ -275,6 +275,8 @@ styles/
   painel-operacional.css
   perfil.css
   ui.css
+types/
+  imagens.d.ts
 instrumentation.ts
 ```
 
