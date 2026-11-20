@@ -1,5 +1,5 @@
 import {afterEach,expect,test,vi} from 'vitest';
-import {cleanup,fireEvent,render,screen} from '@testing-library/react';
+import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import {FarmaciaDashboard} from '@/components/farmacia/dashboard';
 import {EstoquePage} from '@/components/farmacia/estoque';
 import {PedidosPage} from '@/components/farmacia/pedidos';
@@ -58,4 +58,15 @@ test('confirmação de venda exige referência e modal antes de chamar o servido
   fireEvent.change(screen.getByLabelText(/Referência de pagamento/),{target:{value:'PIX conferido 123'}});fireEvent.click(confirmar);
   expect(screen.getByRole('alertdialog')).toHaveTextContent('baixar definitivamente');expect(screen.getByRole('button',{name:'Confirmar',exact:true})).toBeDisabled();
   expect(a.alterarPedido).not.toHaveBeenCalled();
+});
+
+test('pedidos mostram indicadores reais e enviam busca e período ao servidor',async()=>{
+  a.carregarPedidos.mockResolvedValue({ok:true,dados:{pedidos:[],total:0,resumo:{total:42,concluidos:30,andamento:10,cancelados:2}}});
+  render(<PedidosPage gestor={false}/>);await screen.findByText('42');
+  expect(screen.getByText('30')).toBeInTheDocument();expect(screen.getByText('10')).toBeInTheDocument();expect(screen.getByText('2')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('Buscar pedido'),{target:{value:'Dipirona'}});
+  fireEvent.change(screen.getByLabelText('Status'),{target:{value:'em_andamento'}});
+  fireEvent.change(screen.getByLabelText('Período'),{target:{value:''}});
+  await waitFor(()=>expect(a.carregarPedidos).toHaveBeenLastCalledWith({status:'em_andamento',pagina:1,termo:'Dipirona',periodo:null}));
+  expect(screen.queryByRole('button',{name:'Confirmar venda e pagamento'})).not.toBeInTheDocument();
 });

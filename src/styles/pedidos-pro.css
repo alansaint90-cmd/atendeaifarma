@@ -1,0 +1,78 @@
+html body .shell.tema-farma-pro:has(.pedidos-pro) .workspace { background:radial-gradient(ellipse at 70% 25%,#eee5ff70,transparent 65%),#faf9ff; }
+html body .shell.tema-farma-pro .pedidos-pro {
+  gap:22px;
+  svg { width:22px; height:22px; flex-shrink:0; }
+  .pedidos-cabecalho { margin:0; align-items:center; gap:16px; }
+  .pedidos-cabecalho h1 { margin:0; font-size:34px; line-height:1.2; letter-spacing:-1px; }
+  .pedidos-cabecalho p { margin:4px 0 0; font-size:16px; color:#51496b; }
+  .pedidos-cabecalho .primary { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; padding:10px 20px; font-size:13px; }
+  .pedidos-indicadores { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:16px; }
+  .pedidos-indicador { display:flex; align-items:center; gap:18px; padding:22px 18px; min-height:118px; min-width:0; border:1px solid #e8defd; border-radius:22px; box-shadow:0 5px 12px #6720bf0d; background:linear-gradient(145deg,#fff,#f2ebff); }
+  .pedidos-indicador-icone { display:grid; place-items:center; flex-shrink:0; width:66px; height:66px; border-radius:50%; background:#eadeff; color:#7918e6; }
+  .pedidos-indicador-icone svg { width:36px; height:36px; }
+  .pedidos-indicador > div { display:grid; gap:6px; min-width:0; }
+  .pedidos-indicador > div > span { font-size:14px; font-weight:600; line-height:1.3; color:#44385f; }
+  .pedidos-indicador strong { font-size:36px; line-height:1.1; font-weight:750; letter-spacing:-1px; color:#100c1b; }
+  .pedidos-indicador.verde { background:linear-gradient(145deg,#fff,#edfcf5); border-color:#e6f4ed; }
+  .pedidos-indicador.verde .pedidos-indicador-icone { background:#ddfbe9; color:#079c4a; }
+  .pedidos-indicador.laranja { background:linear-gradient(145deg,#fff,#fff8eb); border-color:#f8f0e3; }
+  .pedidos-indicador.laranja .pedidos-indicador-icone { background:#fff0d6; color:#e59a00; }
+  .pedidos-indicador.vermelho { background:linear-gradient(145deg,#fff,#fff0f5); border-color:#f6e3ed; }
+  .pedidos-indicador.vermelho .pedidos-indicador-icone { background:#ffe0e7; color:#ec193c; }
+  .pedidos-consulta { min-width:0; margin-top:4px; }
+  .pedidos-filtros { display:grid; grid-template-columns:minmax(200px,1.8fr) minmax(150px,1fr) minmax(160px,1.05fr) auto; align-items:end; gap:18px; }
+  .pedidos-filtros label { min-width:0; font-size:15px; font-weight:650; color:#241a38; gap:8px; }
+  .pedidos-filtros :is(input,select) { min-height:48px; border-color:#e0d5f8; border-radius:18px; padding:12px 16px; font-size:14px; color:#20172d; background:#ffffffb8; }
+  .pedidos-busca { display:block; position:relative; }
+  .pedidos-busca svg { position:absolute; left:15px; top:13px; color:#7a7092; }
+  .pedidos-busca input { padding-left:46px; }
+  .pedidos-filtros .primary { display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:48px; padding:12px 22px; font-size:14px; font-weight:650; }
+  .pedidos-escopo { margin:10px 2px 16px; color:#70647f; font-size:11px; }
+  .pedidos-tabela { border:1px solid #ebe4f6; border-radius:20px; padding:6px; box-shadow:0 4px 12px #6720bf0b; background:#ffffffb8; }
+  .pedidos-tabela table { min-width:640px; width:100%; table-layout:fixed; }
+  .pedidos-tabela th { background:#f1eef8; color:#51465f; text-transform:uppercase; font-size:13px; font-weight:700; padding:16px 20px; }
+  .pedidos-tabela th:first-child { border-radius:15px 0 0 0; width:19%; }
+  .pedidos-tabela th:nth-child(2) { width:26%; }
+  .pedidos-tabela th:nth-child(3) { width:17%; }
+  .pedidos-tabela th:nth-child(4) { width:23%; }
+  .pedidos-tabela th:last-child { border-radius:0 15px 0 0; width:15%; }
+  .pedidos-tabela td { padding:14px 20px; vertical-align:middle; font-size:15px; line-height:1.35; color:#1d142b; overflow-wrap:anywhere; }
+  .pedidos-tabela tbody tr:last-child td { border-bottom:0; }
+  .pedidos-tabela td > strong { font-weight:600; }
+  .pedidos-tabela td small { display:block; margin-top:4px; font-size:10px; color:#786b89; }
+  .pedidos-tabela .pedidos-numero { display:inline-block; min-height:44px; border:0; padding:4px 0; background:transparent; color:#23113f; font-size:14px; font-weight:650; text-align:left; overflow-wrap:anywhere; }
+  .pedidos-tabela .pedidos-numero:hover { color:#7425e8; text-decoration:underline; }
+  .pedidos-valor,.pedidos-tabela time { white-space:nowrap; }
+  .pedidos-status { display:inline-flex; justify-content:center; padding:6px 12px; border-radius:999px; font-size:13px; line-height:1.2; font-weight:700; white-space:nowrap; }
+  .pedidos-status.concluido { background:#dcfae7; color:#087b2e; }
+  .pedidos-status.andamento { background:#e1efff; color:#184db5; }
+  .pedidos-status.cancelado { background:#ffe1e7; color:#c21b38; }
+  .pedidos-paginacao { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; margin-top:16px; font-size:12px; }
+  .pedidos-paginacao > span { margin-right:auto; color:var(--muted); }
+  .pedidos-paginacao .secondary { min-height:40px; padding:8px 16px; }
+}
+@media(max-width:1200px) {
+  html body .shell.tema-farma-pro .pedidos-pro {
+    .pedidos-indicadores { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .pedidos-filtros { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .pedidos-filtros > .primary { justify-self:end; }
+  }
+}
+@media(max-width:600px) {
+  html body .shell.tema-farma-pro .pedidos-pro {
+    gap:16px;
+    .pedidos-cabecalho h1 { font-size:28px; }
+    .pedidos-cabecalho p { font-size:14px; }
+    .pedidos-indicadores { gap:10px; }
+    .pedidos-indicador { min-height:98px; padding:14px 10px; gap:10px; border-radius:17px; }
+    .pedidos-indicador-icone { width:40px; height:40px; }
+    .pedidos-indicador-icone svg { width:25px; height:25px; }
+    .pedidos-indicador > div > span { font-size:11px; }
+    .pedidos-indicador strong { font-size:28px; }
+    .pedidos-filtros { gap:12px; }
+    .pedidos-filtros > label:first-child { grid-column:1/-1; }
+    .pedidos-filtros :is(input,select) { font-size:16px; border-radius:14px; }
+    .pedidos-filtros > .primary { justify-self:stretch; grid-column:1/-1; }
+    .pedidos-escopo { font-size:10px; }
+  }
+}

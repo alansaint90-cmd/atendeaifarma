@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { STATUS_PEDIDO } from "../db/schema/_enums";
+import { periodoFarmaciaSchema } from "./periodo";
 
 const texto = z.string().trim().max(180);
 export const valor = z.string().regex(/^\d{1,9}\.\d{2}$/, "Use valor decimal, por exemplo 8.90.").refine(v => BigInt(v.replace(".", "")) > 0n, "O valor deve ser positivo.");
@@ -26,3 +28,4 @@ export const habilitacaoSchema = z.strictObject({ usuarioId: z.uuid(), registro:
 export function centavos(v: string): bigint { return BigInt(v.replace(".", "")); }
 export function decimal(v: bigint): string { return `${v / 100n}.${(v % 100n).toString().padStart(2,"0")}`; }
 export type ProdutoEntrada = z.infer<typeof produtoSchema>;
+export const buscaPedidosSchema=z.strictObject({status:z.union([z.literal(""),z.literal("em_andamento"),z.enum(STATUS_PEDIDO)]).default(""),termo:z.string().trim().max(120).default(""),pagina:z.number().int().min(1).max(100000).default(1),id:z.uuid().optional(),periodo:periodoFarmaciaSchema.nullable().default(null)});

@@ -273,6 +273,7 @@ styles/
   layout.css
   marca.css
   painel-operacional.css
+  pedidos-pro.css
   perfil.css
   ui.css
 types/

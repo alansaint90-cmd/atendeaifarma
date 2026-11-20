@@ -160,6 +160,7 @@ try {
     ["mídia sem vídeo/documento reprova", reprova("farmacia/midia-manual.ts", "farmacia-envio-humano")],
     ["envio humano sem canal próprio e validação de mídia reprova", reprova("farmacia/atendimento.ts", "farmacia-envio-humano")],
     ["dashboard sem período validado em Brasília reprova", reprova("farmacia/consultas.ts", "farmacia-painel-periodo")],
+    ["pedidos sem filtros e indicadores reais reprovam", reprova("farmacia/consultas.ts", "pedidos-filtros-reais")],
     ["oferta sem filtro de disponíveis e CTA separado reprova", reprova("farmacia/agente.ts", "farmacia-oferta-disponivel")],
     ["campanha sem elegibilidade e trava reprova", reprova("farmacia/campanhas/repository.ts", "campanha-elegibilidade")],
     ["follow-up sem fila real e auditoria reprova", reprova("agendamentos/fila-followups.ts", "fila-followup-real")],

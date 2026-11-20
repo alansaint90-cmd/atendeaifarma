@@ -1,17 +1,27 @@
 import { sql } from "drizzle-orm";
-import { z } from "zod";
 import { linhas, type BancoSql } from "../db/porta";
 import { autorizar, elegivel, reservaAtiva, hoje, type AtorFarmacia } from "./comum";
 import { descreverPagamento } from "./pagamento";
 import { periodoFarmacia, periodoFarmaciaSchema } from "./periodo";
+import { buscaPedidosSchema } from "./validacao";
 
 export interface PedidoLista { id:string; numero:string; cliente:string; telefone:string|null; total:string; status:string; origem:string; responsavel:string|null; data:string; conferencia:string|null; expira:string|null; conversaId:string|null; itens:{produtoId:string;descricao:string;quantidade:number;preco:string;receita:boolean}[]; eventos:{tipo:string;detalhe:string;data:string;autor:string}[] }
+export interface ResumoPedidos {total:number;concluidos:number;andamento:number;cancelados:number}
 export async function listarPedidos(banco:BancoSql,ator:AtorFarmacia,entrada:unknown) {
-  const v=z.strictObject({status:z.string().max(40).default(""),pagina:z.number().int().min(1).default(1),id:z.uuid().optional()}).parse(entrada);
+  const v=buscaPedidosSchema.parse(entrada);
   return banco.transaction(async tx=>{
+    await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     await autorizar(tx,ator,"operador",true);
-    const filtro=sql`o.is_deleted=false AND ${v.status ? sql`o.status=${v.status}` : sql`true`} AND ${v.id ? sql`o.id=${v.id}` : sql`true`}`;
-    const [c]=linhas<{total:number}>(await tx.execute(sql`SELECT count(*)::int total FROM atendeia_pedidos o WHERE ${filtro}`));
+    const intervalo=v.periodo?sql`o.created_at>=(${v.periodo.inicio}::date::timestamp AT TIME ZONE 'America/Sao_Paulo') AND o.created_at<((${v.periodo.fim}::date+1)::timestamp AT TIME ZONE 'America/Sao_Paulo')`:sql`true`;
+    const busca=v.termo?sql`(position(lower(${v.termo}) in lower(concat_ws(' ',o.numero,c.name,c.phone)))>0 OR EXISTS(SELECT 1 FROM atendeia_pedidos_itens i WHERE i.pedido_id=o.id AND i.is_deleted=false AND position(lower(${v.termo}) in lower(i.descricao))>0))`:sql`true`;
+    const base=sql`o.is_deleted=false AND ${v.id?sql`o.id=${v.id}`:sql`true`} AND ${intervalo} AND ${busca}`;
+    const condicaoStatus=v.status==="em_andamento"?sql`o.status NOT IN ('concluido','cancelado')`:v.status?sql`o.status=${v.status}`:sql`true`;
+    const filtro=sql`${base} AND ${condicaoStatus}`;
+    // Contatos históricos continuam identificando pedidos mesmo após exclusão lógica no CRM.
+    const [resumo]=linhas<ResumoPedidos>(await tx.execute(sql`SELECT count(*)::int total,count(*) FILTER(WHERE o.status='concluido')::int concluidos,
+      count(*) FILTER(WHERE o.status NOT IN ('concluido','cancelado'))::int andamento,count(*) FILTER(WHERE o.status='cancelado')::int cancelados
+      FROM atendeia_pedidos o JOIN atendeia_contacts c ON c.id=o.contato_id WHERE ${base}`));
+    const [c]=linhas<{total:number}>(await tx.execute(sql`SELECT count(*)::int total FROM atendeia_pedidos o JOIN atendeia_contacts c ON c.id=o.contato_id WHERE ${filtro}`));
     const pedidos=linhas<PedidoLista>(await tx.execute(sql`SELECT o.id,o.numero,c.name cliente,c.phone telefone,o.total::text,o.status,o.origem,u.name responsavel,o.created_at::text data,
       o.conferencia,o.conversa_id "conversaId",(SELECT min(expira_em)::text FROM atendeia_pedidos_reservas r WHERE r.pedido_id=o.id AND ${reservaAtiva}) expira
       FROM atendeia_pedidos o JOIN atendeia_contacts c ON c.id=o.contato_id LEFT JOIN atendeia_users u ON u.id=o.responsavel_id
@@ -23,7 +33,7 @@ export async function listarPedidos(banco:BancoSql,ator:AtorFarmacia,entrada:unk
         WHERE e.pedido_id=${p.id} AND e.is_deleted=false ORDER BY e.created_at,e.id`));
       p.eventos=p.eventos.map(e=>e.tipo==="pagamento"?{...e,detalhe:descreverPagamento(e.detalhe)}:e);
     }
-    return {pedidos,total:c.total};
+    return {pedidos,total:c.total,resumo};
   });
 }
 export async function painelFarmacia(banco:BancoSql,ator:AtorFarmacia,entrada:unknown=periodoFarmacia("hoje")) {
