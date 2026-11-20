@@ -15,6 +15,7 @@ import "@/styles/farmacia.css";
 import "@/styles/conversas.css";
 import "@/styles/campanhas.css";
 import "@/styles/farma-pro.css";
+import "@/styles/estoque-pro.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 export const metadata: Metadata = { title: "Atende Aí Farmácia | Atendimento e estoque", description: "Atendimento pelo WhatsApp, estoque real e pedidos da sua farmácia." };

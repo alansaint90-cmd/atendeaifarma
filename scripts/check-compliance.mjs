@@ -419,6 +419,8 @@ function analyzeFile(file) {
     findings.push({ level:"error", id:"farmacia-oferta-disponivel", file:rel, line:1, msg:"Oferta exige disponíveis, contexto dos ofertados, CTA separado e busca composta sem fragmentos de SKU/EAN." });
   if (rel === "src/lib/farmacia/catalogo.ts" && (!/const ordem = sql`\$\{chaveAlfabetica\(sql`nome`\)/.test(content) || /filtro\.ordenar/.test(content)))
     findings.push({ level:"error", id:"farmacia-ordem-alfabetica", file:rel, line:1, msg:"Estoque deve manter ordem alfabética normalizada antes da paginação, sem alternativa por quantidade." });
+  if (rel === "src/lib/farmacia/estoque-painel.ts" && !/periodoMovimentosSchema\.parse[\s\S]*autorizar\(tx,ator,"operador"\)[\s\S]*America\/Sao_Paulo[\s\S]*is_deleted=false/.test(content))
+    findings.push({level:"error",id:"estoque-grafico-real",file:rel,line:1,msg:"Gráfico exige período validado, autorização e movimentos vivos agregados em Brasília."});
   if (rel === "src/lib/farmacia/agente.ts" && (/\$\{p\.numero\}|Reserva válida até/.test(content) || !/registrarEtapaPedido/.test(content))) findings.push({level:"error",id:"farmacia-pedido-cliente",file:rel,line:1,msg:"Pedido no WhatsApp não expõe número ou prazo interno e persiste preferência de pagamento."});
   if (rel === "src/lib/farmacia/importacao.ts" && !/importacaoSchema\.parse[\s\S]*banco\.transaction[\s\S]*travarEstoque\(tx\)[\s\S]*autorizar\(tx[\s\S]*salvarProdutoNaTransacao\(tx/.test(content)) {
     findings.push({ level:"error", id:"farmacia-importacao", file:rel, line:1, msg:"Importação exige validação, transação única, trava, autorização e cadastro auditado compartilhado." });

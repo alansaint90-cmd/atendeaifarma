@@ -1,0 +1,31 @@
+"use client";
+import { useEffect, useId, useState } from "react";
+import Image from "next/image";
+import robo from "@/assets/robo-estoque.png";
+import { carregarFarmacia, carregarMovimentacao } from "@/lib/actions/farmacia";
+import type { MovimentoDiario } from "@/lib/farmacia/estoque-painel";
+import { EstoqueIcone as Icone } from "./estoque-icone";
+type Resumo={total:number;disponiveis:number;esgotados:number;baixos:number;vencendo:number};
+export function EstoqueVisao({revisao,recomendar,categoriasCarregadas}:{revisao:unknown;recomendar:()=>void;categoriasCarregadas:(categorias:string[])=>void}) {
+  const [resumo,setResumo]=useState<Resumo|null>(null),[dias,setDias]=useState<7|15|30>(7);
+  const [movimentos,setMovimentos]=useState<MovimentoDiario[]|null>(null),[erroResumo,setErroResumo]=useState(""),[erroMovimentos,setErroMovimentos]=useState("");
+  useEffect(()=>{let vivo=true;void carregarFarmacia().then(r=>{if(!vivo)return;if(r.ok){setResumo(r.dados.estoque);setErroResumo("");}else{setResumo(null);setErroResumo(r.erro);}}).catch(()=>{if(vivo){setResumo(null);setErroResumo("Indicadores indisponíveis. Tente atualizar.");}});return()=>{vivo=false;};},[revisao]);
+  useEffect(()=>{let vivo=true;void carregarMovimentacao({dias}).then(r=>{if(!vivo)return;if(r.ok){setMovimentos(r.dados.movimentos);categoriasCarregadas(r.dados.categorias);setErroMovimentos("");}else{setMovimentos(null);setErroMovimentos(r.erro);}}).catch(()=>{if(vivo){setMovimentos(null);setErroMovimentos("Movimentações indisponíveis. Tente atualizar.");}});return()=>{vivo=false;};},[dias,revisao,categoriasCarregadas]);
+  const cards=[{titulo:"Produtos cadastrados",valor:resumo?.total,icone:"caixa",tom:"roxo"},{titulo:"Em estoque",valor:resumo?.disponiveis,icone:"caixas",tom:"verde"},{titulo:"Estoque baixo",valor:resumo?.baixos,icone:"alerta",tom:"laranja"},{titulo:"Sem estoque",valor:resumo?.esgotados,icone:"sem",tom:"vermelho"}] as const;
+  return <><section className="estoque-indicadores" aria-label="Indicadores de estoque">{cards.map(c=><article key={c.titulo} className={`estoque-indicador ${c.tom}`}><span className="estoque-indicador-icone"><Icone nome={c.icone}/></span><div><span>{c.titulo}</span><strong>{c.valor===undefined?"—":c.valor.toLocaleString("pt-BR")}</strong></div></article>)}</section>
+    {(erroResumo||erroMovimentos)&&<p role="alert">{erroResumo||erroMovimentos}</p>}
+    <div className="estoque-analise"><section className="estoque-grafico panel" aria-label="Movimentação de estoque"><header><h2>Movimentação de estoque</h2><label className="sr-only" htmlFor="periodo-movimentos">Período das movimentações</label><select id="periodo-movimentos" value={dias} onChange={e=>{setMovimentos(null);setDias(Number(e.target.value) as 7|15|30);}}><option value="7">Últimos 7 dias</option><option value="15">Últimos 15 dias</option><option value="30">Últimos 30 dias</option></select></header>
+      {movimentos?<Grafico movimentos={movimentos}/>:<div className="estoque-grafico-vazio" role="status">Consultando movimentações…</div>}
+    </section><section className="estoque-insights" aria-label="Insights do estoque"><div className="estoque-insights-conteudo"><h2><Icone nome="foguete"/>Insights do estoque</h2><ul><li><Icone nome="check"/>{resumo?`${resumo.baixos} produtos com estoque baixo`:"Consultando estoque baixo…"}</li><li><Icone nome="check"/>{resumo?`${resumo.esgotados} produtos sem estoque`:"Consultando disponibilidade…"}</li><li><Icone nome="check"/>Reposição orientada pelo estoque mínimo</li></ul><button className="primary" onClick={recomendar}>Ver recomendações <Icone nome="seta"/></button></div><Image className="estoque-robo" src={robo} width={1329} height={1183} alt="" sizes="(max-width: 700px) 140px, 220px"/></section></div></>;
+}
+function Grafico({movimentos}:{movimentos:MovimentoDiario[]}) {
+  const id=useId();const valores=movimentos.map(m=>m.variacao),menor=Math.min(0,...valores),maior=Math.max(1,...valores),amplitude=maior-menor;
+  const y=(valor:number)=>150-(valor-menor)/amplitude*125;
+  const pontos=movimentos.map((m,i)=>[54+i/(Math.max(1,movimentos.length-1))*566,y(m.variacao)]);
+  // Curva monotônica por trecho: passa pelos valores reais sem criar extremos artificiais.
+  const caminho=pontos.map(([x,altura],i)=>i?`C ${(pontos[i-1][0]+x)/2} ${pontos[i-1][1]}, ${(pontos[i-1][0]+x)/2} ${altura}, ${x} ${altura}`:`M ${x} ${altura}`).join(" ");
+  return <><svg viewBox="0 0 640 190" role="img" aria-label="Variação líquida diária de embalagens"><defs><linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop stopColor="#8e43ed" stopOpacity=".38"/><stop offset="1" stopColor="#8e43ed" stopOpacity=".04"/></linearGradient></defs>{[0,1,2,3].map(i=>{const valor=menor+amplitude*i/3;return <g key={i}><line x1="46" x2="626" y1={y(valor)} y2={y(valor)} stroke="#eae3f7"/><text x="38" y={y(valor)+4} textAnchor="end">{Math.round(valor).toLocaleString("pt-BR")}</text></g>;})}
+    <path d={`${caminho} L 620 ${y(0)} L 54 ${y(0)} Z`} fill={`url(#${id})`}/><path d={caminho} fill="none" stroke="#761be3" strokeWidth="3"/>
+    {pontos.map(([x,altura],i)=><g key={movimentos[i].dia}><circle cx={x} cy={altura} r="3.2" stroke="#761be3" strokeWidth="2" fill="#fff"><title>{movimentos[i].dia}: {movimentos[i].entradas} entradas, {movimentos[i].saidas} saídas; variação {movimentos[i].variacao}</title></circle>{(movimentos.length===7||i%Math.ceil(movimentos.length/7)===0||i===movimentos.length-1)&&<text x={x} y="179" textAnchor="middle">{movimentos.length===7?new Intl.DateTimeFormat("pt-BR",{weekday:"short",timeZone:"UTC"}).format(new Date(`${movimentos[i].dia}T12:00:00Z`)).replace(".",""):movimentos[i].dia.slice(8)}</text>}</g>)}</svg>
+    <p className="estoque-grafico-legenda">Variação líquida de embalagens · entradas menos saídas</p><details className="estoque-dados-grafico"><summary>Ver dados do gráfico</summary><div className="table"><table><caption>Movimentações registradas por dia em Brasília</caption><thead><tr><th>Data</th><th>Entradas</th><th>Saídas</th><th>Variação</th></tr></thead><tbody>{movimentos.map(m=><tr key={m.dia}><td>{m.dia.split("-").reverse().join("/")}</td><td>{m.entradas}</td><td>{m.saidas}</td><td>{m.variacao}</td></tr>)}</tbody></table></div></details></>;
+}

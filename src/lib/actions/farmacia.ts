@@ -8,6 +8,7 @@ import { consultarProdutos, salvarProduto, entradaEstoque, ajustarEstoque, histo
 import { criarPedido, executarPedido, habilitarFarmaceutico } from "../farmacia/pedidos";
 import { listarPedidos, painelFarmacia, contextoCadastro } from "../farmacia/consultas";
 import { importarProdutos } from "../farmacia/importacao";
+import { consultarMovimentacao } from "../farmacia/estoque-painel";
 
 export async function importarPlanilha(entrada:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"admin");const r=await importarProdutos(db(),s,entrada);revalidatePath("/");return r;}); }
 
@@ -20,5 +21,6 @@ export async function carregarPedidos(entrada:unknown) { return executar(async()
 export async function registrarPedido(entrada:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"operador");const r=await criarPedido(db(),s,entrada);revalidatePath("/");return r;}); }
 export async function alterarPedido(entrada:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"operador");const r=await executarPedido(db(),s,entrada);revalidatePath("/");return r;}); }
 export async function carregarFarmacia(entrada?:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"operador");return painelFarmacia(db(),s,entrada);}); }
+export async function carregarMovimentacao(entrada:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"operador");return consultarMovimentacao(db(),s,entrada);}); }
 export async function carregarCadastrosFarmacia() { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"operador");return contextoCadastro(db(),s);}); }
 export async function salvarHabilitacao(entrada:unknown) { return executar(async()=>{const s=await exigirSessao();await exigirPermissao(s,"admin");await habilitarFarmaceutico(db(),s,entrada);revalidatePath("/");}); }

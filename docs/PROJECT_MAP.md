@@ -6,12 +6,12 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 221 |
+| Arquivos TS/TSX | 224 |
 | Tabelas (Drizzle) | 45 |
 | Server Actions (arquivos) | 16 |
 | Rotas de API | 7 |
 | Paginas | 5 |
-| Componentes | 39 |
+| Componentes | 41 |
 
 ## Arvore (profundidade 3)
 
@@ -42,6 +42,8 @@ app/
   icon.svg
   layout.tsx
   page.tsx
+assets/
+  robo-estoque.png
 components/
   agendamentos/
     central.tsx
@@ -65,6 +67,8 @@ components/
     atendimento.tsx
     comum.tsx
     dashboard.tsx
+    estoque-icone.tsx
+    estoque-visao.tsx
     estoque.tsx
     importar-produtos.tsx
     menu-compositor.tsx
@@ -210,6 +214,7 @@ lib/
     comum.ts
     consultas.ts
     crm.ts
+    estoque-painel.ts
     importacao-validacao.ts
     importacao.ts
     interpretar.ts
@@ -260,6 +265,7 @@ styles/
   conta-menu.css
   conversas.css
   design-juliana.css
+  estoque-pro.css
   farma-pro.css
   farmacia.css
   features.css
@@ -429,7 +435,7 @@ _(colunas nao detectadas)_
 - `src/lib/actions/chatbots.ts`: `carregarChatbots()`, `salvarChatbot()`
 - `src/lib/actions/consultas.ts`: `carregarResumoAgenda()`, `carregarAgendaConsultas()`, `confirmarConsulta()`, `cancelarConsultaAgendada()`
 - `src/lib/actions/crm.ts`: `carregarCrm()`, `adicionarFunil()`, `adicionarMotivo()`, `modificarMotivo()`, `salvarAcessosFunis()`, `adicionarOportunidade()`, `fecharNegocio()`, `moverNegocio()`
-- `src/lib/actions/farmacia.ts`: `importarPlanilha()`, `carregarProdutos()`, `gravarProduto()`, `receberEstoque()`, `ajustarInventario()`, `carregarHistorico()`, `carregarPedidos()`, `registrarPedido()`, `alterarPedido()`, `carregarFarmacia()`, `carregarCadastrosFarmacia()`, `salvarHabilitacao()`
+- `src/lib/actions/farmacia.ts`: `importarPlanilha()`, `carregarProdutos()`, `gravarProduto()`, `receberEstoque()`, `ajustarInventario()`, `carregarHistorico()`, `carregarPedidos()`, `registrarPedido()`, `alterarPedido()`, `carregarFarmacia()`, `carregarMovimentacao()`, `carregarCadastrosFarmacia()`, `salvarHabilitacao()`
 - `src/lib/actions/fila-mensagens.ts`: `carregarFilaMensagens()`, `alterarFilaMensagens()`
 - `src/lib/actions/followups.ts`: `carregarFollowups()`, `salvarFollowups()`
 - `src/lib/actions/operacao.ts`: `carregarOperacao()`, `apagarConversa()`, `excluirContato()`

@@ -45,7 +45,7 @@ export async function consultarProdutos(banco: BancoSql, ator: AtorFarmacia, ent
       ) s ON true WHERE p.is_deleted=false AND ${texto} AND ${categorias})`;
     const [contagem] = linhas<{total:number}>(await tx.execute(sql`${base} SELECT count(*)::int total FROM catalogo WHERE ${condicao}`));
     const ordem = sql`${chaveAlfabetica(sql`nome`)},${chaveAlfabetica(sql`concentracao`)},${chaveAlfabetica(sql`apresentacao`)},sku COLLATE "C",id`;
-    const produtos = linhas<Produto>(await tx.execute(sql`${base} SELECT * FROM catalogo WHERE ${condicao} ORDER BY ${ordem} LIMIT 40 OFFSET ${(filtro.pagina-1)*40}`));
+    const produtos = linhas<Produto>(await tx.execute(sql`${base} SELECT * FROM catalogo WHERE ${condicao} ORDER BY ${ordem} LIMIT ${filtro.porPagina} OFFSET ${(filtro.pagina-1)*filtro.porPagina}`));
     return {produtos,total:contagem.total};
   });
 }

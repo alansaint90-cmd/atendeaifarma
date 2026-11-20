@@ -11,6 +11,7 @@ import { systemUserId } from "../src/lib/db/bootstrap";
 import { consultarProdutos, salvarProduto } from "../src/lib/farmacia/catalogo";
 import { produtoVazio } from "../src/lib/farmacia/cadastro";
 import type { BancoSql } from "../src/lib/db/porta";
+import { consultarMovimentacao } from "../src/lib/farmacia/estoque-painel";
 
 async function verificarOrdenacao(banco:BancoSql) {
   await applyMigrations(banco);
@@ -33,6 +34,13 @@ async function verificarOrdenacao(banco:BancoSql) {
   const segunda=await consultarProdutos(banco,ator,{categoria:grupo,pagina:2});
   assert.equal(primeira.total,43);
   assert.deepEqual([...primeira.produtos,...segunda.produtos].map(p=>p.nome),Array.from({length:43},(_,i)=>`Produto ${String(i).padStart(2,"0")}`),"Ordenação precisa acontecer antes da paginação.");
+  for(const porPagina of [10,20,40]) {
+    const paginas=await Promise.all(Array.from({length:Math.ceil(43/porPagina)},(_,i)=>consultarProdutos(banco,ator,{categoria:grupo,pagina:i+1,porPagina})));
+    assert.deepEqual(paginas.flatMap(p=>p.produtos.map(item=>item.nome)),Array.from({length:43},(_,i)=>`Produto ${String(i).padStart(2,"0")}`));
+  }
+  await assert.rejects(consultarProdutos(banco,ator,{porPagina:5000}));
+  const painel=await consultarMovimentacao(banco,ator,{dias:7});
+  assert.equal(painel.movimentos.length,7);assert.ok(painel.categorias.includes(grupo));
 }
 test("estoque ordena A–Z antes de paginar, sem diferenças de caixa e acentos",async()=>{
   const cliente=new PGlite();try{await verificarOrdenacao(drizzle(cliente));}finally{await cliente.close();}
