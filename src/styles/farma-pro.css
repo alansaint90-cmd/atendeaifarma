@@ -62,9 +62,9 @@ html body .shell.tema-farma-pro {
   .sidebar .marca { padding: 0; gap: 9px; color: #fff; }
   .sidebar .marca-simbolo { width: 40px; height: 46px; }
   .sidebar .marca-textos { display: flex; min-width: 0; }
-  .sidebar .marca-nome { font-size: 22px; }
-  .sidebar .marca-ia { background: none; -webkit-text-fill-color: currentColor; color: #cbb3ff; }
-  .sidebar .marca-textos > small { color: #d2c7e7; font-size: 9px; }
+  .sidebar .marca-nome { font-size: 20px; gap: 3px; }
+  .sidebar .marca-ia { font-size: inherit; background: linear-gradient(115deg, #b16aff, #9942f6 60%, #8736ec); background-clip: text; -webkit-text-fill-color: transparent; color: #ad64ff; }
+  .sidebar .marca-textos > small { color: #d2c7e7; font-size: 8.5px; }
   .sidebar nav { display: grid; align-content: start; flex: 1; min-height: 0; gap: 5px; overflow-y: auto; overflow-x: hidden; scrollbar-color: #73579d transparent; }
   .sidebar nav button {
     display: flex; justify-content: flex-start; gap: 12px; min-height: 44px; width: 100%; padding: 10px 14px;
