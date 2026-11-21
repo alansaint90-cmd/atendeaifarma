@@ -100,16 +100,16 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.match(r.texto,/R\$ 9,50/);assert.doesNotMatch(r.texto,/28 embalagens disponíveis|R\$ 8,90/);
       assert.equal((await consultarProdutos(banco,admin,{termo:"Dipirona"})).produtos[0].disponivel,28);
     });
-    await t.test("distingue esgotado, lote vencido, lote bloqueado e produto ausente",async()=>{
+    await t.test("esgotado, lote vencido, bloqueado e produto ausente aguardam resposta humana",async()=>{
       for(const nome of ["Esgotado","Vencido","Bloqueado"]) {
         const produtoId=await salvarProduto(banco,admin,{id:null,atualizadoEm:null,produto:{...cadastro,nome,sku:randomUUID()},
           estoqueInicial:nome==="Vencido"?{codigo:"LOTE-VENCIDO",quantidade:4,validade:"2020-01-01",chave:randomUUID()}:null});
         if(nome==="Bloqueado")await entradaEstoque(banco,admin,{produtoId,codigo:"QUARENTENA",quantidade:4,validade:"2099-12-31",bloqueado:true,chave:randomUUID()});
-        const r=await atender(`Tem ${nome}?`,{acao:"buscar",termo:nome});
-        assert.match(r.texto,/não temos.*disponível/i);assert.doesNotMatch(r.texto,/4 embalagens disponíveis|Não encontrei|Gostaria de fazer/);
+        const antes=transferencias;const r=await atender(`Tem ${nome}?`,{acao:"buscar",termo:nome});
+        assert.deepEqual(r.mensagens,[]);assert.equal(transferencias,antes+1);
       }
       const r=await atender("Tem produto inexistente?",{acao:"buscar",termo:"Produto inexistente"});
-      assert.match(r.texto,/não temos esse produto disponível/i);assert.doesNotMatch(r.texto,/catálogo|transfer|encaminh/i);
+      assert.deepEqual(r.mensagens,[]);
     });
     await t.test("busca ampla só oferece o produto disponível e não troca apresentação específica",async()=>{
       assert.equal((await consultarProdutos(banco,admin,{termo:"DIP-30-TESTE"})).produtos[0].id,id);
@@ -117,7 +117,7 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const r=await atender("Tem dipirona?",{acao:"buscar",termo:"Dipirona"});
       assert.match(r.mensagens[0],/R\$ 9,50/);assert.doesNotMatch(r.texto,/5,00|30 comprimidos|não temos/i);
       const exata=await atender("Tem dipirona caixa com 30 comprimidos?",{acao:"buscar",termo:"Dipirona 30 comprimidos"});
-      assert.match(exata.texto,/não temos.*disponível/i);assert.doesNotMatch(exata.texto,/9,50|Gostaria de fazer/);
+      assert.deepEqual(exata.mensagens,[]);
       const consultas=await cliente.query<{nome:string;apresentacao:string}>("SELECT p.nome,p.apresentacao FROM atendeia_produtos_consultas q JOIN atendeia_produtos p ON p.id=q.produto_id WHERE p.apresentacao='caixa com 30 comprimidos'");
       assert.equal(consultas.rows.length,0,"Opção indisponível não deve entrar no contexto de oferta.");
     });

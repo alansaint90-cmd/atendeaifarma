@@ -410,9 +410,9 @@ function analyzeFile(file) {
       msg: "Configurações não pode exibir nem editar o prompt legado do orquestrador." });
   }
 
-  if ((rel === "src/lib/farmacia/agente.ts" && (!/disponibilidade:"disponivel"/.test(content) || !/mensagens:\[/.test(content) || !/ofertados/.test(content))) || (rel === "src/lib/farmacia/catalogo.ts" && !/const identificador\s*=\s*termos\.length===1/.test(content)))
-    findings.push({ level:"error", id:"farmacia-oferta-disponivel", file:rel, line:1, msg:"Oferta exige disponíveis, contexto dos ofertados, CTA separado e busca composta sem fragmentos de SKU/EAN." });
-  if (rel === "src/lib/agent/consulta-estoque.ts" && (!/esperaConsultaEstoque = 15000/.test(content) || !/prazo: agora\(\) \+ esperaConsultaEstoque/.test(content) || !/await port\.registrarParte/.test(content) || !/"estoque_indisponivel"/.test(content) || /setTimeout|sleep\(/.test(content)))
+  if ((rel === "src/lib/farmacia/agente.ts" && (!/disponibilidade:"disponivel"/.test(content) || !/mensagens:\[\],transferirEstoque:true/.test(content) || !/ofertados/.test(content))) || (rel === "src/lib/farmacia/catalogo.ts" && !/const identificador\s*=\s*termos\.length===1/.test(content)))
+    findings.push({ level:"error", id:"farmacia-oferta-disponivel", file:rel, line:1, msg:"Oferta exige disponíveis, CTA separado e busca composta; sem saldo apenas notifica a equipe, sem mensagem ao cliente." });
+  if (rel === "src/lib/agent/consulta-estoque.ts" && (!/esperaConsultaEstoque = 15000/.test(content) || !/prazo: agora\(\) \+ esperaConsultaEstoque/.test(content) || !/await port\.registrarParte/.test(content) || !/partes = transferencia \? \[\]/.test(content) || !/"estoque_indisponivel"/.test(content) || /setTimeout|sleep\(/.test(content)))
     findings.push({level:"error",id:"farmacia-consulta-em-etapas",file:rel,line:1,msg:"Consulta exige prazo persistente de 15 segundos, checkpoint por saída e encaminhamento interno, sem sleep."});
   if (rel === "src/lib/farmacia/catalogo.ts" && (!/const ordem = sql`\$\{chaveAlfabetica\(sql`nome`\)/.test(content) || /filtro\.ordenar/.test(content)))
     findings.push({ level:"error", id:"farmacia-ordem-alfabetica", file:rel, line:1, msg:"Estoque deve manter ordem alfabética normalizada antes da paginação, sem alternativa por quantidade." });

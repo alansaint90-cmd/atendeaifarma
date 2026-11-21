@@ -15,7 +15,7 @@ import { registrarEtapaPedido, respostaPagamento } from "./pagamento";
 const sistema={sistema:true} as const;
 export function respostaProduto(produtos:Produto[],total:number):RespostaGerada {
   const disponiveis=produtos.filter(p=>p.ativo&&p.disponivel>0).slice(0,8);
-  if(!disponiveis.length)return {mensagens:["No momento não temos esse produto disponível."],transferirEstoque:true};
+  if(!disponiveis.length)return {mensagens:[],transferirEstoque:true};
   const lista=disponiveis.map(p=>{
     const embalagem=p.embalagem>1&&!/\d/.test(p.apresentacao)?` (${p.embalagem} unidades por embalagem)`:"";
     const descricao=[p.nome,p.concentracao,p.apresentacao].filter(Boolean).join(" — ");

@@ -59,7 +59,7 @@ test("farmácia: catálogo real, transações, receita, idempotência e CRM",asy
     await t.test("B/G: esgotados, vencidos, bloqueados e inativos não ficam disponíveis",async()=>{
       const id=await produto({nome:"Esgotado"});let r=await consultarProdutos(banco,operador,{termo:"Esgotado"});assert.equal(r.produtos[0].disponivel,0);
       await entrada(id,2,"2020-01-01");r=await consultarProdutos(banco,operador,{termo:"Esgotado"});assert.equal(r.produtos[0].disponivel,0);assert.equal(r.produtos[0].vencido,true);
-      const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo:"Esgotado",pedidoId:"",itens:[]},randomUUID());assert.match(textoResposta(resposta),/não temos.*disponível/i);
+      const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo:"Esgotado",pedidoId:"",itens:[]},randomUUID());assert.deepEqual(resposta,{mensagens:[],transferirEstoque:true});
       await assert.rejects(pedido(id),/Quantidade indisponível/);
       const inativo=await produto({nome:"Inativo",ativo:false});await entrada(inativo,3);assert.equal((await consultarProdutos(banco,operador,{termo:"Inativo"})).produtos[0].disponivel,0);
     });

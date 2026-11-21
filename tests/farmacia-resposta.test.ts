@@ -28,7 +28,7 @@ test("cadastro sem saldo não aparece junto à apresentação disponível",()=>{
 });
 test("não oferece compra quando todas as apresentações estão sem saldo",()=>{
   const r=respostaProduto([produto({disponivel:0})],1);
-  const texto=mensagens(r).join(" ");assert.match(texto,/não temos.*disponível/i);assert.doesNotMatch(texto,/Gostaria de fazer|R\$|transfer|encaminh/i);
+  assert.deepEqual(mensagens(r),[],"A resposta final sobre disponibilidade cabe ao atendente.");
   assert.ok(typeof r==="object"&&"transferirEstoque" in r&&r.transferirEstoque);
 });
 test("opções disponíveis mantêm concentração, apresentação, promoção e aviso de receita",()=>{

@@ -41,12 +41,12 @@ test("Redis real: espera de estoque retoma sem reenvio e permite atender outro c
     await client.set(`atendeia:{evolution}:followup:${mensagem.conversation}`,"Ciclo fictício");
     await client.zadd(followupQueue,Date.now()+60000,mensagem.conversation);
     await runAgentTick(dependencias);
-    assert.equal(consultas,1);assert.equal(envios.length,4);assert.equal(await client.xlen(streamKey),0);
+    assert.equal(consultas,1);assert.equal(envios.length,3);assert.equal(await client.xlen(streamKey),0);
     assert.deepEqual(motivos,["estoque_indisponivel"]);
     assert.equal(await client.get(`atendeia:{evolution}:followup:${mensagem.conversation}`),null);
     assert.equal(await client.zscore(followupQueue,mensagem.conversation),null);
     assert.equal(await pausaManualAtiva(client,mensagem.conversation),false,"A pausa persistente fica no PostgreSQL; devolver à IA não deve herdar 30 minutos extras.");
-    assert.ok(envios.every(e=>!/encaminh|transfer/i.test(e.texto)));
+    assert.deepEqual(envios.filter(e=>e.numero===mensagem.number).map(e=>e.texto),["Um momento, vou consultar o estoque.","Consultando…"]);
   } finally {
     await client.del(streamKey,agentKeys.lock,agentKeys.heartbeat,agentKeys.archive,chave,pausaManualKey(mensagem.conversation));client.disconnect();
   }

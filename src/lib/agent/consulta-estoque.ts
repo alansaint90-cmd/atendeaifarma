@@ -55,12 +55,18 @@ export async function processarConsultaEstoque(message: IncomingMessage, config:
       const resposta = await port.consultarEstoque!(estado.estoque!.termo);
       if (typeof resposta === "string") partes = z.array(z.string().trim().min(1).max(6000)).parse([resposta]);
       else if ("mensagens" in resposta) {
-        partes = z.array(z.string().trim().min(1).max(6000)).min(1).max(2).parse(resposta.mensagens);
         transferencia = resposta.transferirEstoque === true;
+        partes = transferencia ? [] : z.array(z.string().trim().min(1).max(6000)).min(1).max(2).parse(resposta.mensagens);
       } else throw new ProviderError("consulta_estoque_resposta_invalida");
     } catch { partes = [falhaConsulta]; }
     await salvar({ ...estado, status: "gerada", partes, transferencia,
       reply: [aviso, consultando, ...partes].join("\n\n"), estoque: { ...estado.estoque!, etapa: "resposta" } });
+  }
+  if (estado.estoque!.etapa === "resposta" && estado.transferencia) {
+    // Também descarta avisos pendentes de versões anteriores, preservando o que já foi enviado.
+    const confirmadas = (estado.partes ?? []).slice(0, Math.max(0, (estado.providerIds?.length ?? 2) - 2));
+    await salvar({ ...estado, partes: confirmadas, reply: [aviso, consultando, ...confirmadas].join("\n\n"),
+      estoque: { ...estado.estoque!, etapa: "transferir" } });
   }
   if (estado.estoque!.etapa === "resposta") {
     for (let indice = (estado.providerIds?.length ?? 2) - 2; indice < estado.partes!.length; indice++) {

@@ -38,12 +38,13 @@ test("consulta persiste espera de 15 segundos e só então consulta saldo atual,
   await processMessage(mensagem,config,c.porta);assert.equal(c.envios.length,4);
   assert.match(c.historico[1].content,/Um momento.*Consultando.*Temos sim/s);
 });
-test("indisponibilidade aciona equipe sem aviso de transferência, inclusive sem transferência genérica habilitada",async()=>{
-  const c=cenario({mensagens:["No momento não temos esse produto disponível."],transferirEstoque:true});
+test("sem saldo notifica somente a equipe e encerra a fala do agente em Consultando",async()=>{
+  const c=cenario({mensagens:[],transferirEstoque:true});
   await processMessage(mensagem,config,c.porta);c.avancar(15000);
   assert.equal(await processMessage(mensagem,config,c.porta),"enviada");
   assert.deepEqual(c.transferencias,["Suporte:estoque_indisponivel"]);
-  assert.deepEqual(c.envios.map(e=>e.texto),["Um momento, vou consultar o estoque.","Consultando…","No momento não temos esse produto disponível."]);
+  assert.deepEqual(c.envios.map(e=>e.texto),["Um momento, vou consultar o estoque.","Consultando…"]);
+  assert.deepEqual(c.registros,["saida-1","saida-2"]);
   assert.equal(c.estado()?.transferencia,true);
   await processMessage(mensagem,config,c.porta);assert.equal(c.transferencias.length,1);
 });
@@ -81,9 +82,21 @@ test("falha interna ao transferir retoma só o encaminhamento, sem repetir respo
   const transferir=c.porta.transferir!;let falhar=true;
   c.porta.transferir=async(...args)=>{if(falhar)throw new Error("Falha interna");await transferir(...args);};
   await processMessage(mensagem,config,c.porta);c.avancar(15000);
-  await assert.rejects(processMessage(mensagem,config,c.porta));assert.equal(c.envios.length,3);
+  await assert.rejects(processMessage(mensagem,config,c.porta));assert.equal(c.envios.length,2);
   falhar=false;assert.equal(await processMessage(mensagem,config,c.porta),"enviada");
-  assert.equal(c.envios.length,3);assert.equal(c.transferencias.length,1);
+  assert.equal(c.envios.length,2);assert.equal(c.transferencias.length,1);
+});
+
+test("retomada de checkpoint antigo descarta aviso de indisponibilidade ainda não enviado",async()=>{
+  const c=cenario();await processMessage(mensagem,config,c.porta);
+  c.envios.push({texto:"Consultando…",instante:115000});
+  await c.porta.write({...c.estado()!,status:"gerada",transferencia:true,
+    partes:["No momento não temos esse produto disponível."],providerIds:["saida-1","saida-2"],
+    reply:"Um momento, vou consultar o estoque.\n\nConsultando…\n\nNo momento não temos esse produto disponível.",
+    estoque:{termo:"Dipirona",etapa:"resposta"}});
+  assert.equal(await processMessage(mensagem,config,c.porta),"enviada");
+  assert.equal(c.envios.length,2);assert.equal(c.transferencias.length,1);
+  assert.doesNotMatch(c.historico[1].content,/não temos|indisponível/);
 });
 test("configuração alterada durante espera encerra sequência sem retomar com instruções diferentes",async()=>{
   const c=cenario();await processMessage(mensagem,config,c.porta);c.avancar(15000);
