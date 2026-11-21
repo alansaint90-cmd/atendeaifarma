@@ -65,13 +65,14 @@ html body .shell.tema-farma-pro {
   .sidebar .marca-nome { font-size: 20px; gap: 3px; }
   .sidebar .marca-ia { font-size: inherit; background: linear-gradient(115deg, #b16aff, #9942f6 60%, #8736ec); background-clip: text; -webkit-text-fill-color: transparent; color: #ad64ff; }
   .sidebar .marca-textos > small { color: #d2c7e7; font-size: 8.5px; }
-  .sidebar nav { display: grid; align-content: start; flex: 1; min-height: 0; gap: 5px; overflow-y: auto; overflow-x: hidden; scrollbar-color: #73579d transparent; }
+  .sidebar nav { display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; flex: 1; min-width: 0; min-height: 0; gap: 5px; overflow-y: auto; overflow-x: hidden; scrollbar-color: #73579d transparent; }
   .sidebar nav button {
-    display: flex; justify-content: flex-start; gap: 12px; min-height: 44px; width: 100%; padding: 10px 14px;
+    display: flex; justify-content: flex-start; gap: 12px; min-width: 0; min-height: 44px; width: 100%; padding: 10px 14px;
     border: 1px solid transparent; border-radius: 12px; color: var(--sidebar-text); background: transparent;
     font-size: 13px; font-weight: 500; line-height: 1.5; box-shadow: none; transition: background-color 160ms ease, border-color 160ms ease;
   }
   .sidebar nav .nav-label { display: inline; }
+  .sidebar nav .nav-icone { display: grid; place-items: center; width: 20px; height: 20px; flex-shrink: 0; }
   .sidebar nav button:hover { background: #ffffff0f; color: #fff; border-color: #ffffff14; transform: none; }
   .sidebar nav button.active { color: #fff; background: var(--pro-gradiente); border-color: #b88aff55; box-shadow: inset 0 1px 0 #ffffff20, 0 4px 14px #09021c33; }
   .sidebar nav .icon { width: 19px; height: 19px; flex-shrink: 0; }
@@ -89,7 +90,7 @@ html body .shell.tema-farma-pro {
   .sidebar .account-menu button:hover { color: var(--primary); background: var(--accent); }
   .sidebar .account-menu :focus-visible { outline-color: var(--primary); }
   &.sidebar-collapsed .sidebar { padding-inline: 12px; }
-  &.sidebar-collapsed .sidebar .marca-textos, &.sidebar-collapsed .nav-label, &.sidebar-collapsed .sidebar .account-details { display: none; }
+  &.sidebar-collapsed .sidebar .marca-textos, &.sidebar-collapsed .sidebar .account-details { display: none; }
   &.sidebar-collapsed .sidebar nav button { padding-inline: 10px; justify-content: center; }
   &.sidebar-collapsed .sidebar .account-identity { flex-wrap: wrap; justify-content: center; }
   &.sidebar-collapsed .sidebar .account-menu { left: calc(100% + 12px); bottom: 0; }
@@ -139,6 +140,16 @@ html body .shell.tema-farma-pro {
   .compositor-barra .compositor-enviar { background: var(--pro-gradiente); }
   .menu-mobile-fechar { width: 36px; min-width: 36px; min-height: 44px; padding: 0; color: #fff; font-size: 25px; background: transparent; justify-content: center; }
   .menu-mobile-fundo { display: none; }
+}
+
+@media (min-width: 769px) {
+  html body .shell.tema-farma-pro.sidebar-collapsed {
+    .sidebar-marca { justify-content: center; }
+    .sidebar nav { justify-items: center; scrollbar-width: none; }
+    .sidebar nav::-webkit-scrollbar { display: none; }
+    .sidebar nav button { width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; gap: 0; justify-content: center; }
+    .sidebar nav .nav-label { display: none; }
+  }
 }
 
 @media (max-width: 768px) {

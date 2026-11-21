@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { PainelShell } from "@/components/painel-shell";
 vi.mock("@/components/conta-menu",()=>({ContaMenu:({aoAbrirAssinatura}:{aoAbrirAssinatura:()=>void})=><button onClick={aoAbrirAssinatura}>Minha assinatura</button>}));
 afterEach(()=>{cleanup();vi.unstubAllGlobals();document.body.style.overflow="";});
@@ -11,9 +11,26 @@ test("tema conserva destinos e permissões do menu e recolhimento no desktop",()
  expect(screen.queryByRole("button",{name:"Configurações"})).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole("button",{name:"Campanhas"}));expect(navegar).toHaveBeenLastCalledWith("campaigns");
  fireEvent.click(screen.getByRole("button",{name:"Alternar menu"}));expect(screen.getByRole("button",{name:"Alternar menu"})).toHaveAttribute("aria-expanded","false");
+ expect(tela.container.querySelectorAll(".nav-label")).toHaveLength(0);
+ expect(screen.getByRole("button",{name:"Estoque"})).toHaveAttribute("title","Estoque");
+ fireEvent.click(screen.getByRole("button",{name:"Alternar menu"}));
+ expect(screen.getByRole("button",{name:"Estoque"})).toHaveTextContent("Estoque");
+ expect(screen.getByRole("button",{name:"Estoque"})).not.toHaveAttribute("title");
  tela.rerender(<PainelShell {...props} papel="operador"><p>Conteúdo real</p></PainelShell>);
  expect(screen.queryByRole("button",{name:"Campanhas"})).not.toBeInTheDocument();expect(screen.queryByRole("button",{name:"Equipe"})).not.toBeInTheDocument();
  expect(screen.getByRole("button",{name:"Estoque"})).toBeInTheDocument();
+});
+
+test("menu recolhido no desktop recupera os nomes ao abrir no celular",()=>{
+ let pequena=false;const ouvintes=new Set<()=>void>();
+ vi.stubGlobal("matchMedia",()=>({matches:pequena,addEventListener:(_tipo:string,ouvinte:()=>void)=>ouvintes.add(ouvinte),removeEventListener:(_tipo:string,ouvinte:()=>void)=>ouvintes.delete(ouvinte)}));
+ const tela=render(<PainelShell {...props} papel="admin"><p>Conteúdo real</p></PainelShell>);
+ fireEvent.click(screen.getByRole("button",{name:"Alternar menu"}));
+ expect(tela.container.querySelectorAll(".nav-label")).toHaveLength(0);
+ act(()=>{pequena=true;ouvintes.forEach(ouvinte=>ouvinte());});
+ fireEvent.click(screen.getByRole("button",{name:"Alternar menu"}));
+ const estoque=within(screen.getByRole("dialog")).getByRole("button",{name:"Estoque"});
+ expect(estoque).toHaveTextContent("Estoque");expect(estoque).not.toHaveAttribute("title");
 });
 
 function celular(){vi.stubGlobal("matchMedia",()=>({matches:true,addEventListener:vi.fn(),removeEventListener:vi.fn()}));}

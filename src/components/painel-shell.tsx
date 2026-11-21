@@ -63,8 +63,8 @@ export function PainelShell({ papel, nome, email, foto, rota, titulo, aoNavegar,
       <div className="sidebar-marca"><Marca clara /><button type="button" className="menu-mobile-fechar" hidden={!menuVisivel} aria-label="Fechar menu" onClick={fechar}>×</button></div>
       <nav aria-label="Menu principal">
       {menu.map(([id, label, ico]) => <button key={id} type="button" className={rota === id ? "active" : ""}
-        data-route={id} aria-label={label} aria-current={rota === id ? "page" : undefined}
-        onClick={() => navegar(id)}><span dangerouslySetInnerHTML={{ __html: icon(ico) }} /><span className="nav-label">{label}</span></button>)}
+        data-route={id} aria-label={label} aria-current={rota === id ? "page" : undefined} title={recolhido && !pequena ? label : undefined}
+        onClick={() => navegar(id)}><span className="nav-icone" aria-hidden="true" dangerouslySetInnerHTML={{ __html: icon(ico) }} />{(!recolhido || pequena) && <span className="nav-label">{label}</span>}</button>)}
     </nav>{rodape ?? <ContaMenu nome={nome} email={email} foto={foto} aoAbrirAssinatura={() => navegar("plans")} />}</aside>
     <section className="workspace" inert={menuVisivel || undefined}><header className="topbar">
       <button ref={alternador} className="icon-button" type="button" aria-label="Alternar menu" aria-controls={menuId} aria-expanded={pequena ? menuVisivel : !recolhido} onClick={() => pequena ? setMenuAberto(!menuAberto) : setRecolhido(!recolhido)}>☰</button>
