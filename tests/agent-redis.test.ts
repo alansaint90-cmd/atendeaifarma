@@ -24,7 +24,7 @@ test("Redis real: espera de estoque retoma sem reenvio e permite atender outro c
   const entrada=evento("5511999990001","Tem dipirona?"),outra=evento("5511999990002","Olá, equipe");
   const mensagem=incomingMessage(entrada,instancia)!,chave=`atendeia:{evolution}:reply:${mensagem.identity}`;
   const envios:{numero:string;texto:string}[]=[],motivos:string[]=[];let consultas=0;
-  const dependencias={settings:async()=>({AI_ENABLED:"true" as const,OPENAI_API_KEY:"teste",OPENAI_MODEL:"teste",
+  const dependencias={settings:async()=>({AI_ENABLED:"true" as const,OPENAI_API_KEY:"sk-teste-consulta",OPENAI_MODEL:"teste",
     EVOLUTION_API_URL:"https://example.invalid",EVOLUTION_API_KEY:"teste",EVOLUTION_INSTANCE_NAME:instancia,REDIS_URL:url}),
     chatbot:async()=>({...chatbotExample,context:"Farmácia",perguntarNome:false,openingMessages:undefined}),
     generate:async(_config:AgentConfig,_history:Turn[],texto:string)=>texto.includes("dipirona")?{consultarEstoque:"Dipirona"}:"Olá!",
