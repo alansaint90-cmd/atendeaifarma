@@ -16,6 +16,16 @@ function Tela() {
   const [id,selecionar]=useState("a");
   return <CaixaEntrada conversas={conversas} selecionada={id} aoSelecionar={selecionar} atualizar={vi.fn()} resposta={<textarea aria-label="Responder"/>}/>;
 }
+
+test("notifica internamente a equipe e remove aviso ao assumir a conversa",()=>{
+ const lista=conversas.map(c=>({...c,aguardaHumano:c.id==="a"}));
+ const tela=render(<CaixaEntrada conversas={lista} selecionada="a" aoSelecionar={vi.fn()} atualizar={vi.fn()}/>);
+ expect(screen.getByText(/1 atendimento\(s\) aguardando resposta da equipe/)).toBeInTheDocument();
+ expect(screen.getByText(/a IA está pausada/)).toBeInTheDocument();
+ expect(screen.getByText(/Aguardando atendente/)).toBeInTheDocument();
+ tela.rerender(<CaixaEntrada conversas={conversas} selecionada="a" aoSelecionar={vi.fn()} atualizar={vi.fn()}/>);
+ expect(screen.queryByText(/a IA está pausada/)).not.toBeInTheDocument();
+});
 test("lista nomes e prévias, troca histórico selecionado e mantém o campo de resposta",()=>{
   render(<Tela/>);
   expect(screen.getByRole("region",{name:"Histórico de Álvaro Silva"})).toBeInTheDocument();

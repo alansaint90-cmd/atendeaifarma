@@ -13,7 +13,7 @@ import { processMessage, type DeliveryState } from "../src/lib/agent/processor";
 import { sendReply, type Turn } from "../src/lib/agent/providers";
 import { salvarChatbotServidor, chatbotDaInstancia } from "../src/lib/chatbots/server-repository";
 import { criarChatbotFarmacia, promptAtendimentoFarmacia } from "../src/lib/farmacia/prompt";
-import { geradorFarmacia } from "../src/lib/farmacia/agente";
+import { consultaEstoqueFarmacia, geradorFarmacia } from "../src/lib/farmacia/agente";
 import { salvarProduto, entradaEstoque, consultarProdutos } from "../src/lib/farmacia/catalogo";
 import { assumirConversa, atendimentoHumanoAtivo } from "../src/lib/farmacia/atendimento";
 import type { ProdutoEntrada } from "../src/lib/farmacia/validacao";
@@ -66,17 +66,22 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         const corpo=JSON.parse(String(inicio?.body));saidas.push({numero:corpo.number,texto:corpo.text});
         return Response.json({key:{id:randomUUID()}});
       };
-      const porta={read:async()=>estados.get(mensagem.identity)??null,write:async(estado:DeliveryState)=>{estados.set(mensagem.identity,estado);},
+      let agora=Date.now();
+      const porta={agora:()=>agora,consultarEstoque:consultaEstoqueFarmacia(banco,instancia,mensagem),read:async()=>estados.get(mensagem.identity)??null,write:async(estado:DeliveryState)=>{estados.set(mensagem.identity,estado);},
         history:async()=>historico,enabled:async()=>!await atendimentoHumanoAtivo(banco,instancia,numero),
         generate:geradorFarmacia(banco,instancia,mensagem,requisicao),
         send:(_config:typeof config,destino:string,texto:string)=>sendReply(config,destino,texto,requisicao),
         transferir:async()=>{transferencias++;},
         complete:async(estado:DeliveryState,turnos:Turn[])=>{estados.set(mensagem.identity,estado);historico.push(...turnos);}};
-      const resultado=await processMessage(mensagem,configuracao,porta);
+      let resultado=await processMessage(mensagem,configuracao,porta);
+      const consulta=resultado==="aguardando_estoque";
+      if(consulta){agora+=15000;resultado=await processMessage(mensagem,configuracao,porta);}
       const quantidade=saidas.length;
       await processMessage(mensagem,configuracao,porta);
       assert.equal(saidas.length,quantidade,"Reentrega não pode repetir a resposta.");
-      const mensagens=saidas.slice(inicioSaidas).map(s=>s.texto);
+      const todas=saidas.slice(inicioSaidas).map(s=>s.texto);
+      if(consulta)assert.deepEqual(todas.slice(0,2),["Um momento, vou consultar o estoque.","Consultando…"]);
+      const mensagens=consulta?todas.slice(2):todas;
       return {resultado,texto:mensagens.join("\n\n"),mensagens};
     }
 
@@ -104,7 +109,7 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         assert.match(r.texto,/não temos.*disponível/i);assert.doesNotMatch(r.texto,/4 embalagens disponíveis|Não encontrei|Gostaria de fazer/);
       }
       const r=await atender("Tem produto inexistente?",{acao:"buscar",termo:"Produto inexistente"});
-      assert.match(r.texto,/Não encontrei esse produto no catálogo/);
+      assert.match(r.texto,/não temos esse produto disponível/i);assert.doesNotMatch(r.texto,/catálogo|transfer|encaminh/i);
     });
     await t.test("busca ampla só oferece o produto disponível e não troca apresentação específica",async()=>{
       assert.equal((await consultarProdutos(banco,admin,{termo:"DIP-30-TESTE"})).produtos[0].id,id);
@@ -137,8 +142,9 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       await assumirConversa(banco,admin,{id:conversa,assumir:false});
     });
     await t.test("dúvida clínica segue encaminhamento humano sem recomendar medicamento",async()=>{
+      const antes=transferencias;
       const r=await atender("Qual remédio devo tomar?",{acao:"humano"});
-      assert.equal(r.texto,bot.transferNotice);assert.equal(transferencias,1);
+      assert.equal(r.texto,bot.transferNotice);assert.equal(transferencias,antes+1);
       assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,0);
     });
     await t.test("falha do provedor não é anunciada como produto esgotado",async()=>{

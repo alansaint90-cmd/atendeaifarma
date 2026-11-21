@@ -2,7 +2,8 @@ import { z } from "zod";
 import type { AgentConfig } from "./config";
 
 export interface Turn { role: "user" | "assistant"; content: string; revisao?: string }
-export type RespostaGerada = string | { transferir: true } | { agendar: true } | { mensagens: string[] };
+export type RespostaConsultaEstoque = string | { mensagens: string[]; transferirEstoque?: true };
+export type RespostaGerada = RespostaConsultaEstoque | { transferir: true } | { agendar: true } | { consultarEstoque: string };
 export class ProviderError extends Error {
   constructor(public readonly code: string) { super(code); }
 }

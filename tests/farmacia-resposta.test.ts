@@ -28,7 +28,8 @@ test("cadastro sem saldo não aparece junto à apresentação disponível",()=>{
 });
 test("não oferece compra quando todas as apresentações estão sem saldo",()=>{
   const r=respostaProduto([produto({disponivel:0})],1);
-  assert.equal(typeof r,"string");assert.match(String(r),/não temos.*disponível/i);assert.doesNotMatch(String(r),/Gostaria de fazer|R\$/);
+  const texto=mensagens(r).join(" ");assert.match(texto,/não temos.*disponível/i);assert.doesNotMatch(texto,/Gostaria de fazer|R\$|transfer|encaminh/i);
+  assert.ok(typeof r==="object"&&"transferirEstoque" in r&&r.transferirEstoque);
 });
 test("opções disponíveis mantêm concentração, apresentação, promoção e aviso de receita",()=>{
   const partes=mensagens(respostaProduto([produto(),produto({concentracao:"1 g",apresentacao:"caixa com 10 comprimidos",promocional:"7.90",receita:true})],2));

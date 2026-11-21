@@ -14,6 +14,44 @@ import { chatbotExample } from "../src/lib/chatbots/defaults";
 import { pausaManualAtiva, pausaManualKey, pausaManualParaEvento } from "../src/lib/agent/pausa";
 import type { Turn } from "../src/lib/agent/providers";
 
+test("Redis real: espera de estoque retoma sem reenvio e permite atender outro contato",{skip:!process.env.TEST_REDIS_URL},async()=>{
+  const url=process.env.TEST_REDIS_URL!,alvo=new URL(url);
+  assert.ok(["localhost","127.0.0.1"].includes(alvo.hostname)&&alvo.pathname==="/15");
+  const client=agentRedis(url);await client.connect();
+  const instancia=`estoque-${randomUUID()}`;
+  const evento=(numero:string,texto:string):EvolutionEvent=>({event:"messages.upsert",instance:instancia,data:{
+    key:{id:randomUUID(),fromMe:false,remoteJid:`${numero}@s.whatsapp.net`},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:texto}}});
+  const entrada=evento("5511999990001","Tem dipirona?"),outra=evento("5511999990002","Olá, equipe");
+  const mensagem=incomingMessage(entrada,instancia)!,chave=`atendeia:{evolution}:reply:${mensagem.identity}`;
+  const envios:{numero:string;texto:string}[]=[],motivos:string[]=[];let consultas=0;
+  const dependencias={settings:async()=>({AI_ENABLED:"true" as const,OPENAI_API_KEY:"teste",OPENAI_MODEL:"teste",
+    EVOLUTION_API_URL:"https://example.invalid",EVOLUTION_API_KEY:"teste",EVOLUTION_INSTANCE_NAME:instancia,REDIS_URL:url}),
+    chatbot:async()=>({...chatbotExample,context:"Farmácia",perguntarNome:false,openingMessages:undefined}),
+    generate:async(_config:AgentConfig,_history:Turn[],texto:string)=>texto.includes("dipirona")?{consultarEstoque:"Dipirona"}:"Olá!",
+    consultarEstoque:async()=>{consultas++;return {mensagens:["No momento não temos esse produto disponível."],transferirEstoque:true as const};},
+    registrarEnvio:async()=>{},transferir:async(_i:string,_n:string,_d:string,motivo?:"estoque_indisponivel")=>{motivos.push(motivo??"");},
+    send:async(_config:unknown,numero:string,texto:string)=>{envios.push({numero,texto});return randomUUID();}};
+  try {
+    await enqueueEvolutionEventWithClient(client,entrada);await runAgentTick(dependencias);
+    assert.equal(await client.xlen(streamKey),1);assert.equal(envios.length,1);assert.equal(consultas,0);
+    await enqueueEvolutionEventWithClient(client,outra);await runAgentTick(dependencias);
+    assert.equal(envios.length,2);assert.equal(envios[1].numero,"5511999990002");
+    const estado=JSON.parse((await client.get(chave))!);assert.equal(estado.estoque.etapa,"consultando");
+    estado.estoque.prazo=Date.now()-1;await client.set(chave,JSON.stringify(estado));
+    await client.set(`atendeia:{evolution}:followup:${mensagem.conversation}`,"Ciclo fictício");
+    await client.zadd(followupQueue,Date.now()+60000,mensagem.conversation);
+    await runAgentTick(dependencias);
+    assert.equal(consultas,1);assert.equal(envios.length,4);assert.equal(await client.xlen(streamKey),0);
+    assert.deepEqual(motivos,["estoque_indisponivel"]);
+    assert.equal(await client.get(`atendeia:{evolution}:followup:${mensagem.conversation}`),null);
+    assert.equal(await client.zscore(followupQueue,mensagem.conversation),null);
+    assert.equal(await pausaManualAtiva(client,mensagem.conversation),false,"A pausa persistente fica no PostgreSQL; devolver à IA não deve herdar 30 minutos extras.");
+    assert.ok(envios.every(e=>!/encaminh|transfer/i.test(e.texto)));
+  } finally {
+    await client.del(streamKey,agentKeys.lock,agentKeys.heartbeat,agentKeys.archive,chave,pausaManualKey(mensagem.conversation));client.disconnect();
+  }
+});
+
 test("ecos dos dois balões da abertura não pausam a IA", { skip: !process.env.TEST_REDIS_URL }, async () => {
   const url = process.env.TEST_REDIS_URL!; const alvo = new URL(url);
   assert.ok(["localhost", "127.0.0.1"].includes(alvo.hostname) && alvo.pathname === "/15");

@@ -1,22 +1,17 @@
 #!/usr/bin/env node
 // @ts-check
 /**
- * check-compliance.mjs — Auditor de conformidade da Estrutura Base.
- *
- * Uso:
+ * check-compliance.mjs — Auditor de conformidade da Estrutura Base. Uso:
  *   node scripts/check-compliance.mjs                # escaneia src/ (ou cwd)
  *   node scripts/check-compliance.mjs --file <path>  # escaneia um arquivo
  *   node scripts/check-compliance.mjs --json         # saida JSON (CI/IA)
  *   node scripts/check-compliance.mjs --quiet        # so erros (esconde avisos)
- *   node scripts/check-compliance.mjs --help
- *
- * Exit code: 1 se houver ERROS, 0 caso contrario (avisos nao falham).
+ *   node scripts/check-compliance.mjs --help — exit 1 para ERROS, 0 caso contrário.
  */
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, extname, relative, basename, resolve } from "node:path";
 import { colunasDasFabricas } from "./colunas-fabricas.mjs";
-import { regrasCampanhas } from "./regras-campanhas.mjs"; import { regrasConversas } from "./regras-conversas.mjs";
-const ROOT = process.cwd(); const MAX_LINES = 500;
+import { regrasCampanhas } from "./regras-campanhas.mjs"; import { regrasConversas } from "./regras-conversas.mjs"; const ROOT = process.cwd(); const MAX_LINES = 500;
 /**
  * Excecao de caminho do limite de linhas. `src/components/ui/` e codigo de
  * terceiro vendorizado pelo CLI do shadcn, que a regra proibe editar. Vale SO
@@ -417,6 +412,8 @@ function analyzeFile(file) {
 
   if ((rel === "src/lib/farmacia/agente.ts" && (!/disponibilidade:"disponivel"/.test(content) || !/mensagens:\[/.test(content) || !/ofertados/.test(content))) || (rel === "src/lib/farmacia/catalogo.ts" && !/const identificador\s*=\s*termos\.length===1/.test(content)))
     findings.push({ level:"error", id:"farmacia-oferta-disponivel", file:rel, line:1, msg:"Oferta exige disponíveis, contexto dos ofertados, CTA separado e busca composta sem fragmentos de SKU/EAN." });
+  if (rel === "src/lib/agent/consulta-estoque.ts" && (!/esperaConsultaEstoque = 15000/.test(content) || !/prazo: agora\(\) \+ esperaConsultaEstoque/.test(content) || !/await port\.registrarParte/.test(content) || !/"estoque_indisponivel"/.test(content) || /setTimeout|sleep\(/.test(content)))
+    findings.push({level:"error",id:"farmacia-consulta-em-etapas",file:rel,line:1,msg:"Consulta exige prazo persistente de 15 segundos, checkpoint por saída e encaminhamento interno, sem sleep."});
   if (rel === "src/lib/farmacia/catalogo.ts" && (!/const ordem = sql`\$\{chaveAlfabetica\(sql`nome`\)/.test(content) || /filtro\.ordenar/.test(content)))
     findings.push({ level:"error", id:"farmacia-ordem-alfabetica", file:rel, line:1, msg:"Estoque deve manter ordem alfabética normalizada antes da paginação, sem alternativa por quantidade." });
   if (rel === "src/lib/farmacia/estoque-painel.ts" && !/periodoMovimentosSchema\.parse[\s\S]*autorizar\(tx,ator,"operador"\)[\s\S]*America\/Sao_Paulo[\s\S]*is_deleted=false/.test(content))

@@ -4,7 +4,7 @@ import { effectiveSettings } from "../settings/repository";
 import { evolutionEventSchema } from "../evolution/schema";
 import { streamKey } from "../evolution/queue";
 import { agentBaseConfigSchema, configurarAgente as configurarBase } from "./config";
-import { geradorFarmacia } from "../farmacia/agente";
+import { consultaEstoqueFarmacia, geradorFarmacia } from "../farmacia/agente";
 import { atendimentoHumanoAtivo } from "../farmacia/atendimento";
 import { incomingMessage, digest } from "./message";
 import { generateReply, sendReply } from "./providers";
@@ -39,7 +39,8 @@ function report(status: string) {
 
 const dependenciasPadrao = { settings: effectiveSettings, generate: generateReply, send: sendReply,
   apagada: (instancia: string, numero: string, instante: number, identidade: string) => conversaApagadaAposMensagem(db(), instancia, numero, instante, identidade),
-  transferir: (instancia: string, numero: string, destino: string) => transferirAtendimento(db(), instancia, numero, destino),
+  transferir: (instancia: string, numero: string, destino: string, motivo?: "estoque_indisponivel") => transferirAtendimento(db(), instancia, numero, destino, motivo),
+  consultarEstoque: (instancia: string, mensagem: Parameters<typeof consultaEstoqueFarmacia>[2], termo: string) => consultaEstoqueFarmacia(db(), instancia, mensagem)(termo),
   registrarEnvio: (instancia: string, id: string) => registrarEnvioIa(db(), instancia, id),
   chatbot: (instancia: string) => chatbotDaInstancia(db(), instancia) };
 export async function runAgentTick(substituicoes: Partial<typeof dependenciasPadrao> = {}) {
@@ -64,13 +65,11 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
     const followups = followupStore(client, token);
     try { await client.xgroup("CREATE", streamKey, agentKeys.group, "0", "MKSTREAM"); }
     catch (error) { if (!(error instanceof Error) || !error.message.includes("BUSYGROUP")) throw error; }
-    // Consumidor fixo + lease global recuperam o primeiro pendente antes de ler novos.
-    let raw = await client.xreadgroup("GROUP", agentKeys.group, agentKeys.consumer, "COUNT", 1, "STREAMS", streamKey, "0");
-    let entries = streamResult.parse(raw ?? [])[0]?.[1] ?? [];
-    if (!entries.length) {
-      raw = await client.xreadgroup("GROUP", agentKeys.group, agentKeys.consumer, "COUNT", 1, "STREAMS", streamKey, ">");
-      entries = streamResult.parse(raw ?? [])[0]?.[1] ?? [];
-    }
+    // Retoma pendentes sem impedir que outros contatos entrem durante a espera de estoque.
+    let raw = await client.xreadgroup("GROUP", agentKeys.group, agentKeys.consumer, "COUNT", 20, "STREAMS", streamKey, "0");
+    const pendentes = streamResult.parse(raw ?? [])[0]?.[1] ?? [];
+    raw = await client.xreadgroup("GROUP", agentKeys.group, agentKeys.consumer, "COUNT", 1, "STREAMS", streamKey, ">");
+    const entries = [...pendentes, ...(streamResult.parse(raw ?? [])[0]?.[1] ?? [])];
     for (const [id, fields] of entries) {
       const payload = fields[fields.indexOf("payload") + 1] ?? "{}";
       let value: unknown;
@@ -97,13 +96,15 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
         result = await dependencies.apagada(instancia, message.number, message.timestamp, message.identity) ? "conversa_apagada"
           : await pausaManualAtiva(client, message.conversation) ? "pausa_manual" : await processMessage(message, config.data, {
           ...store, generate: substituicoes.generate ?? geradorFarmacia(db(), instancia, message), send: dependencies.send, transcribe: transcribeAudio,
+          consultarEstoque: termo => dependencies.consultarEstoque(instancia, message, termo),
           registrarParte: async id => {
             await followups.outgoing(instancia, id);
             await dependencies.registrarEnvio(instancia, id);
           },
-          transferir: async destino => {
-            await dependencies.transferir(instancia, message.number, destino);
-            await pausarTransferencia(client, token, message.conversation);
+          transferir: async (destino, motivo) => {
+            await dependencies.transferir(instancia, message.number, destino, motivo);
+            // Estoque mantém a pausa no PostgreSQL até a equipe devolver à IA.
+            await pausarTransferencia(client, token, message.conversation, Date.now(), motivo !== "estoque_indisponivel");
           },
           enabled: atendimentoAtivo,
         });
@@ -124,6 +125,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
         await client.set(agentKeys.heartbeat, JSON.stringify({ status: "ativo", at: new Date().toISOString(),
           lastResult: result, lastCode: state?.code ?? null, lastAt: new Date().toISOString() }), "EX", 180);
       }
+      if (result === "aguardando_estoque") continue;
       if (result !== "repetir" && result !== "pausada") {
         const archive = JSON.stringify({ event: parsed.success ? parsed.data.event : "invalido", message });
         await finishEvent(client, token, id, archive, result);

@@ -4,7 +4,7 @@ import { LIMITE_CONTATOS } from "./limites";
 
 export interface ContatoOperacional { id: string; version: number; nome: string; telefone: string | null; email: string | null; origem: string | null; status: string }
 export interface MensagemOperacional { id: string; conteudo: string | null; direcao: string; instante: string }
-export interface ConversaOperacional { id: string; version: number; nome: string; telefone: string | null; canal: string; status: string; fotoUrl?: string | null; mensagens: MensagemOperacional[] }
+export interface ConversaOperacional { id: string; version: number; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; fotoUrl?: string | null; mensagens: MensagemOperacional[] }
 export interface ResumoOperacional {
   abertas: number; pendentes: number; qualificados: number; taxaResposta: number; totalContatos: number;
   contatos: ContatoOperacional[]; conversas: ConversaOperacional[]; volume: { dia: string; total: number }[];
@@ -32,7 +32,8 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
       count(*) FILTER (WHERE lead_status='qualificado')::int qualificados FROM atendeia_contacts WHERE is_deleted=false`))[0];
     const contatos = linhas<ContatoOperacional>(await tx.execute(sql`SELECT id,version,name nome,phone telefone,email,source origem,lead_status status
       FROM atendeia_contacts WHERE is_deleted=false ORDER BY created_at DESC,id LIMIT ${LIMITE_CONTATOS}`));
-    const conversas = linhas<Omit<ConversaOperacional, "mensagens">>(await tx.execute(sql`SELECT c.id,c.version,p.name nome,p.phone telefone,ch.name canal,c.status,p.foto_url "fotoUrl"
+    const conversas = linhas<Omit<ConversaOperacional, "mensagens">>(await tx.execute(sql`SELECT c.id,c.version,p.name nome,p.phone telefone,ch.name canal,c.status,p.foto_url "fotoUrl",
+      (c.status='pending' AND c.human_takeover=true AND c.assigned_to IS NULL) "aguardaHumano"
       FROM atendeia_conversations c JOIN atendeia_contacts p ON p.id=c.contact_id JOIN atendeia_channels ch ON ch.id=c.channel_id
       WHERE c.is_deleted=false AND p.is_deleted=false AND ch.is_deleted=false ORDER BY c.last_message_at DESC NULLS LAST,c.id LIMIT 50`));
     const historicos: ConversaOperacional[] = [];
@@ -40,7 +41,7 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
       const mensagens = linhas<MensagemOperacional>(await tx.execute(sql`SELECT id,content conteudo,direction direcao,
         to_char(sent_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') instante FROM atendeia_messages
         WHERE conversation_id=${conversa.id} AND is_deleted=false ORDER BY sent_at DESC,created_at DESC,id LIMIT 50`)).reverse();
-      historicos.push({ id: conversa.id, version: conversa.version, nome: conversa.nome, telefone: conversa.telefone, canal: conversa.canal, status: conversa.status, fotoUrl: conversa.fotoUrl, mensagens });
+      historicos.push({ id: conversa.id, version: conversa.version, nome: conversa.nome, telefone: conversa.telefone, canal: conversa.canal, status: conversa.status, aguardaHumano: conversa.aguardaHumano, fotoUrl: conversa.fotoUrl, mensagens });
     }
     const volume = linhas<{ dia: string; total: number }>(await tx.execute(sql`SELECT to_char(d.dia,'YYYY-MM-DD') dia,count(m.id)::int total
       FROM generate_series((now() AT TIME ZONE 'UTC')::date-6,(now() AT TIME ZONE 'UTC')::date,interval '1 day') d(dia)

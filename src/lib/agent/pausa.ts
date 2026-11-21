@@ -6,14 +6,14 @@ import { digest } from "./message";
 import { agentKeys, owned, assertResult } from "./redis";
 
 export const duracaoPausaManual = 30 * 60 * 1000;
-export async function pausarTransferencia(client: Redis, token: string, conversa: string, agora = Date.now()) {
+export async function pausarTransferencia(client: Redis, token: string, conversa: string, agora = Date.now(), pausaRedis = true) {
   await assertResult(await client.eval(owned + `
     local prazo = math.max(tonumber(redis.call('GET', KEYS[2]) or '0'), tonumber(ARGV[2]))
-    redis.call('SET', KEYS[2], prazo, 'PXAT', prazo)
+    if ARGV[4] == '1' then redis.call('SET', KEYS[2], prazo, 'PXAT', prazo) end
     redis.call('DEL', KEYS[3])
     redis.call('ZREM', KEYS[4], ARGV[3])
     return 1`, 4, agentKeys.lock, pausaManualKey(conversa),
-  `atendeia:{evolution}:followup:${conversa}`, 'atendeia:{evolution}:followups', token, agora + duracaoPausaManual, conversa));
+  `atendeia:{evolution}:followup:${conversa}`, 'atendeia:{evolution}:followups', token, agora + duracaoPausaManual, conversa, pausaRedis ? '1' : '0'));
 }
 export const pausaManualKey = (conversation: string) => `atendeia:{evolution}:manual-pause:${conversation}`;
 const aliasKey = (conversation: string) => `atendeia:{evolution}:contact-alias:${conversation}`;

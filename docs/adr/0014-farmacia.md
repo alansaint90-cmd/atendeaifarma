@@ -18,6 +18,7 @@ Reutilizar Next App Router, React, TypeScript, Drizzle/postgres-js, Evolution, R
 - Oportunidade acompanha venda/cancelamento; fechamento manual avulso bloqueado.
 - Preferência de pagamento e etapa comercial do WhatsApp usam eventos auditados existentes, sem nova tabela ou status financeiro. O contexto é reconstruído pelo pedido da conversa; eventos recebem instantes crescentes por pedido sob a trava transacional para desempatar operações no mesmo milissegundo. Acréscimos reaproveitam a validação do cadastro de pedido e uma chave com assinatura dos itens, sem duplicar o pedido ou aceitar a mesma operação com outros dados.
 - Tema da base, modal de três segundos, erro explícito e atualização de dez segundos. Prévia clínica indisponível.
+- Consulta de estoque é uma sequência retomável no checkpoint Redis existente: aviso, prazo mínimo de 15 segundos, consultando, consulta atual e resposta. O worker mantém o evento pendente, mas processa outros contatos durante o prazo. Sem disponibilidade, usa a conversa existente como fila/notificação interna (pending, human_takeover e sem responsável), com auditoria transacional e pausa Redis dos follow-ups. Não cria tabelas nem envia aviso de transferência ao cliente. A devolução explícita à IA mantém o controle humano existente.
 
 ## Limites
 

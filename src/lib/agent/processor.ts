@@ -6,8 +6,9 @@ import { extrairNomeInformado, instrucoesComNome, respostaComNome, personaDoAgen
 import { deveConsultarAgenda } from "../consultas/intencao";
 import { mensagensDaConsulta } from "../consultas/fluxo";
 import { z } from "zod";
+import { processarConsultaEstoque, type EstadoConsultaEstoque } from "./consulta-estoque";
 
-export interface DeliveryState { status: "gerando" | "gerada" | "enviando" | "enviada" | "incerta" | "falhou"; attempts: number; reply?: string; partes?: string[]; providerIds?: string[]; transcript?: string; code?: string; configHash?: string; providerId?: string; transferencia?: boolean; consulta?: boolean }
+export interface DeliveryState { status: "gerando" | "gerada" | "enviando" | "enviada" | "incerta" | "falhou"; attempts: number; reply?: string; partes?: string[]; providerIds?: string[]; transcript?: string; code?: string; configHash?: string; providerId?: string; transferencia?: boolean; consulta?: boolean; estoque?: EstadoConsultaEstoque }
 export interface ProcessingPort {
   read(): Promise<DeliveryState | null>;
   write(state: DeliveryState): Promise<void>;
@@ -17,7 +18,9 @@ export interface ProcessingPort {
   complete(state: DeliveryState, turns: Turn[]): Promise<void>;
   enabled(): Promise<boolean>;
   transcribe?(config: AgentConfig, message: IncomingMessage): Promise<string>;
-  transferir?(destino: string): Promise<void>;
+  transferir?(destino: string, motivo?: "estoque_indisponivel"): Promise<void>;
+  consultarEstoque?(termo: string): Promise<RespostaGerada>;
+  agora?(): number;
   cadastroConsulta?(texto: string, iniciar: boolean): Promise<string | null>;
   generate(config: AgentConfig, history: Turn[], text: string): Promise<RespostaGerada>;
   send(config: AgentConfig, number: string, text: string): Promise<string>;
@@ -82,6 +85,14 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
       }
       const gerada = cadastro ?? (partes ? partes.join("\n\n") : message.midia && config.atendimento?.transferMedia ? { transferir: true as const }
         : await port.generate({ ...config, AI_SYSTEM_PROMPT: instrucoes }, contextoAtual, transcript ?? message.text));
+      if (typeof gerada !== "string" && "consultarEstoque" in gerada) {
+        const termo = z.string().trim().min(2).max(120).parse(gerada.consultarEstoque);
+        if (!port.consultarEstoque || !port.transferir) throw new ProviderError("consulta_estoque_indisponivel");
+        const inicial: DeliveryState = { status: "gerada", attempts, configHash, transcript,
+          reply: "Um momento, vou consultar o estoque.", estoque: { termo, etapa: "aviso" } };
+        await port.write(inicial);
+        return processarConsultaEstoque(message, config, port, inicial);
+      }
       if (cadastro) { consulta = true; partes = undefined; reply = cadastro; }
       else if (typeof gerada !== "string" && "mensagens" in gerada) {
         partes = z.array(z.string().trim().min(1).max(6000)).min(1).max(3).parse(gerada.mensagens);
@@ -108,6 +119,7 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
     state = { status: "gerada", attempts, reply, partes, configHash, transcript, transferencia, consulta };
     await port.write(state);
   }
+  if (state.estoque) return processarConsultaEstoque(message, config, port, state);
   if (!await port.enabled()) return "pausada";
   if (!state.partes && !state.transferencia && /\[(?:NOME|NOME DO CLIENTE)\]|\{NOME\}/iu.test(state.reply!)) {
     state = { ...state, reply: respostaComNome(state.reply!, await port.contactName?.() ?? null, config.perguntarNome !== false) };

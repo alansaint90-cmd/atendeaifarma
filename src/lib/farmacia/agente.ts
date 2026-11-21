@@ -14,9 +14,8 @@ import { personaDoAgente } from "../agent/nome";
 import { registrarEtapaPedido, respostaPagamento } from "./pagamento";
 const sistema={sistema:true} as const;
 export function respostaProduto(produtos:Produto[],total:number):RespostaGerada {
-  if(!produtos.length)return "Não encontrei esse produto no catálogo. Informe o nome, a concentração ou o código de barras. Posso encaminhar a consulta à equipe.";
   const disponiveis=produtos.filter(p=>p.ativo&&p.disponivel>0).slice(0,8);
-  if(!disponiveis.length)return "No momento não temos esse produto disponível para venda. Gostaria de falar com a equipe da farmácia?";
+  if(!disponiveis.length)return {mensagens:["No momento não temos esse produto disponível."],transferirEstoque:true};
   const lista=disponiveis.map(p=>{
     const embalagem=p.embalagem>1&&!/\d/.test(p.apresentacao)?` (${p.embalagem} unidades por embalagem)`:"";
     const descricao=[p.nome,p.concentracao,p.apresentacao].filter(Boolean).join(" — ");
@@ -88,6 +87,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
     try {
       const contexto=await contextoDaConversa(banco,instancia,m);
       const intencao=await interpretarIntencao(config,historico,texto,contexto,request);
+      if(intencao.acao==="buscar"&&intencao.termo.trim().length>=2)return {consultarEstoque:intencao.termo.trim()};
       if(intencao.acao==="saudacao") {
         const persona=personaDoAgente(config.AI_SYSTEM_PROMPT);
         return persona ? `Olá! Sou ${persona}, assistente virtual do Atende Aí Pharma. Qual medicamento ou produto você procura?` : await atenderIntencao(banco,contexto,intencao,m.identity);
@@ -99,4 +99,9 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
       return "Não consegui consultar o sistema agora. Não posso confirmar preço, disponibilidade ou pedido. Tente novamente ou solicite atendimento humano.";
     }
   };
+}
+
+export function consultaEstoqueFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage) {
+  return async(termo:string)=>atenderIntencao(banco,await contextoDaConversa(banco,instancia,m),
+    {acao:"buscar",termo,pedidoId:"",itens:[]},m.identity);
 }

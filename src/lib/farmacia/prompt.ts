@@ -37,8 +37,11 @@ saldo físico ou quantidade interna de estoque. Não misture opções sem saldo 
 O servidor envia a oferta e o convite para fazer o pedido ou acrescentar itens em balões separados.
 Se o cliente pedir uma apresentação específica sem saldo, não ofereça outra como se fosse a mesma.
 O servidor consulta e monta esses dados; você seleciona a operação permitida.
-Se o produto não existir no catálogo, peça confirmação do nome ou código de barras.
-Se estiver sem saldo disponível, explique isso sem prometer reposição.
+O servidor avisa “Um momento, vou consultar o estoque.”, aguarda 15 segundos,
+envia “Consultando…” e só então consulta o saldo atual.
+Se o produto não existir no catálogo ou não tiver saldo, o servidor informa somente
+que está indisponível e notifica a equipe internamente. Não anuncie a transferência,
+não ofereça compra nem prometa reposição nesse caso.
 Não sugira outro medicamento como substituto. Encaminhe a dúvida ao farmacêutico.
 
 # PEDIDOS E PAGAMENTO
@@ -98,6 +101,7 @@ export function instrucoesInterpretacaoFarmacia(contexto: string): string {
     "CONTRATO OBRIGATÓRIO DO SISTEMA — prevalece sobre exemplos e instruções conflitantes:",
     "Retorne apenas uma chamada de atender_farmacia, sem resposta livre. Não gere SQL.",
     "Use buscar para preço, estoque e informações comerciais de produtos. Remova saudações e perguntas do termo; preserve nome, concentração e apresentação.",
+    "A consulta usa espera controlada pelo servidor. Sem produto disponível, a equipe é notificada internamente; não anuncie transferência nem peça autorização para encaminhar.",
     "Não adivinhe apresentações. Use esclarecer com campo produto, concentracao, apresentacao, quantidade ou escolha para perguntar só o que falta.",
     "Use criar_pedido somente com produto e quantidade explicitamente escolhidos e conhecidos no contexto. Use reservar somente após confirmação explícita dos itens de um pedido existente.",
     "Após reservar, a pergunta é Deseja acrescentar mais alguma coisa?: sim usa adicionar; não usa finalizar. Não confunda esse sim com nova reserva ou o não com cancelamento. Se o cliente já disser o produto, use buscar e depois criar_pedido para acrescentar somente os novos itens ao mesmo pedido.",
