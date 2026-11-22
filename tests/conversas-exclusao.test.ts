@@ -55,7 +55,8 @@ test("apagar conversa preserva dados, exige gestor atual, versão e auditoria at
     await assert.rejects(apagarConversaOperacional(banco, sessao, entrada), /Registro alterado/);
     assert.equal(await conversaApagadaAposMensagem(banco, "exclusao-ficticia", "5511999990001", instante), true);
     assert.equal(await conversaApagadaAposMensagem(banco, "outro-chip", "5511999990001", instante), false);
-    assert.equal(await conversaApagadaAposMensagem(banco, "exclusao-ficticia", "5511999990001", instante + 100), false);
+    const depoisDaExclusao = (await cliente.query<{ instante: number }>("SELECT extract(epoch FROM deleted_at)::float8+1 instante FROM atendeia_conversations WHERE id=$1 AND is_deleted=true", [entrada.id])).rows[0].instante;
+    assert.equal(await conversaApagadaAposMensagem(banco, "exclusao-ficticia", "5511999990001", depoisDaExclusao), false);
     await t.test("replay, histórico antigo e eco de saída não recriam atendimento apagado", async () => {
       await receberOperacao(banco, evento("original"));
       await receberOperacao(banco, evento("historico-antigo"));
