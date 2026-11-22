@@ -66,23 +66,25 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         const corpo=JSON.parse(String(inicio?.body));saidas.push({numero:corpo.number,texto:corpo.text});
         return Response.json({key:{id:randomUUID()}});
       };
-      let agora=Date.now();
+      let agora=Date.now(),adicional=false;
+      const gerar=geradorFarmacia(banco,instancia,mensagem,requisicao);
       const porta={agora:()=>agora,consultarEstoque:consultaEstoqueFarmacia(banco,instancia,mensagem),read:async()=>estados.get(mensagem.identity)??null,write:async(estado:DeliveryState)=>{estados.set(mensagem.identity,estado);},
         history:async()=>historico,enabled:async()=>!await atendimentoHumanoAtivo(banco,instancia,numero),
-        generate:geradorFarmacia(banco,instancia,mensagem,requisicao),
+        generate:async(...args:Parameters<typeof gerar>)=>{const r=await gerar(...args);adicional=typeof r!=="string"&&"consultarEstoque" in r&&!!r.continuidade;return r;},
         send:(_config:typeof config,destino:string,texto:string)=>sendReply(config,destino,texto,requisicao),
         transferir:async()=>{transferencias++;},
         complete:async(estado:DeliveryState,turnos:Turn[])=>{estados.set(mensagem.identity,estado);historico.push(...turnos);}};
       let resultado=await processMessage(mensagem,configuracao,porta);
-      const consulta=resultado==="aguardando_estoque";
-      if(consulta){agora+=15000;resultado=await processMessage(mensagem,configuracao,porta);}
+      if(resultado==="aguardando_estoque"){agora+=15000;resultado=await processMessage(mensagem,configuracao,porta);}
+      const consulta=!!estados.get(mensagem.identity)?.estoque;
       const quantidade=saidas.length;
       await processMessage(mensagem,configuracao,porta);
       assert.equal(saidas.length,quantidade,"Reentrega não pode repetir a resposta.");
       const todas=saidas.slice(inicioSaidas).map(s=>s.texto);
-      if(consulta)assert.deepEqual(todas.slice(0,2),["Um momento, vou consultar o estoque.","Consultando…"]);
-      const mensagens=consulta?todas.slice(2):todas;
-      return {resultado,texto:mensagens.join("\n\n"),mensagens};
+      const prefixo=adicional?["Consultando…"]:["Um momento, vou consultar o estoque.","Consultando…"];
+      if(consulta)assert.deepEqual(todas.slice(0,prefixo.length),prefixo);
+      const mensagens=consulta?todas.slice(prefixo.length):todas;
+      return {resultado,texto:mensagens.join("\n\n"),mensagens,todas};
     }
 
     await t.test("responde apresentação e preço em um balão e CTA em outro sem baixar estoque",async()=>{
@@ -101,6 +103,8 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.equal((await consultarProdutos(banco,admin,{termo:"Dipirona"})).produtos[0].disponivel,28);
     });
     await t.test("esgotado, lote vencido, bloqueado e produto ausente aguardam resposta humana",async()=>{
+      const anteriores=historico.splice(0);
+      try {
       for(const nome of ["Esgotado","Vencido","Bloqueado"]) {
         const produtoId=await salvarProduto(banco,admin,{id:null,atualizadoEm:null,produto:{...cadastro,nome,sku:randomUUID()},
           estoqueInicial:nome==="Vencido"?{codigo:"LOTE-VENCIDO",quantidade:4,validade:"2020-01-01",chave:randomUUID()}:null});
@@ -110,14 +114,21 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       }
       const r=await atender("Tem produto inexistente?",{acao:"buscar",termo:"Produto inexistente"});
       assert.deepEqual(r.mensagens,[]);
+      } finally {historico.splice(0,historico.length,...anteriores);}
     });
     await t.test("busca ampla só oferece o produto disponível e não troca apresentação específica",async()=>{
       assert.equal((await consultarProdutos(banco,admin,{termo:"DIP-30-TESTE"})).produtos[0].id,id);
       await salvarProduto(banco,admin,{id:null,atualizadoEm:null,produto:{...cadastro,apresentacao:"caixa com 30 comprimidos",preco:"5.00",sku:randomUUID()}});
       const r=await atender("Tem dipirona?",{acao:"buscar",termo:"Dipirona"});
       assert.match(r.mensagens[0],/R\$ 9,50/);assert.doesNotMatch(r.texto,/5,00|30 comprimidos|não temos/i);
-      const exata=await atender("Tem dipirona caixa com 30 comprimidos?",{acao:"buscar",termo:"Dipirona 30 comprimidos"});
-      assert.deepEqual(exata.mensagens,[]);
+      const antes=transferencias;
+      const exata=await atender("Quero acrescentar dipirona caixa com 30 comprimidos",{acao:"buscar",termo:"Dipirona 30 comprimidos"});
+      assert.equal(exata.todas[0],"Consultando…");assert.equal(exata.todas.length,3);
+      assert.equal(exata.mensagens[0],"No momento não temos esse produto disponível.");
+      assert.match(exata.mensagens[1],/Gostaria de finalizar.*Dipirona.*500 mg.*comprimidos/s);
+      assert.doesNotMatch(exata.mensagens[1],/30 comprimidos/);assert.equal(transferencias,antes);
+      assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,0,"Oferta anterior não cria pedido nem assume quantidade.");
+      assert.equal((await atender("Sim",{acao:"esclarecer",campo:"quantidade"})).texto,"Quantas embalagens você deseja?");
       const consultas=await cliente.query<{nome:string;apresentacao:string}>("SELECT p.nome,p.apresentacao FROM atendeia_produtos_consultas q JOIN atendeia_produtos p ON p.id=q.produto_id WHERE p.apresentacao='caixa com 30 comprimidos'");
       assert.equal(consultas.rows.length,0,"Opção indisponível não deve entrar no contexto de oferta.");
     });
@@ -167,6 +178,13 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const p=(await cliente.query<{id:string;numero:string}>("SELECT id,numero FROM atendeia_pedidos")).rows[0];
       assert.equal((await atender("Sim",{acao:"reservar",pedidoId:p.id})).texto,"Itens confirmados. Deseja acrescentar mais alguma coisa?");
       assert.equal((await atender("Sim",{acao:"adicionar",pedidoId:p.id})).texto,"Qual produto você deseja acrescentar ao pedido?");
+      const antes=transferencias;
+      const indisponivel=await atender("Quero acrescentar produto inexistente",{acao:"buscar",termo:"Produto inexistente"});
+      assert.equal(indisponivel.todas.length,3);assert.equal(indisponivel.todas[0],"Consultando…");
+      assert.match(indisponivel.mensagens[1],/finalizar.*Dipirona/s);assert.equal(transferencias,antes);
+      assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,1);
+      assert.deepEqual((await atender("Sim",{acao:"finalizar",pedidoId:p.id})).mensagens,
+        ["Pedido registrado, aguardando pagamento.","Qual forma de pagamento você prefere: Pix, dinheiro ou cartão?"]);
       const acrescimo=await atender("Mais uma dipirona",{acao:"criar_pedido",itens:[{produtoId:id,quantidade:1}]});
       assert.match(acrescimo.texto,/2 ×.*Total: R\$ 19,00/s);
       assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,1);

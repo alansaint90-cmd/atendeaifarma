@@ -7,7 +7,7 @@ import { agentBaseConfigSchema, configurarAgente as configurarBase } from "./con
 import { consultaEstoqueFarmacia, geradorFarmacia } from "../farmacia/agente";
 import { atendimentoHumanoAtivo } from "../farmacia/atendimento";
 import { incomingMessage, digest } from "./message";
-import { generateReply, sendReply } from "./providers";
+import { generateReply, sendReply, type ContinuidadeEstoque } from "./providers";
 import { transcribeAudio } from "./audio";
 import { processMessage } from "./processor";
 import { agentRedis, agentKeys, owned } from "./redis";
@@ -40,7 +40,7 @@ function report(status: string) {
 const dependenciasPadrao = { settings: effectiveSettings, generate: generateReply, send: sendReply,
   apagada: (instancia: string, numero: string, instante: number, identidade: string) => conversaApagadaAposMensagem(db(), instancia, numero, instante, identidade),
   transferir: (instancia: string, numero: string, destino: string, motivo?: "estoque_indisponivel") => transferirAtendimento(db(), instancia, numero, destino, motivo),
-  consultarEstoque: (instancia: string, mensagem: Parameters<typeof consultaEstoqueFarmacia>[2], termo: string) => consultaEstoqueFarmacia(db(), instancia, mensagem)(termo),
+  consultarEstoque: (instancia: string, mensagem: Parameters<typeof consultaEstoqueFarmacia>[2], termo: string, continuidade?: ContinuidadeEstoque) => consultaEstoqueFarmacia(db(), instancia, mensagem)(termo, continuidade),
   registrarEnvio: (instancia: string, id: string) => registrarEnvioIa(db(), instancia, id),
   chatbot: (instancia: string) => chatbotDaInstancia(db(), instancia) };
 export async function runAgentTick(substituicoes: Partial<typeof dependenciasPadrao> = {}) {
@@ -96,7 +96,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
         result = await dependencies.apagada(instancia, message.number, message.timestamp, message.identity) ? "conversa_apagada"
           : await pausaManualAtiva(client, message.conversation) ? "pausa_manual" : await processMessage(message, config.data, {
           ...store, generate: substituicoes.generate ?? geradorFarmacia(db(), instancia, message), send: dependencies.send, transcribe: transcribeAudio,
-          consultarEstoque: termo => dependencies.consultarEstoque(instancia, message, termo),
+          consultarEstoque: (termo, continuidade) => dependencies.consultarEstoque(instancia, message, termo, continuidade),
           registrarParte: async id => {
             await followups.outgoing(instancia, id);
             await dependencies.registrarEnvio(instancia, id);

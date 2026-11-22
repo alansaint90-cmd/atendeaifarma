@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { processMessage, type DeliveryState, type ProcessingPort } from "../src/lib/agent/processor";
 import type { AgentConfig } from "../src/lib/agent/config";
 import type { RespostaGerada, Turn } from "../src/lib/agent/providers";
+import { randomUUID } from "node:crypto";
 
 const config: AgentConfig = { AI_ENABLED:"true",AI_SYSTEM_PROMPT:"Farmácia",perguntarNome:false,
   OPENAI_API_KEY:"teste",OPENAI_MODEL:"teste",EVOLUTION_API_URL:"https://example.invalid",
@@ -102,4 +103,26 @@ test("configuração alterada durante espera encerra sequência sem retomar com 
   const c=cenario();await processMessage(mensagem,config,c.porta);c.avancar(15000);
   assert.equal(await processMessage(mensagem,{...config,AI_SYSTEM_PROMPT:"Outro prompt"},c.porta),"falhou");
   assert.equal(c.envios.length,1);assert.equal(c.consultas(),0);
+});
+
+test("acréscimo usa só Consultando, continua o pedido e não aciona pausa humana",async()=>{
+  const c=cenario({mensagens:["No momento não temos esse produto disponível.","Gostaria de finalizar o seu pedido com Dipirona?"]});
+  const continuidade={produtoIds:[randomUUID()]};
+  c.porta.generate=async()=>({consultarEstoque:"Dipirona",continuidade});
+  const consultar=c.porta.consultarEstoque!;
+  c.porta.consultarEstoque=async(termo,recebida)=>{assert.deepEqual(recebida,continuidade);return consultar(termo,recebida);};
+  assert.equal(await processMessage(mensagem,config,c.porta),"enviada");
+  assert.deepEqual(c.envios.map(e=>e.texto),["Consultando…","No momento não temos esse produto disponível.","Gostaria de finalizar o seu pedido com Dipirona?"]);
+  assert.ok(c.envios.every(e=>e.instante===100000));assert.equal(c.transferencias.length,0);assert.equal(c.registros.length,3);
+  await processMessage(mensagem,config,c.porta);assert.equal(c.envios.length,3);
+});
+
+test("acréscimo preserva checkpoint e entrega incerta em cada balão sem repetir nem transferir",async()=>{
+  for(const falha of [1,2,3]) {
+    const c=cenario({mensagens:["Produto adicional indisponível.","Gostaria de finalizar com Dipirona?"]});
+    c.porta.generate=async()=>({consultarEstoque:"Dipirona",continuidade:{produtoIds:[],pedidoId:randomUUID()}});
+    const enviar=c.porta.send;c.porta.send=async(...args)=>{const id=await enviar(...args);if(c.envios.length===falha)throw new Error("Falha simulada");return id;};
+    assert.equal(await processMessage(mensagem,config,c.porta),"incerta");
+    await processMessage(mensagem,config,c.porta);assert.equal(c.envios.length,falha);assert.equal(c.transferencias.length,0);
+  }
 });

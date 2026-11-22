@@ -2,8 +2,11 @@ import { z } from "zod";
 import type { AgentConfig } from "./config";
 
 export interface Turn { role: "user" | "assistant"; content: string; revisao?: string }
+export const continuidadeEstoqueSchema = z.strictObject({ produtoIds: z.array(z.uuid()).max(8), pedidoId: z.uuid().optional() })
+  .refine(v => v.produtoIds.length > 0 || Boolean(v.pedidoId), "Informe uma oferta ou pedido anterior.");
+export type ContinuidadeEstoque = z.infer<typeof continuidadeEstoqueSchema>;
 export type RespostaConsultaEstoque = string | { mensagens: string[]; transferirEstoque?: true };
-export type RespostaGerada = RespostaConsultaEstoque | { transferir: true } | { agendar: true } | { consultarEstoque: string };
+export type RespostaGerada = RespostaConsultaEstoque | { transferir: true } | { agendar: true } | { consultarEstoque: string; continuidade?: ContinuidadeEstoque };
 export class ProviderError extends Error {
   constructor(public readonly code: string) { super(code); }
 }

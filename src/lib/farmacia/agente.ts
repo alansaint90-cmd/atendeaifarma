@@ -4,7 +4,7 @@ import { systemUserId } from "../db/bootstrap";
 import { ErroDeNegocio } from "../acao";
 import type { AgentConfig } from "../agent/config";
 import type { IncomingMessage } from "../agent/message";
-import type { Turn, RespostaGerada } from "../agent/providers";
+import type { ContinuidadeEstoque, Turn, RespostaGerada } from "../agent/providers";
 import { consultarProdutos, type Produto } from "./catalogo";
 import { criarPedido, executarPedido } from "./pedidos";
 import { listarPedidos } from "./consultas";
@@ -12,13 +12,14 @@ import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
 import { personaDoAgente } from "../agent/nome";
 import { registrarEtapaPedido, respostaPagamento } from "./pagamento";
+import { continuidadeDaConsulta, conviteContinuarPedido, descricaoComercial } from "./continuidade";
 const sistema={sistema:true} as const;
 export function respostaProduto(produtos:Produto[],total:number):RespostaGerada {
   const disponiveis=produtos.filter(p=>p.ativo&&p.disponivel>0).slice(0,8);
   if(!disponiveis.length)return {mensagens:[],transferirEstoque:true};
   const lista=disponiveis.map(p=>{
     const embalagem=p.embalagem>1&&!/\d/.test(p.apresentacao)?` (${p.embalagem} unidades por embalagem)`:"";
-    const descricao=[p.nome,p.concentracao,p.apresentacao].filter(Boolean).join(" — ");
+    const descricao=descricaoComercial(p);
     return `${descricao}${embalagem}, por R$ ${(p.promocional??p.preco).replace(".",",")}.${p.receita||p.controle?" A liberação exige conferência de receita pelo farmacêutico.":""}`;
   });
   const oferta=lista.length===1?`Temos sim ${lista[0]}`:`Temos estas opções disponíveis:\n${lista.map(t=>`• ${t}`).join("\n")}`;
@@ -29,9 +30,12 @@ async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMess
   const [c]=linhas<{id:string;contato_id:string}>(await banco.execute(sql`SELECT c.id,c.contact_id contato_id FROM atendeia_conversations c JOIN atendeia_channels ch ON ch.id=c.channel_id
     WHERE ch.instance_name=${instancia} AND ch.is_deleted=false AND c.remote_jid=${`${m.number}@s.whatsapp.net`} AND c.status<>'closed' AND c.is_deleted=false`));
   if(!c)throw new ErroDeNegocio("Conversa indisponível.");
-  const produtos=linhas<ContextoFarmacia["produtos"][number]>(await banco.execute(sql`SELECT DISTINCT p.id,p.nome,p.concentracao,p.apresentacao FROM atendeia_produtos_consultas q
-    JOIN atendeia_produtos p ON p.id=q.produto_id WHERE q.conversa_id=${c.id} AND q.created_at>now()-interval '24 hours' AND q.is_deleted=false AND p.is_deleted=false LIMIT 40`));
+  const produtos=linhas<ContextoFarmacia["produtos"][number]>(await banco.execute(sql`SELECT p.id,p.nome,p.concentracao,p.apresentacao,
+    to_char(max(q.created_at) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') "consultadoEm" FROM atendeia_produtos_consultas q
+    JOIN atendeia_produtos p ON p.id=q.produto_id WHERE q.conversa_id=${c.id} AND q.created_at>now()-interval '24 hours' AND q.is_deleted=false AND p.is_deleted=false
+    GROUP BY p.id,p.nome,p.concentracao,p.apresentacao ORDER BY max(q.created_at) DESC,p.id LIMIT 40`));
   const pedidos=linhas<ContextoFarmacia["pedidos"][number]>(await banco.execute(sql`SELECT p.id,p.numero,p.status,
+    to_char(p.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') "atualizadoEm",
     (SELECT tipo FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.is_deleted=false ORDER BY e.created_at DESC,e.id DESC LIMIT 1) etapa,
     (SELECT detalhe FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.tipo='pagamento' AND e.is_deleted=false ORDER BY e.created_at DESC,e.id DESC LIMIT 1) pagamento
     FROM atendeia_pedidos p WHERE p.conversa_id=${c.id} AND p.is_deleted=false ORDER BY p.created_at DESC,p.id LIMIT 10`));
@@ -87,7 +91,8 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
     try {
       const contexto=await contextoDaConversa(banco,instancia,m);
       const intencao=await interpretarIntencao(config,historico,texto,contexto,request);
-      if(intencao.acao==="buscar"&&intencao.termo.trim().length>=2)return {consultarEstoque:intencao.termo.trim()};
+      if(intencao.acao==="buscar"&&intencao.termo.trim().length>=2)return {
+        consultarEstoque:intencao.termo.trim(),continuidade:continuidadeDaConsulta(contexto,historico)};
       if(intencao.acao==="saudacao") {
         const persona=personaDoAgente(config.AI_SYSTEM_PROMPT);
         return persona ? `Olá! Sou ${persona}, assistente virtual do Atende Aí Pharma. Qual medicamento ou produto você procura?` : await atenderIntencao(banco,contexto,intencao,m.identity);
@@ -102,6 +107,13 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
 }
 
 export function consultaEstoqueFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage) {
-  return async(termo:string)=>atenderIntencao(banco,await contextoDaConversa(banco,instancia,m),
-    {acao:"buscar",termo,pedidoId:"",itens:[]},m.identity);
+  return async(termo:string,continuidade?:ContinuidadeEstoque):Promise<RespostaGerada>=>{
+    const contexto=await contextoDaConversa(banco,instancia,m);
+    const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo,pedidoId:"",itens:[]},m.identity);
+    if(continuidade&&typeof resposta!=="string"&&"mensagens" in resposta&&resposta.transferirEstoque) {
+      const convite=await conviteContinuarPedido(banco,contexto.conversaId,continuidade);
+      if(convite)return {mensagens:["No momento não temos esse produto disponível.",convite]};
+    }
+    return resposta;
+  };
 }

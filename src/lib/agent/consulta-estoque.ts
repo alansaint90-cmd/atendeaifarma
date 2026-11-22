@@ -3,12 +3,13 @@ import type { AgentConfig } from "./config";
 import type { IncomingMessage } from "./message";
 import { digest } from "./message";
 import type { DeliveryState, ProcessingPort } from "./processor";
-import { ProviderError } from "./providers";
+import { ProviderError, type ContinuidadeEstoque } from "./providers";
 
 export interface EstadoConsultaEstoque {
   termo: string;
   etapa: "aviso" | "consultando" | "consultar" | "resposta" | "transferir";
   prazo?: number;
+  continuidade?: ContinuidadeEstoque;
 }
 export const esperaConsultaEstoque = 15000;
 const aviso = "Um momento, vou consultar o estoque.";
@@ -18,6 +19,7 @@ const falhaConsulta = "Não consegui consultar o sistema agora. Não posso confi
 /** Cada saída e prazo ficam no checkpoint Redis; nenhuma espera mantém a lease ocupada. */
 export async function processarConsultaEstoque(message: IncomingMessage, config: AgentConfig, port: ProcessingPort, inicial: DeliveryState): Promise<string> {
   let estado = inicial;
+  const prefixo = estado.estoque!.continuidade ? [consultando] : [aviso, consultando];
   const agora = port.agora ?? Date.now;
   const salvar = async (proximo: DeliveryState) => { await port.write(proximo); estado = proximo; };
   const enviar = async (texto: string): Promise<string | null> => {
@@ -52,7 +54,7 @@ export async function processarConsultaEstoque(message: IncomingMessage, config:
     let partes: string[];
     let transferencia = false;
     try {
-      const resposta = await port.consultarEstoque!(estado.estoque!.termo);
+      const resposta = await port.consultarEstoque!(estado.estoque!.termo, estado.estoque!.continuidade);
       if (typeof resposta === "string") partes = z.array(z.string().trim().min(1).max(6000)).parse([resposta]);
       else if ("mensagens" in resposta) {
         transferencia = resposta.transferirEstoque === true;
@@ -60,16 +62,16 @@ export async function processarConsultaEstoque(message: IncomingMessage, config:
       } else throw new ProviderError("consulta_estoque_resposta_invalida");
     } catch { partes = [falhaConsulta]; }
     await salvar({ ...estado, status: "gerada", partes, transferencia,
-      reply: [aviso, consultando, ...partes].join("\n\n"), estoque: { ...estado.estoque!, etapa: "resposta" } });
+      reply: [...prefixo, ...partes].join("\n\n"), estoque: { ...estado.estoque!, etapa: "resposta" } });
   }
   if (estado.estoque!.etapa === "resposta" && estado.transferencia) {
     // Também descarta avisos pendentes de versões anteriores, preservando o que já foi enviado.
-    const confirmadas = (estado.partes ?? []).slice(0, Math.max(0, (estado.providerIds?.length ?? 2) - 2));
-    await salvar({ ...estado, partes: confirmadas, reply: [aviso, consultando, ...confirmadas].join("\n\n"),
+    const confirmadas = (estado.partes ?? []).slice(0, Math.max(0, (estado.providerIds?.length ?? prefixo.length) - prefixo.length));
+    await salvar({ ...estado, partes: confirmadas, reply: [...prefixo, ...confirmadas].join("\n\n"),
       estoque: { ...estado.estoque!, etapa: "transferir" } });
   }
   if (estado.estoque!.etapa === "resposta") {
-    for (let indice = (estado.providerIds?.length ?? 2) - 2; indice < estado.partes!.length; indice++) {
+    for (let indice = (estado.providerIds?.length ?? prefixo.length) - prefixo.length; indice < estado.partes!.length; indice++) {
       const resultado = await enviar(estado.partes![indice]);
       if (resultado) return resultado;
       await salvar({ ...estado, status: "gerada", estoque: { ...estado.estoque!, etapa: "resposta" } });

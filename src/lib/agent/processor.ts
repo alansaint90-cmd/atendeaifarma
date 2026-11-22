@@ -1,7 +1,7 @@
 import type { AgentConfig } from "./config";
 import type { IncomingMessage } from "./message";
 import { digest } from "./message";
-import { ProviderError, type Turn, type RespostaGerada } from "./providers";
+import { ProviderError, continuidadeEstoqueSchema, type ContinuidadeEstoque, type Turn, type RespostaGerada } from "./providers";
 import { extrairNomeInformado, instrucoesComNome, respostaComNome, personaDoAgente, mesmoNome, removerRotuloDaPersona } from "./nome";
 import { deveConsultarAgenda } from "../consultas/intencao";
 import { mensagensDaConsulta } from "../consultas/fluxo";
@@ -19,7 +19,7 @@ export interface ProcessingPort {
   enabled(): Promise<boolean>;
   transcribe?(config: AgentConfig, message: IncomingMessage): Promise<string>;
   transferir?(destino: string, motivo?: "estoque_indisponivel"): Promise<void>;
-  consultarEstoque?(termo: string): Promise<RespostaGerada>;
+  consultarEstoque?(termo: string, continuidade?: ContinuidadeEstoque): Promise<RespostaGerada>;
   agora?(): number;
   cadastroConsulta?(texto: string, iniciar: boolean): Promise<string | null>;
   generate(config: AgentConfig, history: Turn[], text: string): Promise<RespostaGerada>;
@@ -87,9 +87,11 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
         : await port.generate({ ...config, AI_SYSTEM_PROMPT: instrucoes }, contextoAtual, transcript ?? message.text));
       if (typeof gerada !== "string" && "consultarEstoque" in gerada) {
         const termo = z.string().trim().min(2).max(120).parse(gerada.consultarEstoque);
+        const continuidade = gerada.continuidade ? continuidadeEstoqueSchema.parse(gerada.continuidade) : undefined;
         if (!port.consultarEstoque || !port.transferir) throw new ProviderError("consulta_estoque_indisponivel");
         const inicial: DeliveryState = { status: "gerada", attempts, configHash, transcript,
-          reply: "Um momento, vou consultar o estoque.", estoque: { termo, etapa: "aviso" } };
+          reply: continuidade ? "Consultando…" : "Um momento, vou consultar o estoque.",
+          estoque: { termo, etapa: continuidade ? "consultando" : "aviso", prazo: continuidade ? 0 : undefined, continuidade } };
         await port.write(inicial);
         return processarConsultaEstoque(message, config, port, inicial);
       }

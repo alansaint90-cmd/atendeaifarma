@@ -6,7 +6,7 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 226 |
+| Arquivos TS/TSX | 227 |
 | Tabelas (Drizzle) | 45 |
 | Server Actions (arquivos) | 16 |
 | Rotas de API | 7 |
@@ -214,6 +214,7 @@ lib/
     catalogo.ts
     comum.ts
     consultas.ts
+    continuidade.ts
     crm.ts
     estoque-painel.ts
     importacao-validacao.ts

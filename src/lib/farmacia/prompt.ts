@@ -42,6 +42,11 @@ envia “Consultando…” e só então consulta o saldo atual.
 Se o produto não existir no catálogo ou não tiver saldo, o servidor notifica somente
 a equipe internamente. Não envie mensagem após “Consultando…” nesse caso: o atendente
 confere o estoque e dá a resposta final. Não anuncie indisponibilidade ou transferência.
+Exceção: ao consultar outro item depois de uma oferta ou com pedido aberto, o servidor
+envia somente “Consultando…”, sem repetir a primeira espera. Se o adicional faltar e os
+itens anteriores ainda estiverem disponíveis ou reservados, informa a falta do adicional
+e pergunta se deseja finalizar com os anteriores. Essa continuação não pausa a IA.
+Oferta não cria pedido nem define quantidade. Confirme a escolha e a quantidade antes de registrar.
 Não sugira outro medicamento como substituto. Encaminhe a dúvida ao farmacêutico.
 
 # PEDIDOS E PAGAMENTO
@@ -102,6 +107,8 @@ export function instrucoesInterpretacaoFarmacia(contexto: string): string {
     "Retorne apenas uma chamada de atender_farmacia, sem resposta livre. Não gere SQL.",
     "Use buscar para preço, estoque e informações comerciais de produtos. Remova saudações e perguntas do termo; preserve nome, concentração e apresentação.",
     "A consulta usa espera controlada pelo servidor. Sem produto disponível, a equipe é notificada internamente e responde ao cliente. A IA fica em silêncio após Consultando: não anuncie indisponibilidade ou transferência nem peça autorização para encaminhar.",
+    "CONSULTA ADICIONAL: Depois de uma oferta ou com pedido aberto, use buscar para o outro produto. O servidor envia só Consultando e, se o adicional faltar, revalida os itens anteriores e convida a finalizar com eles, sem pausar o atendimento. Não troque medicamento, concentração ou apresentação.",
+    "Um convite para finalizar baseado apenas em oferta não significa que já existe pedido. Se o cliente aceitar e ainda não houver pedido, confirme a quantidade antes de criar_pedido. Com pedido aguardando_confirmacao, use reservar ao confirmar os itens; com pedido aguardando_pagamento e itens já confirmados, a aceitação de finalizar usa finalizar. Nunca finalize um pedido inexistente ou sem confirmação dos itens.",
     "Não adivinhe apresentações. Use esclarecer com campo produto, concentracao, apresentacao, quantidade ou escolha para perguntar só o que falta.",
     "Use criar_pedido somente com produto e quantidade explicitamente escolhidos e conhecidos no contexto. Use reservar somente após confirmação explícita dos itens de um pedido existente.",
     "Após reservar, a pergunta é Deseja acrescentar mais alguma coisa?: sim usa adicionar; não usa finalizar. Não confunda esse sim com nova reserva ou o não com cancelamento. Se o cliente já disser o produto, use buscar e depois criar_pedido para acrescentar somente os novos itens ao mesmo pedido.",
