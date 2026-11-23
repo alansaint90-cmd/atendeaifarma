@@ -15,15 +15,19 @@ import { salvarProduto, consultarProdutos } from "../src/lib/farmacia/catalogo";
 import { criarPedido, executarPedido } from "../src/lib/farmacia/pedidos";
 import { registrarEtapaPedido, respostaPagamento } from "../src/lib/farmacia/pagamento";
 import { listarPedidos } from "../src/lib/farmacia/consultas";
+import { receberOperacao } from "../src/lib/operacao/receber";
 
 async function verificar(banco:BancoSql) {
   await applyMigrations(banco);
   const admin={userId:randomUUID(),papel:"admin" as const},contato=randomUUID(),canal=randomUUID(),conversa=randomUUID();
+  const sku=randomUUID();
+  const telefone=`+5571${BigInt(`0x${contato.slice(0,8)}`)%900000000n+100000000n}`;
+  const jid=`${telefone.slice(1)}@s.whatsapp.net`;
   await banco.execute(sql`INSERT INTO atendeia_users(id,name,role,enabled,modified_by) VALUES (${admin.userId},'Teste pagamento','admin',true,${systemUserId})`);
-  await banco.execute(sql`INSERT INTO atendeia_contacts(id,name,modified_by) VALUES (${contato},'Cliente teste',${systemUserId})`);
+  await banco.execute(sql`INSERT INTO atendeia_contacts(id,name,phone,modified_by) VALUES (${contato},'Cliente teste',${telefone},${systemUserId})`);
   await banco.execute(sql`INSERT INTO atendeia_channels(id,name,instance_name,modified_by) VALUES (${canal},'Teste',${canal},${systemUserId})`);
-  await banco.execute(sql`INSERT INTO atendeia_conversations(id,contact_id,channel_id,remote_jid,modified_by) VALUES (${conversa},${contato},${canal},'teste@s.whatsapp.net',${systemUserId})`);
-  const produtoId=await salvarProduto(banco,admin,{id:null,atualizadoEm:null,produto:{...produtoVazio,nome:'Produto de teste',sku:randomUUID(),apresentacao:'caixa',preco:'11.90'},estoqueInicial:{codigo:'TESTE',quantidade:10,validade:'2099-12-31',chave:randomUUID()}});
+  await banco.execute(sql`INSERT INTO atendeia_conversations(id,contact_id,channel_id,remote_jid,modified_by) VALUES (${conversa},${contato},${canal},${jid},${systemUserId})`);
+  const produtoId=await salvarProduto(banco,admin,{id:null,atualizadoEm:null,produto:{...produtoVazio,nome:'Produto de teste',sku,apresentacao:'caixa',preco:'11.90'},estoqueInicial:{codigo:'TESTE',quantidade:10,validade:'2099-12-31',chave:randomUUID()}});
   const entrada={contatoId:contato,conversaId:conversa,chave:randomUUID(),itens:[{produtoId,quantidade:1}]};
   const id=await criarPedido(banco,{sistema:true},entrada);
   const registro=(etapa:string,pagamento?:object,chave=randomUUID())=>registrarEtapaPedido(banco,{id,conversaId:conversa,chave,etapa,...(pagamento?{pagamento}: {})});
@@ -39,7 +43,7 @@ async function verificar(banco:BancoSql) {
   assert.equal(p.itens[0].quantidade,2);assert.equal(p.total,'23.80');assert.equal(p.status,'aguardando_confirmacao');
   const [oportunidade]=linhas<{valor:string}>(await banco.execute(sql`SELECT valor::text FROM atendeia_funis_oportunidades WHERE id=(SELECT oportunidade_id FROM atendeia_pedidos WHERE id=${id} AND is_deleted=false) AND is_deleted=false`));
   assert.equal(oportunidade.valor,p.total,'O valor do CRM acompanha os acréscimos ao mesmo pedido.');
-  assert.equal((await consultarProdutos(banco,admin,{termo:'Produto de teste'})).produtos.find(p=>p.id===produtoId)?.disponivel,10);
+  assert.equal((await consultarProdutos(banco,admin,{termo:sku})).produtos[0]?.disponivel,10);
   await executarPedido(banco,{sistema:true},{id,acao:'reservar',chave:randomUUID()});
   await registro('finalizar');
   const chave=randomUUID();await Promise.all([registro('pagamento',{forma:'pix'},chave),registro('pagamento',{forma:'pix'},chave)]);
@@ -56,12 +60,63 @@ async function verificar(banco:BancoSql) {
   await assert.rejects(criarPedido(banco,{sistema:true},{...entrada,contatoId:randomUUID(),chave:randomUUID()},id),/indisponível/);
   await assert.rejects(criarPedido(banco,{sistema:true},{...entrada,chave:randomUUID(),itens:[{produtoId,quantidade:100}]},id),/Quantidade indisponível/);
   assert.equal((await listarPedidos(banco,admin,{id})).pedidos[0].itens[0].quantidade,2);
-  assert.equal((await consultarProdutos(banco,admin,{termo:'Produto de teste'})).produtos.find(p=>p.id===produtoId)?.reservado,2,'Falha de acréscimo preserva reserva anterior.');
+  assert.equal((await consultarProdutos(banco,admin,{termo:sku})).produtos[0]?.reservado,2,'Falha de acréscimo preserva reserva anterior.');
   await banco.execute(sql`UPDATE atendeia_pedidos_reservas SET expira_em=now()-interval '1 minute' WHERE pedido_id=${id} AND is_deleted=false`);
   await assert.rejects(registro('pagamento',{forma:'pix'}),/reconfirmar a disponibilidade/);
+
+  const carregar=async(pedidoId=id)=>(await listarPedidos(banco,admin,{id:pedidoId})).pedidos[0];
+  const comando=async(acao:string,pedidoId=id)=>({id:pedidoId,acao,chave:randomUUID(),referencia:'Conferência de teste 12345',atualizadoEm:(await carregar(pedidoId)).atualizadoEm});
+  await executarPedido(banco,admin,{id,acao:'reservar',chave:randomUUID()});
+  await registro('pagamento',{forma:'pix'});
+  assert.deepEqual((await carregar()).pagamento,{forma:'pix',estado:'pendente'});
+  await assert.rejects(executarPedido(banco,admin,await comando('entregar')),/Confirme o recebimento/);
+  await assert.rejects(executarPedido(banco,admin,await comando('conferir_pix')),/comprovante Pix/);
+  await assert.rejects(executarPedido(banco,admin,await comando('confirmar')),/fluxo de pagamento e entrega/);
+  const versaoSemComprovante=await comando('conferir_pix');
+  const anexo=(messageTimestamp=Math.floor(Date.now()/1000),fromMe=false)=>({event:'messages.upsert' as const,instance:canal,data:{
+    key:{id:randomUUID(),remoteJid:jid,fromMe},messageTimestamp,message:{documentMessage:{}}}});
+  await receberOperacao(banco,anexo(Math.floor(Date.now()/1000)-60));
+  await receberOperacao(banco,anexo(Math.floor(Date.now()/1000),true));
+  assert.equal((await carregar()).pagamento.estado,'pendente');
+  const comprovante=anexo();
+  await Promise.all([receberOperacao(banco,comprovante),receberOperacao(banco,comprovante)]);
+  const recebido=await carregar();
+  assert.deepEqual(recebido.pagamento,{forma:'pix',estado:'informado'});
+  assert.equal(recebido.eventos.filter(e=>e.tipo==='comprovante_pix').length,1);
+  await assert.rejects(executarPedido(banco,admin,versaoSemComprovante),/pedido foi atualizado/);
+  const conferirPix=await comando('conferir_pix');
+  await assert.rejects(executarPedido(banco,{sistema:true},conferirPix),/atendente autorizado/);
+  assert.deepEqual(await Promise.all([executarPedido(banco,admin,conferirPix),executarPedido(banco,admin,conferirPix)]),[id,id]);
+  const pago=await carregar();
+  assert.equal(pago.status,'aguardando_pagamento');assert.equal(pago.pagamento.estado,'pago');
+  assert.equal(pago.eventos.filter(e=>e.tipo==='pix_conferido').length,1);
+  await assert.rejects(registro('pagamento',{forma:'cartao'}),/já confirmou o Pix/i);
+  await assert.rejects(criarPedido(banco,{sistema:true},{...entrada,chave:randomUUID()},id),/já confirmou o Pix/i);
+  const saldoAtual=async()=>(await consultarProdutos(banco,admin,{termo:sku})).produtos[0].fisico;
+  assert.equal(await saldoAtual(),10);
+  await banco.execute(sql`UPDATE atendeia_pedidos_reservas SET expira_em=now()-interval '1 minute' WHERE pedido_id=${id} AND is_deleted=false`);
+  const entregar=await comando('entregar');
+  assert.deepEqual(await Promise.all([executarPedido(banco,admin,entregar),executarPedido(banco,admin,entregar)]),[id,id]);
+  assert.equal((await carregar()).status,'concluido');assert.equal(await saldoAtual(),8);
+
+  for(const forma of ['cartao','dinheiro']) {
+    const novo=await criarPedido(banco,{sistema:true},{...entrada,chave:randomUUID()});
+    await executarPedido(banco,{sistema:true},{id:novo,acao:'reservar',chave:randomUUID()});
+    const fase={id:novo,conversaId:conversa};
+    await registrarEtapaPedido(banco,{...fase,chave:randomUUID(),etapa:'finalizar'});
+    await registrarEtapaPedido(banco,{...fase,chave:randomUUID(),etapa:'pagamento',pagamento:{forma}});
+    assert.deepEqual((await carregar(novo)).pagamento,{forma,estado:'na_entrega'});
+    const antes=await saldoAtual();
+    const entrega=await comando('entregar',novo);
+    await assert.rejects(executarPedido(banco,admin,{...entrega,referencia:''}),/pagamento recebido na entrega/);
+    await executarPedido(banco,admin,entrega);
+    const entregue=await carregar(novo);
+    assert.equal(entregue.status,'concluido');assert.deepEqual(entregue.pagamento,{forma,estado:'pago'});
+    assert.equal(await saldoAtual(),antes-1);
+  }
 }
 
-test('pedido persiste preferências e troco sem confirmar pagamento ou duplicar acréscimos',async()=>{
+test('pedido registra formas e comprovante, confere Pix e baixa estoque uma vez na entrega',async()=>{
   const cliente=new PGlite();try{await verificar(drizzle(cliente));}finally{await cliente.close();}
 });
 test('PostgreSQL 16 real mantém pedido e histórico de pagamento idempotentes',{skip:!process.env.TEST_DATABASE_URL},async()=>{

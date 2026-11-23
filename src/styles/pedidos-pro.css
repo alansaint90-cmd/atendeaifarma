@@ -29,17 +29,21 @@ html body .shell.tema-farma-pro .pedidos-pro {
   .pedidos-filtros .primary { display:inline-flex; align-items:center; justify-content:center; gap:10px; min-height:48px; padding:12px 22px; font-size:14px; font-weight:650; }
   .pedidos-escopo { margin:10px 2px 16px; color:#70647f; font-size:11px; }
   .pedidos-tabela { border:1px solid #ebe4f6; border-radius:20px; padding:6px; box-shadow:0 4px 12px #6720bf0b; background:#ffffffb8; }
-  .pedidos-tabela table { min-width:640px; width:100%; table-layout:fixed; }
+  .pedidos-tabela table { min-width:760px; width:100%; table-layout:fixed; }
   .pedidos-tabela th { background:#f1eef8; color:#51465f; text-transform:uppercase; font-size:13px; font-weight:700; padding:16px 20px; }
-  .pedidos-tabela th:first-child { border-radius:15px 0 0 0; width:19%; }
-  .pedidos-tabela th:nth-child(2) { width:26%; }
-  .pedidos-tabela th:nth-child(3) { width:17%; }
-  .pedidos-tabela th:nth-child(4) { width:23%; }
-  .pedidos-tabela th:last-child { border-radius:0 15px 0 0; width:15%; }
+  .pedidos-tabela th:first-child { border-radius:15px 0 0 0; width:16%; }
+  .pedidos-tabela th:nth-child(2) { width:20%; }
+  .pedidos-tabela th:nth-child(3) { width:12%; }
+  .pedidos-tabela th:nth-child(4) { width:20%; }
+  .pedidos-tabela th:nth-child(5) { width:18%; }
+  .pedidos-tabela th:last-child { border-radius:0 15px 0 0; width:14%; }
   .pedidos-tabela td { padding:14px 20px; vertical-align:middle; font-size:15px; line-height:1.35; color:#1d142b; overflow-wrap:anywhere; }
   .pedidos-tabela tbody tr:last-child td { border-bottom:0; }
   .pedidos-tabela td > strong { font-weight:600; }
   .pedidos-tabela td small { display:block; margin-top:4px; font-size:10px; color:#786b89; }
+  .pedidos-tabela td:nth-child(4) small,.pedido-detalhe-pagamento small { display:block; font-size:12px; color:#645475; }
+  .pedido-detalhe-pagamento { margin-block:12px; }
+  .pedido-detalhe-pagamento span { display:block; margin-bottom:4px; }
   .pedidos-tabela .pedidos-numero { display:inline-block; min-height:44px; border:0; padding:4px 0; background:transparent; color:#23113f; font-size:14px; font-weight:650; text-align:left; overflow-wrap:anywhere; }
   .pedidos-tabela .pedidos-numero:hover { color:#7425e8; text-decoration:underline; }
   .pedidos-valor,.pedidos-tabela time { white-space:nowrap; }

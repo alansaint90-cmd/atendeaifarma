@@ -52,12 +52,29 @@ test('atalho de inativação preserva registros e exige confirmação bloqueada 
 
 test('confirmação de venda exige referência e modal antes de chamar o servidor',async()=>{
   a.carregarCadastrosFarmacia.mockResolvedValue({ok:true,dados:{usuarios:[],contatos:[],categorias:[]}});
-  a.carregarPedidos.mockResolvedValue({ok:true,dados:{total:1,pedidos:[{id:crypto.randomUUID(),numero:'F-TESTE',cliente:'Cliente',telefone:'+5571000000000',total:'17.80',status:'aguardando_pagamento',origem:'painel',responsavel:'Gerente',data:'2026-10-14T12:00:00Z',expira:null,conferencia:null,itens:[],eventos:[]}]}});
+  a.carregarPedidos.mockResolvedValue({ok:true,dados:{total:1,pedidos:[{id:crypto.randomUUID(),numero:'F-TESTE',cliente:'Cliente',telefone:'+5571000000000',total:'17.80',status:'aguardando_pagamento',origem:'painel',responsavel:'Gerente',data:'2026-10-14T12:00:00Z',pagamento:{forma:null,estado:'pendente'},expira:null,conferencia:null,itens:[],eventos:[]}]}});
   render(<PedidosPage gestor/>);fireEvent.click(await screen.findByRole('button',{name:'Abrir pedido'}));
   const confirmar=screen.getByRole('button',{name:'Confirmar venda e pagamento'});expect(confirmar).toBeDisabled();
   fireEvent.change(screen.getByLabelText(/Referência de pagamento/),{target:{value:'PIX conferido 123'}});fireEvent.click(confirmar);
   expect(screen.getByRole('alertdialog')).toHaveTextContent('baixar definitivamente');expect(screen.getByRole('button',{name:'Confirmar',exact:true})).toBeDisabled();
   expect(a.alterarPedido).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['pix','informado','Pago informado · conferir comprovante','Confirmar pagamento Pix'],
+  ['pix','pago','Pago','Confirmar entrega'],
+  ['cartao','na_entrega','Pagar na entrega','Confirmar entrega'],
+  ['dinheiro','na_entrega','Pagar na entrega','Confirmar entrega'],
+])('pedidos mostra %s %s e ação da etapa',async(forma,estado,texto,rotulo)=>{
+  a.carregarCadastrosFarmacia.mockResolvedValue({ok:true,dados:{usuarios:[]}});
+  a.carregarPedidos.mockResolvedValue({ok:true,dados:{total:1,pedidos:[{id:crypto.randomUUID(),numero:'F-TESTE',cliente:'Cliente',
+    total:'12.00',status:'aguardando_pagamento',data:'2026-10-14T12:00:00Z',pagamento:{forma,estado},itens:[],eventos:[]}]}});
+  render(<PedidosPage gestor/>);
+  expect(await screen.findByRole('columnheader',{name:'Pagamento'})).toBeInTheDocument();
+  expect(screen.getByText(texto)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'Abrir pedido'}));
+  expect(screen.getByRole('button',{name:rotulo})).toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'Confirmar venda e pagamento'})).not.toBeInTheDocument();
 });
 
 test('pedidos mostram indicadores reais e enviam busca e período ao servidor',async()=>{

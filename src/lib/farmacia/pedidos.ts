@@ -7,6 +7,7 @@ import { centavos, decimal, novoPedidoSchema, comandoPedidoSchema, habilitacaoSc
 import { autorizar, evento, auditar, elegivel, reservaAtiva, travarEstoque, type AtorFarmacia } from "./comum";
 import { reservarItens, confirmarItens, cancelarItens } from "./transacoes";
 import { criarNegociacao, sincronizarNegociacao, atualizarValorNegociacao } from "./crm";
+import { atualizarVersaoPagamento, estadoPagamento } from "./pagamento";
 
 export interface PedidoInterno { id:string; status:string; contato_id:string; conversa_id:string|null; total:string; confirmado_em:string|null; conferido_por:string|null }
 export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: unknown, acrescentarId?: string, ajustarQuantidade = false) {
@@ -31,6 +32,8 @@ export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: 
       if(!anterior)throw new ErroDeNegocio("Pedido indisponível para acrescentar itens.");
       const [repeticao]=linhas<{chave:string}>(await tx.execute(sql`SELECT chave FROM atendeia_pedidos_eventos WHERE pedido_id=${anterior.id} AND starts_with(chave,${`acrescentar:${operacao}:`}) AND is_deleted=false`));
       if(repeticao){if(repeticao.chave!==chaveAcrescimo)throw new ErroDeNegocio("Operação já utilizada com outros itens.");return anterior.id;}
+      const pixConferido=linhas(await tx.execute(sql`SELECT id FROM atendeia_pedidos_eventos WHERE pedido_id=${anterior.id} AND tipo='pix_conferido' AND is_deleted=false LIMIT 1`));
+      if(pixConferido.length)throw new ErroDeNegocio("A equipe já confirmou o Pix. Fale com a farmácia antes de alterar os itens.");
       const anteriores=linhas<{produtoId:string;quantidade:number}>(await tx.execute(sql`SELECT produto_id "produtoId",quantidade FROM atendeia_pedidos_itens WHERE pedido_id=${anterior.id} AND is_deleted=false`));
       const somados=new Map(anteriores.map(i=>[i.produtoId,i.quantidade]));
       for(const i of v.itens)somados.set(i.produtoId,ajustarQuantidade?i.quantidade:(somados.get(i.produtoId)??0)+i.quantidade);
@@ -73,11 +76,12 @@ export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: 
 export async function executarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: unknown) {
   const v = comandoPedidoSchema.parse(entrada);
   return banco.transaction(async tx => {
-    await travarEstoque(tx); const autor = await autorizar(tx,ator,v.acao==="confirmar" || v.acao==="cancelar" ? "admin" : "operador",v.acao==="reservar");
+    await travarEstoque(tx); const autor = await autorizar(tx,ator,["confirmar","cancelar","conferir_pix","entregar"].includes(v.acao) ? "admin" : "operador",v.acao==="reservar");
     const chave = `acao:${v.id}:${v.chave}`;
+    const tipoEvento=v.acao==="conferir_pix"?"pix_conferido":v.acao;
     const [repetido] = linhas<{tipo:string}>(await tx.execute(sql`SELECT tipo FROM atendeia_pedidos_eventos WHERE chave=${chave} AND is_deleted=false`));
     if (repetido) {
-      if (repetido.tipo!==v.acao) throw new ErroDeNegocio("Chave utilizada em outra operação.");
+      if (repetido.tipo!==tipoEvento) throw new ErroDeNegocio("Chave utilizada em outra operação.");
       return v.id;
     }
     const [p] = linhas<PedidoInterno>(await tx.execute(sql`SELECT * FROM atendeia_pedidos WHERE id=${v.id} AND is_deleted=false FOR UPDATE`));
@@ -85,6 +89,27 @@ export async function executarPedido(banco: BancoSql, ator: AtorFarmacia, entrad
     if (v.acao==="cancelar" && p.status==="cancelado") return p.id;
     if (v.acao==="confirmar" && p.confirmado_em && p.status!=="cancelado") return p.id;
     if (p.status==="cancelado") throw new ErroDeNegocio("Pedido cancelado.");
+    if (v.acao==="confirmar"||v.acao==="conferir_pix"||v.acao==="entregar") {
+      if(v.atualizadoEm) {
+        const versao=linhas(await tx.execute(sql`SELECT id FROM atendeia_pedidos WHERE id=${p.id} AND is_deleted=false AND updated_at=${v.atualizadoEm}::timestamptz`));
+        if(!versao.length)throw new ErroDeNegocio("O pedido foi atualizado. Abra os detalhes novamente antes de confirmar.");
+      }
+      const etapas=linhas<{tipo:string;detalhe:string}>(await tx.execute(sql`SELECT tipo,detalhe FROM atendeia_pedidos_eventos
+        WHERE pedido_id=${p.id} AND is_deleted=false ORDER BY created_at,id`));
+      const pg=estadoPagamento(p.status,Boolean(p.confirmado_em),etapas);
+      if(v.acao==="confirmar"&&pg.forma)throw new ErroDeNegocio("Use o fluxo de pagamento e entrega da forma registrada no pedido.");
+      if(v.acao==="conferir_pix") {
+        if(p.status!=="aguardando_pagamento"||pg.forma!=="pix"||pg.estado!=="informado")throw new ErroDeNegocio("O pedido precisa de um comprovante Pix aguardando conferência.");
+        if(v.referencia.length<5)throw new ErroDeNegocio("Informe a referência da conferência do Pix.");
+        await atualizarVersaoPagamento(tx,p.id,autor);
+      }
+      if(v.acao==="entregar") {
+        if(pg.forma==="pix"&&pg.estado!=="pago")throw new ErroDeNegocio("Confirme o recebimento do Pix antes de registrar a entrega.");
+        if(!pg.forma)throw new ErroDeNegocio("O pedido não tem forma de pagamento registrada.");
+        if(pg.forma!=="pix"&&v.referencia.length<5)throw new ErroDeNegocio("Informe a referência do pagamento recebido na entrega.");
+        await confirmarItens(tx,p,autor,v.referencia||"Pix conferido e entrega confirmada pelo gerente.","concluido");
+      }
+    }
     if (v.acao==="reservar") {
       if("sistema" in ator) {
         const [ultima]=linhas<{tipo:string}>(await tx.execute(sql`SELECT tipo FROM atendeia_pedidos_eventos
@@ -116,8 +141,8 @@ export async function executarPedido(banco: BancoSql, ator: AtorFarmacia, entrad
       if (p.status!==esperado) throw new ErroDeNegocio("Transição de status inválida.");
       await tx.execute(sql`UPDATE atendeia_pedidos SET status=${proximo},updated_at=clock_timestamp(),modified_by=${autor} WHERE id=${p.id} AND is_deleted=false`);
     }
-    if(v.acao==="confirmar"||v.acao==="cancelar")await sincronizarNegociacao(tx,autor,p.id);
-    await evento(tx,autor,p.id,v.acao,v.acao==="conferir" ? "Conferência farmacêutica registrada." : v.referencia || "Operação registrada.",chave);
+    if(v.acao==="confirmar"||v.acao==="cancelar"||v.acao==="entregar")await sincronizarNegociacao(tx,autor,p.id);
+    await evento(tx,autor,p.id,tipoEvento,v.acao==="conferir" ? "Conferência farmacêutica registrada." : v.referencia || "Operação registrada.",chave);
     return p.id;
   });
 }

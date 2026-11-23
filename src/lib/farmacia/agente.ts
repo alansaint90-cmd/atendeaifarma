@@ -43,7 +43,7 @@ async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMess
   const pedidos=linhas<ContextoFarmacia["pedidos"][number]>(await banco.execute(sql`SELECT p.id,p.numero,p.status,
     to_char(p.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') "atualizadoEm",
     (SELECT tipo FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.is_deleted=false
-      AND e.tipo NOT IN ('endereco_entrega','destinatario_entrega','adicionar')
+      AND e.tipo NOT IN ('endereco_entrega','destinatario_entrega','adicionar','conferir')
       AND (e.tipo<>'reservar' OR compra.tipo IS DISTINCT FROM 'finalizar')
       ORDER BY e.created_at DESC,e.id DESC LIMIT 1) etapa,
     EXISTS(SELECT 1 FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.tipo='endereco_entrega' AND e.is_deleted=false) "temEndereco",
@@ -105,7 +105,7 @@ export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,i
 }
 function pedidoEmPagamento(contexto:ContextoFarmacia) {
   const pendentes=contexto.pedidos.filter(p=>p.status==="aguardando_pagamento"&&
-    ["finalizar","pagamento","comprovante_pix"].includes(p.etapa??""));
+    ["finalizar","pagamento","comprovante_pix","pix_conferido"].includes(p.etapa??""));
   return pendentes.length===1?pendentes[0]:undefined;
 }
 
@@ -116,10 +116,12 @@ export async function responderComprovanteFarmacia(banco:BancoSql,instancia:stri
   if(!m.midia)return null;
   const contexto=await contextoDaConversa(banco,instancia,m);
   const pedido=pedidoEmPagamento(contexto);
-  if(!pedido||pagamentoSalvo(pedido.pagamento)?.forma!=="pix")return null;
-  if(pedido.etapa==="pagamento")await registrarEtapaPedido(banco,{id:pedido.id,conversaId:contexto.conversaId,chave:m.identity,etapa:"comprovante_pix"});
-  else if(pedido.etapa!=="comprovante_pix")return null;
-  return comPerguntaEntrega(["Recebi o anexo. A equipe vai conferir o comprovante."],pedido);
+  if(!pedido)return null;
+  if(pedido.etapa==="pix_conferido")return comPerguntaEntrega(["A equipe já confirmou o pagamento por Pix."],pedido);
+  if(pedido.etapa!=="comprovante_pix")return null;
+  const comprovante=linhas(await banco.execute(sql`SELECT id FROM atendeia_pedidos_eventos WHERE pedido_id=${pedido.id}
+    AND tipo='comprovante_pix' AND chave=${`fluxo:${m.identity}`} AND is_deleted=false`));
+  return comPerguntaEntrega([comprovante.length?"Recebi o anexo. A equipe vai conferir o comprovante.":"A equipe já recebeu um comprovante para conferência."],pedido);
 }
 
 export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage,request=fetch) {
@@ -142,6 +144,9 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         const pg=pedido.etapa==="finalizar"?undefined:pagamentoSalvo(pedido.pagamento);
         const executarPagamento=(pagamento:unknown)=>atenderIntencao(banco,contexto,
           {acao:"pagamento",pedidoId:pedido.id,termo:"",itens:[],pagamento},m.identity);
+        if(forma&&pedido.etapa==="pix_conferido") {
+          return comPerguntaEntrega(["A equipe já confirmou o pagamento por Pix."],pedido);
+        }
         if(forma==="pix"&&pg?.forma==="pix"&&pedido.etapa==="comprovante_pix") {
           return comPerguntaEntrega(["A equipe já recebeu o comprovante para conferência."],pedido);
         }
@@ -164,7 +169,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
           if(pg.troco!=="nao"&&valor)return await executarPagamento({forma:"dinheiro",troco:"sim",valor});
         }
         if(pedido.temEndereco&&pedido.temDestinatario&&encerramentoSemAlteracao.test(textoNormal))return entregaRegistrada;
-        const coletarEntrega=podeColetarEntrega(pg,pedido.etapa==="comprovante_pix");
+        const coletarEntrega=podeColetarEntrega(pg,pedido.etapa==="comprovante_pix"||pedido.etapa==="pix_conferido");
         if(coletarEntrega&&enderecoInformado(texto)) {
           await registrarEtapaPedido(banco,{id:pedido.id,conversaId:contexto.conversaId,chave:m.identity,etapa:"endereco_entrega",endereco:texto});
           return comPerguntaEntrega(["Endereço registrado."],{...pedido,temEndereco:true});

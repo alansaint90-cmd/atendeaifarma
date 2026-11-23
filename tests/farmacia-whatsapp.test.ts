@@ -15,6 +15,7 @@ import { salvarChatbotServidor, chatbotDaInstancia } from "../src/lib/chatbots/s
 import { criarChatbotFarmacia, promptAtendimentoFarmacia } from "../src/lib/farmacia/prompt";
 import { consultaEstoqueFarmacia, geradorFarmacia, responderComprovanteFarmacia } from "../src/lib/farmacia/agente";
 import { consultarOperacao } from "../src/lib/operacao/consultas";
+import { listarPedidos } from "../src/lib/farmacia/consultas";
 import { executarPedido } from "../src/lib/farmacia/pedidos";
 import { salvarProduto, entradaEstoque, consultarProdutos } from "../src/lib/farmacia/catalogo";
 import { alterarPausaIa, assumirConversa, estadoPausaIa } from "../src/lib/farmacia/atendimento";
@@ -247,6 +248,9 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.match(endereco.mensagens[1],/nome de quem vai receber/);
       const cartao=await atender("Pode trazer a maquininha?", {acao:"humano"});
       assert.equal(cartao.mensagens.length,3);assert.match(cartao.mensagens[0],/maquininha/);
+      const [registradoNoPainel]=(await listarPedidos(banco,admin,{termo:numero})).pedidos;
+      assert.equal(registradoNoPainel.id,p.id);
+      assert.deepEqual(registradoNoPainel.pagamento,{forma:"cartao",estado:"na_entrega"});
       assert.match(cartao.mensagens[1],/sendo preparado/);assert.match(cartao.mensagens[2],/nome de quem vai receber/);
       assert.doesNotMatch(cartao.texto,/Qual é o endereço/);
       assert.match((await atender("Marina de Souza",{falhaProvedor:true})).texto,/Nome de quem vai receber registrado/);

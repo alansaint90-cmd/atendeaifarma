@@ -5,7 +5,7 @@ import { ErroDeNegocio } from "../acao";
 import { elegivel, reservaAtiva } from "./comum";
 import type { PedidoInterno } from "./pedidos";
 
-export async function reservarItens(tx:TransacaoSql,p:PedidoInterno,autor:string) {
+export async function reservarItens(tx:TransacaoSql,p:PedidoInterno,autor:string,paraEntrega=false) {
   if (!["aguardando_confirmacao","aguardando_pagamento"].includes(p.status)) throw new ErroDeNegocio("Pedido não aceita reserva.");
   const prazo = Number(process.env.FARMACIA_RESERVA_MINUTOS ?? "15");
   if (!Number.isInteger(prazo) || prazo<1 || prazo>120) throw new ErroDeNegocio("Prazo de reserva inválido no servidor.");
@@ -14,7 +14,7 @@ export async function reservarItens(tx:TransacaoSql,p:PedidoInterno,autor:string
   const itens = linhas<{produto_id:string;quantidade:number;preco:string}>(await tx.execute(sql`SELECT produto_id,quantidade,preco::text FROM atendeia_pedidos_itens WHERE pedido_id=${p.id} AND is_deleted=false ORDER BY produto_id`));
   for (const item of itens) {
     const [produto]=linhas<{preco:string}>(await tx.execute(sql`SELECT coalesce(promocional,preco)::text preco FROM atendeia_produtos WHERE id=${item.produto_id} AND ativo=true AND is_deleted=false FOR UPDATE`));
-    if (!produto || produto.preco!==item.preco) throw new ErroDeNegocio("Produto ou preço mudou. Cancele e recrie o pedido para conferir os novos valores.");
+    if (!produto || (!paraEntrega&&produto.preco!==item.preco)) throw new ErroDeNegocio("Produto ou preço mudou. Cancele e recrie o pedido para conferir os novos valores.");
     const lotes=linhas<{id:string;livre:number}>(await tx.execute(sql`SELECT l.id,(l.quantidade-coalesce(r.qtd,0))::int livre FROM atendeia_produtos_lotes l JOIN atendeia_produtos p ON p.id=l.produto_id
       LEFT JOIN LATERAL (SELECT sum(r.quantidade)::int qtd FROM atendeia_pedidos_reservas r WHERE r.lote_id=l.id AND ${reservaAtiva}) r ON true
       WHERE p.id=${item.produto_id} AND ${elegivel} ORDER BY l.validade NULLS LAST,l.id FOR UPDATE OF l`));
@@ -30,7 +30,15 @@ export async function reservarItens(tx:TransacaoSql,p:PedidoInterno,autor:string
   await tx.execute(sql`UPDATE atendeia_pedidos SET status='aguardando_pagamento',updated_at=clock_timestamp(),modified_by=${autor} WHERE id=${p.id} AND is_deleted=false`);
 }
 
-export async function confirmarItens(tx:TransacaoSql,p:PedidoInterno,autor:string,referencia:string) {
+export async function reservaCobreItens(tx:TransacaoSql,pedidoId:string) {
+  const invalidos=linhas(await tx.execute(sql`SELECT i.id FROM atendeia_pedidos_itens i
+    WHERE i.pedido_id=${pedidoId} AND i.is_deleted=false AND i.quantidade<>(SELECT coalesce(sum(r.quantidade),0)
+      FROM atendeia_pedidos_reservas r JOIN atendeia_produtos_lotes l ON l.id=r.lote_id JOIN atendeia_produtos p ON p.id=l.produto_id
+      WHERE r.pedido_id=i.pedido_id AND p.id=i.produto_id AND ${reservaAtiva} AND ${elegivel}) LIMIT 1`));
+  return !invalidos.length;
+}
+
+export async function confirmarItens(tx:TransacaoSql,p:PedidoInterno,autor:string,referencia:string,status:"pagamento_confirmado"|"concluido"="pagamento_confirmado") {
   if (p.status!=="aguardando_pagamento") throw new ErroDeNegocio("Confirme os itens e reserve o estoque antes de confirmar a venda.");
   const restritos=linhas(await tx.execute(sql`SELECT i.id FROM atendeia_pedidos_itens i JOIN atendeia_produtos p ON p.id=i.produto_id
     WHERE i.pedido_id=${p.id} AND i.is_deleted=false AND p.is_deleted=false AND (p.receita=true OR p.controle<>'')`));
@@ -39,12 +47,9 @@ export async function confirmarItens(tx:TransacaoSql,p:PedidoInterno,autor:strin
       WHERE f.usuario_id=${p.conferido_por} AND f.habilitado=true AND f.is_deleted=false AND u.enabled=true AND u.is_deleted=false`)).length;
     if (!valido) throw new ErroDeNegocio("É necessária a conferência de um farmacêutico habilitado.");
   }
-  const itens=linhas<{produto_id:string;quantidade:number}>(await tx.execute(sql`SELECT produto_id,quantidade FROM atendeia_pedidos_itens WHERE pedido_id=${p.id} AND is_deleted=false ORDER BY produto_id`));
-  for (const item of itens) {
-    const [s]=linhas<{qtd:number}>(await tx.execute(sql`SELECT coalesce(sum(r.quantidade),0)::int qtd FROM atendeia_pedidos_reservas r
-      JOIN atendeia_produtos_lotes l ON l.id=r.lote_id JOIN atendeia_produtos p ON p.id=l.produto_id
-      WHERE r.pedido_id=${p.id} AND l.produto_id=${item.produto_id} AND ${reservaAtiva} AND ${elegivel}`));
-    if (s.qtd!==item.quantidade) throw new ErroDeNegocio("Reserva expirada ou lote indisponível. Reserve novamente antes da venda.");
+  if(!await reservaCobreItens(tx,p.id)) {
+    if(status!=="concluido")throw new ErroDeNegocio("Reserva expirada ou lote indisponível. Reserve novamente antes da venda.");
+    await reservarItens(tx,p,autor,true);
   }
   const reservas=linhas<{id:string;lote_id:string;quantidade:number;saldo:number}>(await tx.execute(sql`SELECT r.id,r.lote_id,r.quantidade,l.quantidade saldo
     FROM atendeia_pedidos_reservas r JOIN atendeia_produtos_lotes l ON l.id=r.lote_id WHERE r.pedido_id=${p.id} AND ${reservaAtiva} AND l.is_deleted=false ORDER BY l.id,r.id FOR UPDATE OF l,r`));
@@ -56,7 +61,7 @@ export async function confirmarItens(tx:TransacaoSql,p:PedidoInterno,autor:strin
       VALUES (${r.lote_id},${p.id},${-r.quantidade},${lote.quantidade+r.quantidade},${lote.quantidade},'venda','Venda confirmada por atendente',${`venda:${r.id}`},${autor})`);
   }
   await tx.execute(sql`UPDATE atendeia_pedidos_reservas SET status='consumida',updated_at=clock_timestamp(),modified_by=${autor} WHERE pedido_id=${p.id} AND status='ativa' AND is_deleted=false`);
-  await tx.execute(sql`UPDATE atendeia_pedidos SET status='pagamento_confirmado',referencia=${referencia},confirmado_em=clock_timestamp(),responsavel_id=${autor},updated_at=clock_timestamp(),modified_by=${autor} WHERE id=${p.id} AND is_deleted=false`);
+  await tx.execute(sql`UPDATE atendeia_pedidos SET status=${status},referencia=${referencia},confirmado_em=clock_timestamp(),responsavel_id=${autor},updated_at=clock_timestamp(),modified_by=${autor} WHERE id=${p.id} AND is_deleted=false`);
 }
 
 export async function cancelarItens(tx:TransacaoSql,p:PedidoInterno,autor:string) {

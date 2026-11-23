@@ -5,6 +5,13 @@ import type { EvolutionEvent } from "../evolution/schema";
 import { mensagensOperacionais } from "./evento";
 import { receberFotosContatos } from "./fotos";
 import { travarTelefoneContato } from "./excluir-contato";
+import { digest } from "../agent/message";
+import { travarEstoque } from "../farmacia/comum";
+import { registrarComprovanteRecebido } from "../farmacia/pagamento";
+
+function anexoRecebido(mensagem:ReturnType<typeof mensagensOperacionais>[number]) {
+  return !mensagem.saida && (mensagem.tipo === "image" || mensagem.tipo === "document");
+}
 
 async function auditar(tx: TransacaoSql, entidade: string, id: string, campos: string[]) {
   await tx.execute(sql`INSERT INTO atendeia_audit_logs(action,entity_type,entity_id,changed_fields,modified_by)
@@ -17,6 +24,7 @@ export async function receberOperacao(banco: BancoSql, evento: EvolutionEvent) {
   const mensagens = mensagensOperacionais(evento);
   if (!mensagens.length) return;
   await banco.transaction(async tx => {
+    if (mensagens.some(anexoRecebido)) await travarEstoque(tx);
     for (const telefone of [...new Set(mensagens.map(m => m.telefone))].sort()) await travarTelefoneContato(tx, telefone);
     for (const mensagem of mensagens) {
       if (mensagem.saida) await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${mensagem.instancia} || ':' || ${mensagem.provedorId}, 0))`);
@@ -61,6 +69,7 @@ export async function receberOperacao(banco: BancoSql, evento: EvolutionEvent) {
         VALUES (${conversa[0].id},${mensagem.provedorId},${mensagem.saida ? "outbound" : "inbound"},${mensagem.saida ? envioIa ? "bot" : "system" : "contact"},
           ${mensagem.conteudo},${mensagem.tipo},${mensagem.saida ? "sent" : "received"},${mensagem.instante}::timestamptz,${systemUserId}) RETURNING id`));
       await auditar(tx, "mensagem", registro[0].id, ["content", "direction", "provider_message_id"]);
+      if (anexoRecebido(mensagem)) await registrarComprovanteRecebido(tx, conversa[0].id, mensagem.instante, digest(`${mensagem.instancia}:${mensagem.provedorId}`));
       const atualizada = linhas(await tx.execute(sql`UPDATE atendeia_conversations SET last_message_at=greatest(last_message_at,${mensagem.instante}::timestamptz),
         updated_at=now(),version=version+1,modified_by=${systemUserId}
         WHERE id=${conversa[0].id} AND version=${conversa[0].version} AND is_deleted=false RETURNING id`));
