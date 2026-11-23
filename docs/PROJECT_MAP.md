@@ -6,10 +6,10 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 232 |
+| Arquivos TS/TSX | 234 |
 | Tabelas (Drizzle) | 45 |
 | Server Actions (arquivos) | 16 |
-| Rotas de API | 8 |
+| Rotas de API | 9 |
 | Paginas | 5 |
 | Componentes | 42 |
 
@@ -220,6 +220,7 @@ lib/
     continuidade.ts
     crm.ts
     estoque-painel.ts
+    foto-conversa.ts
     importacao-validacao.ts
     importacao.ts
     interpretar.ts
@@ -432,6 +433,7 @@ _(colunas nao detectadas)_
 | `/api/auth/passkey` | POST |
 | `/api/farmacia/[recurso]` | GET, POST |
 | `/api/farmacia/audio/[id]` | GET |
+| `/api/farmacia/foto/[id]` | GET |
 | `/api/settings/agent` | GET |
 | `/api/settings/evolution-webhook` | POST |
 | `/api/settings/integrations` | GET, PUT |

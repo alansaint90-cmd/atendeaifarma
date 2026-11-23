@@ -73,6 +73,7 @@ function ListaOperacionalPage({ rota, podeApagarConversa, podeExcluirContato }: 
           : <p>Nenhum contato cadastrado. Aguardando mensagens reais.</p>}</article>}
       {rota === "inbox" && <CaixaEntrada conversas={dados.conversas} selecionada={conversa?.id ?? ""} aoSelecionar={selecionar} atualizar={() => void carregar()} atualizando={ocupado}
         fonteAudio={id => `/api/farmacia/audio/${encodeURIComponent(id)}`}
+        fonteFoto={id => `/api/farmacia/foto/${encodeURIComponent(id)}`}
         acoesConversa={podeApagarConversa && conversa && <AcoesConversa key={conversa.id} id={conversa.id} version={conversa.version} nome={conversa.nome} apagar={apagar} />}
         resposta={conversa && <AtendimentoManual key={conversa.id} id={conversa.id} version={conversa.version}
           comEquipe={conversa.estadoIa==="humano"||conversa.aguardaHumano} atualizar={carregar} />} />}

@@ -1,6 +1,8 @@
 /** Exclusão visual usa o schema ativo e não pode contornar versão, papel ou auditoria. */
 export function regrasConversas(rel, content) {
   const regras = [
+    ["src/app/api/farmacia/foto/[id]/route.ts", [/administradorHttp\("operador"\)/, /private, no-store/, /Referrer-Policy/]],
+    ["src/lib/farmacia/foto-conversa.ts", [/autorizar\(tx,ator,"operador"\)/, /c.is_deleted=false AND ch.is_deleted=false AND p.is_deleted=false/, /configurarCanalManual/, /redirect:"error"/, /fotoHttps\(url\)/]],
     ["src/lib/farmacia/atendimento.ts", [/alterarPausaSchema=z.strictObject/, /c.version=\$\{dados.version\}/, /ai_resumed_at=CASE/, /ia_despausada_no_painel/]],
     ["src/lib/agent/pausa.ts", [/duracaoPausaManual > retomadaEm/, /aliasKey\(conversation\)/]],
     ["src/lib/farmacia/agente.ts", [/normalizarPedido\(texto\)/, /etapa:"revisar"/, /candidatos.length!==1/, /if\(intencao.acao==="criar_pedido"\)/]],

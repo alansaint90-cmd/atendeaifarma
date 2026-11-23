@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { applyMigrations } from "../src/lib/db/migrate";
@@ -7,6 +8,8 @@ import { receberOperacao } from "../src/lib/operacao/receber";
 import { consultarOperacao } from "../src/lib/operacao/consultas";
 import { mensagensOperacionais } from "../src/lib/operacao/evento";
 import type { EvolutionEvent } from "../src/lib/evolution/schema";
+import { systemUserId } from "../src/lib/db/bootstrap";
+import { criarConsultaFoto, recuperarFotoConversa } from "../src/lib/farmacia/foto-conversa";
 
 const mensagem = (id: string, saida = false) => ({
   key: { id, fromMe: saida, remoteJid: "123456789012345@lid", remoteJidAlt: "5571999999999@s.whatsapp.net" },
@@ -42,11 +45,41 @@ test("operacional grava dados reais, deduplica, audita e respeita exclusão lóg
       assert.equal((await cliente.query<{total:number}>("SELECT count(*)::int total FROM atendeia_audit_logs WHERE action='contato_foto_atualizada' AND is_deleted=false")).rows[0].total,1);
       await receberOperacao(banco,{...foto,instance:"outra",data:{...contato,profilePicUrl:"https://example.invalid/outra.jpg"}});
       await receberOperacao(banco,{...foto,data:{...contato,profilePicUrl:"javascript:foto"}});
+      await receberOperacao(banco,{...foto,event:"contacts.upsert",data:{...contato,profilePicUrl:null}});
       await receberOperacao(banco,{...foto,data:{...contato,remoteJid:"1111111111@lid"}});
       assert.equal((await consultarOperacao(banco)).conversas[0].fotoUrl,contato.profilePicUrl);
+      await receberOperacao(banco,{...foto,data:{remoteJid:"1111111111@lid",remoteJidAlt:contato.remoteJid,profilePicUrl:"https://example.invalid/nova.jpg"}});
+      assert.equal((await consultarOperacao(banco)).conversas[0].fotoUrl,"https://example.invalid/nova.jpg");
       await receberOperacao(banco,{...foto,data:{...contato,profilePicUrl:null}});
       assert.equal((await consultarOperacao(banco)).conversas[0].fotoUrl,null);
       assert.equal((await consultarOperacao(banco)).totalContatos,1);
+    });
+    await t.test("foto ausente é consultada pelo chip e telefone da conversa com autorização atual", async () => {
+      const ator={userId:randomUUID(),papel:"operador" as const};
+      await cliente.query("INSERT INTO atendeia_users(id,name,role,enabled,modified_by) VALUES ($1,'Operador fictício','operador',true,$2)",[ator.userId,systemUserId]);
+      const [conversa]=(await consultarOperacao(banco)).conversas;
+      const destino="https://pps.whatsapp.net/teste.jpg";
+      const settings=async()=>({EVOLUTION_API_URL:"https://example.invalid",EVOLUTION_API_KEY:"chave-ficticia",EVOLUTION_INSTANCE_NAME:"teste"});
+      let chamadas=0;
+      let retorno=destino;
+      let agora=1700000000000;
+      const request:typeof fetch=async(url,init)=>{
+        chamadas++;
+        assert.equal(String(url),"https://example.invalid/chat/fetchProfilePictureUrl/teste");
+        assert.equal(init?.redirect,"error");
+        assert.deepEqual(JSON.parse(String(init?.body)),{number:"5571999999999"});
+        return Response.json({wuid:"5571999999999@s.whatsapp.net",profilePictureUrl:retorno});
+      };
+      const deps={settings,consultarFoto:criarConsultaFoto(request,()=>agora)};
+      assert.deepEqual(await Promise.all([recuperarFotoConversa(banco,ator,conversa.id,deps),recuperarFotoConversa(banco,ator,conversa.id,deps)]),[destino,destino]);
+      assert.equal(chamadas,1);
+      assert.equal(await recuperarFotoConversa(banco,ator,randomUUID(),deps),null);
+      await assert.rejects(recuperarFotoConversa(banco,{...ator,userId:randomUUID()},conversa.id,deps),/Sem permissão/);
+      assert.equal(chamadas,1);
+      agora+=120001;
+      retorno="https://whatsapp.net.example.invalid/foto.jpg";
+      assert.equal(await recuperarFotoConversa(banco,ator,conversa.id,deps),null);
+      assert.equal(chamadas,2);
     });
     await t.test("saída não renomeia contato; replay após fechamento não reabre conversa", async () => {
       const dado = mensagem("saida-1", true); dado.messageTimestamp += 1;

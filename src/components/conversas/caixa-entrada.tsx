@@ -10,6 +10,7 @@ interface CaixaEntradaProps {
   conversas: ConversaLista[]; selecionada: string; aoSelecionar: (id: string) => void;
   resposta?: ReactNode; acoesConversa?: ReactNode; atualizar: () => void; atualizando?: boolean;
   fonteAudio?: (id: string) => string;
+  fonteFoto?: (id: string) => string;
 }
 const normalizar = (texto: string) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 const hora = (instante: string) => new Date(instante).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -24,7 +25,7 @@ const rotulosIa: Record<EstadoIaConversa, string> = {
 };
 
 /** Apresentação compartilhável entre instalações; autenticação e envio ficam no adaptador. */
-export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, acoesConversa, atualizar, atualizando = false, fonteAudio }: CaixaEntradaProps) {
+export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, acoesConversa, atualizar, atualizando = false, fonteAudio, fonteFoto }: CaixaEntradaProps) {
   const [busca, definirBusca] = useState("");
   const [aberta, definirAberta] = useState(false);
   const buscaId = useId();
@@ -51,7 +52,7 @@ export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, a
         const ultima = c.mensagens.at(-1);
         return <li key={c.id}><button type="button" className="conversas-contato" aria-label={`Abrir conversa com ${c.nome} · ${c.canal}`} aria-pressed={conversa?.id === c.id}
           onClick={() => { aoSelecionar(c.id); definirAberta(true); }}>
-          <AvatarContato nome={c.nome} fotoUrl={c.fotoUrl} /><span className="conversas-resumo"><span className="conversas-identificacao"><strong>{c.nome}</strong>{ultima && <time dateTime={ultima.instante}>{hora(ultima.instante)}</time>}</span>
+          <AvatarContato nome={c.nome} fotoUrl={c.fotoUrl} fotoAlternativa={fonteFoto?.(c.id)} /><span className="conversas-resumo"><span className="conversas-identificacao"><strong>{c.nome}</strong>{ultima && <time dateTime={ultima.instante}>{hora(ultima.instante)}</time>}</span>
             <span className="conversas-previa">{ultima ? `${ultima.direcao === "outbound" ? "Você: " : ""}${ultima.conteudo || "Mensagem sem texto"}` : "Nenhuma mensagem no histórico"}</span>
             <span className="conversas-canal">{c.canal} · {c.aguardaHumano ? "🔔 Aguardando atendente" : c.avisoEntrega ? `🔔 ${c.avisoEntrega}` : status[c.status] ?? c.status}</span></span>
         </button></li>;
@@ -61,7 +62,7 @@ export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, a
     <div className="conversas-principal">
       {conversa ? <><header className="conversas-barra conversas-cabecalho">
         <button type="button" className="conversas-voltar" onClick={() => { definirAberta(false); campoBusca.current?.focus(); }} aria-label="Voltar para a lista de conversas">←</button>
-        <AvatarContato nome={conversa.nome} fotoUrl={conversa.fotoUrl} />
+        <AvatarContato key={conversa.id} nome={conversa.nome} fotoUrl={conversa.fotoUrl} fotoAlternativa={fonteFoto?.(conversa.id)} />
         <div>
           <div className="conversas-titulo">
             <h2 ref={titulo} tabIndex={-1}>{conversa.nome}</h2>
