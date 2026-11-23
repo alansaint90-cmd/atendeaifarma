@@ -55,8 +55,9 @@ export function pausaManualParaEvento(event: EvolutionEvent) {
     outgoingKey: `atendeia:{evolution}:outgoing:${atual.identity}` };
 }
 
-export async function pausaManualAtiva(client: Redis, conversation: string, agora = Date.now()) {
-  if (Number(await client.get(pausaManualKey(conversation))) > agora) return true;
+export async function pausaManualAtiva(client: Redis, conversation: string, agora = Date.now(), retomadaEm = 0) {
+  const ativa = (prazo: string | null) => Number(prazo) > agora && Number(prazo) - duracaoPausaManual > retomadaEm;
+  if (ativa(await client.get(pausaManualKey(conversation)))) return true;
   const associado = await client.get(aliasKey(conversation));
-  return associado ? Number(await client.get(pausaManualKey(associado))) > agora : false;
+  return associado ? ativa(await client.get(pausaManualKey(associado))) : false;
 }

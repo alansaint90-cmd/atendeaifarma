@@ -1,8 +1,8 @@
 import { afterEach,expect,test,vi } from "vitest";
 import { act,cleanup,fireEvent,render,screen } from "@testing-library/react";
 import { AtendimentoManual } from "@/components/farmacia/atendimento";
-import { assumirAtendimento } from "@/lib/actions/atendimento-farmacia";
-vi.mock("@/lib/actions/atendimento-farmacia",()=>({assumirAtendimento:vi.fn(),enviarMensagemManual:vi.fn(),validarCanalAtendimento:vi.fn()}));
+import { alterarPausaAtendimento,assumirAtendimento } from "@/lib/actions/atendimento-farmacia";
+vi.mock("@/lib/actions/atendimento-farmacia",()=>({alterarPausaAtendimento:vi.fn(),assumirAtendimento:vi.fn(),enviarMensagemManual:vi.fn(),validarCanalAtendimento:vi.fn()}));
 afterEach(()=>{cleanup();vi.resetAllMocks();vi.useRealTimers();});
 test("barra recolhe ações, oferece só os três anexos pedidos e fecha menu por Escape",()=>{
   render(<AtendimentoManual id="teste" atualizar={vi.fn()}/>);
@@ -39,4 +39,19 @@ test("confirmação some em quatro segundos e erro permanece para conferência",
   fireEvent.click(screen.getByRole("button",{name:"Ações do atendimento"}));
   await act(async()=>{fireEvent.click(screen.getByRole("button",{name:"Devolver à IA"}));});
   act(()=>vi.advanceTimersByTime(5000));expect(screen.getByText("Falha ao devolver.")).toBeInTheDocument();
+});
+test("menu inferior pausa e despausa com a versão da conversa sem assumir atendimento",async()=>{
+  const atualizar=vi.fn();
+  vi.mocked(alterarPausaAtendimento).mockResolvedValue({ok:true,dados:{version:8}});
+  const tela=render(<AtendimentoManual id="teste" version={7} atualizar={atualizar}/>);
+  fireEvent.click(screen.getByRole("button",{name:"Ações do atendimento"}));
+  await act(async()=>fireEvent.click(screen.getByRole("button",{name:"Pausar IA",exact:true})));
+  expect(alterarPausaAtendimento).toHaveBeenCalledWith({id:"teste",version:7,pausar:true});
+  expect(screen.getByText("IA pausada nesta conversa.")).toBeInTheDocument();
+  tela.rerender(<AtendimentoManual id="teste" version={8} atualizar={atualizar}/>);
+  fireEvent.click(screen.getByRole("button",{name:"Ações do atendimento"}));
+  await act(async()=>fireEvent.click(screen.getByRole("button",{name:"Despausar IA",exact:true})));
+  expect(alterarPausaAtendimento).toHaveBeenCalledWith({id:"teste",version:8,pausar:false});
+  expect(assumirAtendimento).not.toHaveBeenCalled();
+  expect(atualizar).toHaveBeenCalledTimes(2);
 });

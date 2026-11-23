@@ -11,7 +11,7 @@ import { listarPedidos } from "./consultas";
 import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
 import { personaDoAgente } from "../agent/nome";
-import { registrarEtapaPedido, respostaPagamento, pagamentoSalvo, formaMencionada, enderecoInformado, perguntaEndereco, valorParaTroco } from "./pagamento";
+import { registrarEtapaPedido, respostaPagamento, respostaPixSemPedido, pagamentoSalvo, formaMencionada, enderecoInformado, perguntaEndereco, valorParaTroco } from "./pagamento";
 import { continuidadeDaConsulta, conviteContinuarPedido, descricaoComercial } from "./continuidade";
 import { NOME_FARMACIA } from "./configuracao-agente";
 const sistema={sistema:true} as const;
@@ -122,8 +122,9 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         return corrigir;
       }
       const pedido=pedidoEmPagamento(contexto);
+      const forma=formaMencionada(texto);
+      if(forma==="pix"&&!pedido)return respostaPixSemPedido();
       if(pedido) {
-        const forma=formaMencionada(texto);
         const pg=pedido.etapa==="finalizar"?undefined:pagamentoSalvo(pedido.pagamento);
         const executarPagamento=(pagamento:unknown)=>atenderIntencao(banco,contexto,
           {acao:"pagamento",pedidoId:pedido.id,termo:"",itens:[],pagamento},m.identity);
@@ -132,7 +133,13 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
             ?{mensagens:["A equipe já recebeu o comprovante para conferência.",perguntaEndereco]}
             :"A equipe já recebeu o comprovante e o endereço.";
         }
-        if(forma)return await executarPagamento({forma});
+        if(forma) {
+          try { return await executarPagamento({forma}); }
+          catch(erro) {
+            if(forma==="pix"&&erro instanceof ErroDeNegocio)return respostaPixSemPedido();
+            throw erro;
+          }
+        }
         if(pg?.forma==="dinheiro"&&pedido.etapa==="pagamento") {
           if(pg.valor==="0.00"&&pg.troco!=="nao") {
             if(/^(?:sim(?:[, ]+(?:preciso|por favor))?|preciso|vou precisar)[\s!.]*$/iu.test(texto.trim()))return await executarPagamento({forma:"dinheiro",troco:"sim"});

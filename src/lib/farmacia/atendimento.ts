@@ -13,6 +13,33 @@ export async function atendimentoHumanoAtivo(banco:BancoSql,instancia:string,num
   return linhas(await banco.execute(sql`SELECT c.id FROM atendeia_conversations c JOIN atendeia_channels ch ON ch.id=c.channel_id
     WHERE ch.instance_name=${instancia} AND c.remote_jid=${`${numero}@s.whatsapp.net`} AND c.human_takeover=true AND c.is_deleted=false AND ch.is_deleted=false AND c.status<>'closed'`)).length>0;
 }
+export async function estadoPausaIa(banco:BancoSql,instancia:string,numero:string) {
+  return linhas<{ bloqueada:boolean; retomadaEm:number }>(await banco.execute(sql`
+    SELECT (c.ai_paused OR c.human_takeover) bloqueada,
+      coalesce(extract(epoch FROM c.ai_resumed_at)*1000,0)::float8 "retomadaEm"
+    FROM atendeia_conversations c JOIN atendeia_channels ch ON ch.id=c.channel_id
+    WHERE ch.instance_name=${instancia} AND ch.provider='evolution' AND c.remote_jid=${`${numero}@s.whatsapp.net`}
+      AND c.is_deleted=false AND ch.is_deleted=false AND c.status<>'closed'`))[0];
+}
+
+const alterarPausaSchema=z.strictObject({id:z.uuid(),version:z.number().int().min(0).max(2147483647),pausar:z.boolean()});
+export async function alterarPausaIa(banco:BancoSql,ator:SessaoAtiva,entrada:unknown) {
+  const dados=alterarPausaSchema.parse(entrada);
+  return banco.transaction(async tx=>{
+    const autor=await autorizar(tx,ator,"operador");
+    const [alterada]=linhas<{version:number}>(await tx.execute(sql`
+      UPDATE atendeia_conversations c SET ai_paused=${dados.pausar},
+        ai_resumed_at=CASE WHEN ${dados.pausar} THEN c.ai_resumed_at ELSE clock_timestamp() END,
+        updated_at=clock_timestamp(),version=c.version+1,modified_by=${autor}
+      WHERE c.id=${dados.id} AND c.version=${dados.version} AND c.is_deleted=false AND c.status<>'closed'
+        AND EXISTS(SELECT 1 FROM atendeia_contacts p WHERE p.id=c.contact_id AND p.is_deleted=false)
+        AND EXISTS(SELECT 1 FROM atendeia_channels ch WHERE ch.id=c.channel_id AND ch.is_deleted=false)
+      RETURNING c.version`));
+    if(!alterada)throw new ErroDeNegocio("Esta conversa mudou ou foi encerrada. Atualize a caixa de entrada e tente novamente.");
+    await auditar(tx,autor,dados.id,dados.pausar?"ia_pausada_no_painel":"ia_despausada_no_painel");
+    return alterada;
+  });
+}
 export async function assumirConversa(banco:BancoSql,ator:SessaoAtiva,entrada:unknown) {
   const v=z.strictObject({id:z.uuid(),assumir:z.boolean()}).parse(entrada);
   return banco.transaction(async tx=>{

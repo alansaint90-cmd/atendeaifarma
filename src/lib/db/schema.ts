@@ -98,6 +98,8 @@ export const conversations = pgTable("atendeia_conversations", {
   assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "restrict" }),
   chatbotId: uuid("chatbot_id").references(() => chatbots.id, { onDelete: "restrict" }),
   humanTakeover: boolean("human_takeover").notNull().default(false),
+  aiPaused: boolean("ai_paused").notNull().default(false),
+  aiResumedAt: instante("ai_resumed_at"),
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }), closedAt: timestamp("closed_at", { withTimezone: true }), ...audit(),
 }, t => [
   uniqueIndex("atendeia_conversation_open").on(t.channelId, t.remoteJid).where(sql`${t.isDeleted} = false AND ${t.status} <> 'closed'`),

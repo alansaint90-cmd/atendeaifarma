@@ -32,6 +32,15 @@ test("agente arquiva evento anterior à exclusão sem gerar, enviar ou agendar f
   expect(d.followups.schedule).not.toHaveBeenCalled(); expect(d.arquivar.mock.calls[0].at(-1)).toBe("conversa_apagada");
   expect(d.apagada).toHaveBeenCalledWith("chip-ficticio", "5511999990001", expect.any(Number), expect.any(String));
 });
+test("pausa registrada no painel impede o worker de interpretar e responder", async () => {
+  const portas = dependencias();
+  const pausaConversa = vi.fn(async () => ({ bloqueada: true, retomadaEm: 0 }));
+  await runAgentTick({ ...portas, pausaConversa });
+  expect(pausaConversa).toHaveBeenCalledWith("chip-ficticio", "5511999990001");
+  expect(d.processar).not.toHaveBeenCalled();
+  expect(portas.send).not.toHaveBeenCalled();
+  expect(d.arquivar.mock.calls[0].at(-1)).toBe("pausa_manual");
+});
 test("exclusão entre partes desativa a continuação e libera o evento sem repetição", async () => {
   d.processar.mockImplementationOnce(async (_mensagem, _config, portas: { enabled: () => Promise<boolean> }) => {
     expect(await portas.enabled()).toBe(true);

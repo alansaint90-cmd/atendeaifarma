@@ -28,10 +28,11 @@ test("usa a instância correta, a pausa do processador e o atendimento registrad
   const estados = await consultarEstadosIa([
     base, { ...base, id: "b", instancia: "chip-secundario" }, { ...base, id: "c", assumida: true, atribuida: true },
     { ...base, id: "d", assumida: true }, { ...base, id: "e", instancia: "outro" }, { ...base, id: "f", status: "closed" },
+    { ...base, id: "g", pausaPainel: true },
   ]);
-  expect(Object.fromEntries(estados)).toEqual({ a: "ativa", b: "pausada", c: "humano", d: "pausada", e: "indisponivel" });
+  expect(Object.fromEntries(estados)).toEqual({ a: "ativa", b: "pausada", c: "humano", d: "pausada", e: "indisponivel", g: "pausada" });
   expect(portas.pausada).toHaveBeenCalledTimes(2);
-  expect(portas.pausada).toHaveBeenCalledWith(portas.redis, digest(`${base.instancia}:${base.jid}`));
+  expect(portas.pausada).toHaveBeenCalledWith(portas.redis, digest(`${base.instancia}:${base.jid}`), expect.any(Number), undefined);
   expect(portas.redis.disconnect).toHaveBeenCalledOnce();
 });
 

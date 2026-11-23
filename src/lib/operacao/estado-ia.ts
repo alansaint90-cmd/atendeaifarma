@@ -14,6 +14,8 @@ export interface OrigemEstadoIa {
   jid: string;
   assumida: boolean;
   atribuida: boolean;
+  pausaPainel?: boolean;
+  retomadaEm?: number;
 }
 
 const heartbeatSchema = z.object({ status: z.string() });
@@ -23,8 +25,8 @@ export async function consultarEstadosIa(conversas: OrigemEstadoIa[], portas = p
   const estados = new Map<string, EstadoIaConversa>();
   const candidatas = conversas.filter(conversa => {
     if (conversa.status === "closed") return false;
-    if (!conversa.assumida) return true;
-    estados.set(conversa.id, conversa.atribuida ? "humano" : "pausada");
+    if (!conversa.assumida && !conversa.pausaPainel) return true;
+    estados.set(conversa.id, conversa.assumida && conversa.atribuida ? "humano" : "pausada");
     return false;
   });
   if (!candidatas.length) return estados;
@@ -51,7 +53,7 @@ export async function consultarEstadosIa(conversas: OrigemEstadoIa[], portas = p
       if (!instancias.includes(conversa.instancia) || !/^[1-9]\d{6,14}@s\.whatsapp\.net$/.test(conversa.jid)) {
         return [conversa.id, "indisponivel"];
       }
-      const pausada = await portas.pausada(client, digest(`${conversa.instancia}:${conversa.jid}`));
+      const pausada = await portas.pausada(client, digest(`${conversa.instancia}:${conversa.jid}`), Date.now(), conversa.retomadaEm);
       return [conversa.id, pausada ? "pausada" : "ativa"];
     }));
     for (const [id, estado] of resultados) estados.set(id, estado);

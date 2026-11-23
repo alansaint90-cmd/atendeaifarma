@@ -57,7 +57,7 @@ export function pagamentoSalvo(detalhe?:string|null) {
 
 export function formaMencionada(texto:string):Pagamento["forma"]|undefined {
   const normalizado=texto.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase().trim().replace(/\s+/g," ");
-  const chave=/^(?:(?:kd|cade|qual(?: e)?|(?:me )?(?:mande|envie|manda|passa|passe))\s+)?(?:a\s+)?chave\s+(?:(?:d[oe])\s+)?pix(?:[, ]+por favor)?[\s?!.:]*$/;
+  const chave=/^(?:(?:kd|cade|qual(?: e)?|(?:me )?(?:mande|envie|manda|passa|passe))\s+)?(?:a\s+)?chave\s+(?:(?:d[oe])\s+)?pix(?:[, ]+por favor)?[\s?!.:;]*$/;
   if(chave.test(normalizado))return "pix";
   const pedido=/^(?:(?:quero|vou|prefiro|posso|pode ser|gostaria de)\s+(?:pagar\s+)?)?(?:(?:no|na|em|por|com|via)\s+)?(pix|dinheiro|cartao)(?:\s+(?:por favor|na entrega|de credito|de debito))?[\s?!.]*$/.exec(normalizado);
   return z.enum(["pix","dinheiro","cartao"]).safeParse(pedido?.[1]).data;
@@ -75,13 +75,19 @@ export function valorParaTroco(texto:string) {
   return valor ? `${valor[1]}.${valor[2]??"00"}` : undefined;
 }
 
+const chaveDemonstracao = "Pix de demonstração. Chave fictícia: 99999999. Não faça uma transferência.";
+export function respostaPixSemPedido():{mensagens:string[]} {
+  const aviso="Confirme os itens com a equipe para receber os dados de pagamento deste pedido.";
+  return {mensagens:process.env.FARMACIA_PIX_CHAVE?.trim()?[aviso]:[chaveDemonstracao,aviso]};
+}
+
 export function respostaPagamento(pg:Pagamento,total:string):{mensagens:string[]} {
   if(pg.forma==="pix") {
     const chave=process.env.FARMACIA_PIX_CHAVE?.trim();
     const recebedor=process.env.FARMACIA_PIX_RECEBEDOR?.trim();
     const valor=`R$ ${total.replace(".",",")}`;
     if(!chave)return {mensagens:[
-      "Pix de demonstração. Chave fictícia: 99999999. Não faça uma transferência.",
+      chaveDemonstracao,
       `Valor simulado do pedido: ${valor}. Aguardando pagamento simulado.`,
       "Ao concluir a simulação, envie um comprovante de teste por aqui.",
     ]};

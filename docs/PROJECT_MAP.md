@@ -407,7 +407,7 @@ _(colunas nao detectadas)_
 `id`, `instanceName`, `status`
 
 ### `atendeia_conversations` — src/lib/db/schema.ts
-`id`, `contactId`, `remoteJid`, `departmentId`, `assignedTo`, `chatbotId`, `humanTakeover`, `lastMessageAt`
+`id`, `contactId`, `remoteJid`, `departmentId`, `assignedTo`, `chatbotId`, `humanTakeover`, `aiPaused`, `aiResumedAt`, `lastMessageAt`
 
 ### `atendeia_messages` — src/lib/db/schema.ts
 `id`, `providerMessageId`, `senderType`, `messageType`, `sentAt`
@@ -440,7 +440,7 @@ _(colunas nao detectadas)_
 ## Server Actions
 
 - `src/lib/actions/agendamentos.ts`: `carregarAgendamentos()`, `gravarAgendamento()`, `cancelarEnvioAgendado()`
-- `src/lib/actions/atendimento-farmacia.ts`: `validarCanalAtendimento()`, `assumirAtendimento()`, `enviarMensagemManual()`
+- `src/lib/actions/atendimento-farmacia.ts`: `validarCanalAtendimento()`, `assumirAtendimento()`, `alterarPausaAtendimento()`, `enviarMensagemManual()`
 - `src/lib/actions/campanhas.ts`: `carregarCampanhas()`, `gravarCampanha()`, `iniciarCampanha()`, `cancelarCampanha()`, `detalharCampanha()`
 - `src/lib/actions/chatbots.ts`: `carregarChatbots()`, `salvarChatbot()`
 - `src/lib/actions/consultas.ts`: `carregarResumoAgenda()`, `carregarAgendaConsultas()`, `confirmarConsulta()`, `cancelarConsultaAgendada()`

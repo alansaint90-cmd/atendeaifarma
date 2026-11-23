@@ -21,6 +21,12 @@ test("LID explícito e lotes preservam a pausa sem presumir telefone nem afetar 
   assert.equal(await pausaManualAtiva(client, digest(`${instance}:${telefone}`)), true);
   assert.equal(await pausaManualAtiva(client, digest(`outro:${telefone}`)), false);
   assert.equal(await pausaManualAtiva(client, digest(`${instance}:${telefone}`), timestamp * 1000 + 1799999), true);
+  const conversa= digest(`${instance}:${telefone}`);
+  const retomada=timestamp*1000+500;
+  assert.equal(await pausaManualAtiva(client,conversa,retomada,retomada),false,"despausar ignora saídas antigas também no LID");
+  dados.set(pausaManualKey(conversa),String(semPar[0].ate+1000));
+  assert.equal(await pausaManualAtiva(client,conversa,retomada+1000,retomada),true,"uma saída manual nova pausa novamente");
+  dados.delete(pausaManualKey(conversa));
   const manual = evento(true);
   const lote = await pausasManuaisParaEvento(client, { ...manual, data: [manual.data as Record<string, unknown>] });
   assert.equal(lote.length, 2);

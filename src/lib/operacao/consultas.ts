@@ -35,6 +35,7 @@ export async function consultarOperacao(banco: BancoSql, consultarIa?: typeof co
       FROM atendeia_contacts WHERE is_deleted=false ORDER BY created_at DESC,id LIMIT ${LIMITE_CONTATOS}`));
     const conversas = linhas<Omit<ConversaOperacional, "mensagens"> & OrigemEstadoIa>(await tx.execute(sql`SELECT c.id,c.version,p.name nome,p.phone telefone,ch.name canal,c.status,p.foto_url "fotoUrl",
       ch.instance_name instancia,c.remote_jid jid,c.human_takeover assumida,(c.assigned_to IS NOT NULL) atribuida,
+      c.ai_paused "pausaPainel",coalesce(extract(epoch FROM c.ai_resumed_at)*1000,0)::float8 "retomadaEm",
       (c.status='pending' AND c.human_takeover=true AND c.assigned_to IS NULL) "aguardaHumano",
       (SELECT aviso FROM atendeia_pedidos pedido
         CROSS JOIN LATERAL (SELECT CASE
@@ -54,8 +55,8 @@ export async function consultarOperacao(banco: BancoSql, consultarIa?: typeof co
       WHERE c.is_deleted=false AND p.is_deleted=false AND ch.is_deleted=false ORDER BY c.last_message_at DESC NULLS LAST,c.id LIMIT 50`));
     const historicos: ConversaOperacional[] = [];
     const origens: OrigemEstadoIa[] = [];
-    for (const { instancia, jid, assumida, atribuida, ...conversa } of conversas) {
-      origens.push({ id: conversa.id, status: conversa.status, instancia, jid, assumida, atribuida });
+    for (const { instancia, jid, assumida, atribuida, pausaPainel, retomadaEm, ...conversa } of conversas) {
+      origens.push({ id: conversa.id, status: conversa.status, instancia, jid, assumida, atribuida, pausaPainel, retomadaEm });
       const mensagens = linhas<MensagemOperacional>(await tx.execute(sql`SELECT id,content conteudo,direction direcao,message_type tipo,
         (message_type='audio' AND provider_message_id IS NOT NULL) "audioDisponivel",
         to_char(sent_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') instante FROM atendeia_messages

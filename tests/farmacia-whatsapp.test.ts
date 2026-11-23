@@ -16,7 +16,7 @@ import { criarChatbotFarmacia, promptAtendimentoFarmacia } from "../src/lib/farm
 import { consultaEstoqueFarmacia, geradorFarmacia, responderComprovanteFarmacia } from "../src/lib/farmacia/agente";
 import { consultarOperacao } from "../src/lib/operacao/consultas";
 import { salvarProduto, entradaEstoque, consultarProdutos } from "../src/lib/farmacia/catalogo";
-import { assumirConversa, atendimentoHumanoAtivo } from "../src/lib/farmacia/atendimento";
+import { alterarPausaIa, assumirConversa, estadoPausaIa } from "../src/lib/farmacia/atendimento";
 import type { ProdutoEntrada } from "../src/lib/farmacia/validacao";
 
 test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resposta sem chamadas externas",async t=>{
@@ -70,7 +70,7 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       let agora=Date.now(),adicional=false;
       const gerar=geradorFarmacia(banco,instancia,mensagem,requisicao);
       const porta={agora:()=>agora,consultarEstoque:consultaEstoqueFarmacia(banco,instancia,mensagem),read:async()=>estados.get(mensagem.identity)??null,write:async(estado:DeliveryState)=>{estados.set(mensagem.identity,estado);},
-        history:async()=>historico,enabled:async()=>!await atendimentoHumanoAtivo(banco,instancia,numero),
+        history:async()=>historico,enabled:async()=>!(await estadoPausaIa(banco,instancia,numero))?.bloqueada,
         receberMidia:()=>responderComprovanteFarmacia(banco,instancia,mensagem),
         generate:async(...args:Parameters<typeof gerar>)=>{const r=await gerar(...args);adicional=typeof r!=="string"&&"consultarEstoque" in r&&!!r.continuidade;return r;},
         send:(_config:typeof config,destino:string,texto:string)=>sendReply(config,destino,texto,requisicao),
@@ -154,6 +154,34 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const r=await atender("Tem dipirona?",{acao:"buscar",termo:"Dipirona"});
       assert.equal(r.resultado,"pausada");assert.equal(saidas.length,antes);
       await assumirConversa(banco,admin,{id:conversa,assumir:false});
+    });
+    await t.test("pausa do painel é persistente, auditada e independente do atendimento humano",async()=>{
+      const [c]=(await cliente.query<{id:string;version:number}>("SELECT id,version FROM atendeia_conversations WHERE remote_jid=$1",[`${numero}@s.whatsapp.net`])).rows;
+      await alterarPausaIa(banco,admin,{...c,pausar:true});
+      assert.equal((await estadoPausaIa(banco,instancia,numero))?.bloqueada,true);
+      assert.equal((await atender("Kd a chave pix ?",{falhaProvedor:true})).resultado,"pausada");
+      await assert.rejects(alterarPausaIa(banco,admin,{...c,pausar:false}),/mudou/);
+      const [atual]=(await cliente.query<{version:number}>("SELECT version FROM atendeia_conversations WHERE id=$1 AND is_deleted=false",[c.id])).rows;
+      const retomada=await alterarPausaIa(banco,admin,{id:c.id,version:atual.version,pausar:false});
+      const estado=await estadoPausaIa(banco,instancia,numero);
+      assert.equal(estado?.bloqueada,false);assert.ok(Number(estado?.retomadaEm)>0);
+      await assumirConversa(banco,admin,{id:c.id,assumir:true});
+      await alterarPausaIa(banco,admin,{id:c.id,version:retomada.version+1,pausar:false});
+      assert.equal((await estadoPausaIa(banco,instancia,numero))?.bloqueada,true);
+      await assumirConversa(banco,admin,{id:c.id,assumir:false});
+      const anterior=process.env.FARMACIA_PIX_CHAVE;
+      try {
+        delete process.env.FARMACIA_PIX_CHAVE;
+        assert.match((await atender("Kd a chave pix ?",{falhaProvedor:true})).mensagens[0],/99999999.*Não faça uma transferência/);
+        process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
+        const semPedido=await atender("Kd a chave pix ?",{falhaProvedor:true});
+        assert.match(semPedido.texto,/Confirme os itens/);assert.doesNotMatch(semPedido.texto,/example.invalid/);
+      } finally {
+        if(anterior===undefined)delete process.env.FARMACIA_PIX_CHAVE;
+        else process.env.FARMACIA_PIX_CHAVE=anterior;
+      }
+      const auditorias=await cliente.query("SELECT id FROM atendeia_audit_logs WHERE entity_id=$1 AND action IN ('ia_pausada_no_painel','ia_despausada_no_painel') AND is_deleted=false",[c.id]);
+      assert.equal(auditorias.rows.length,3);
     });
     await t.test("dúvida clínica segue encaminhamento humano sem recomendar medicamento",async()=>{
       const antes=transferencias;

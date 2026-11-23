@@ -1,0 +1,2 @@
+ALTER TABLE "atendeia_conversations" ADD COLUMN "ai_paused" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "atendeia_conversations" ADD COLUMN "ai_resumed_at" timestamp (3) with time zone;
