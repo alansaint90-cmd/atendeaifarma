@@ -241,10 +241,16 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.match((await consultarOperacao(banco)).conversas[0].avisoEntrega??"",/precisa de troco/);
       assert.match((await atender("Para 50 reais",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"dinheiro",troco:"sim",valor:"50.00"}})).texto,/Troco para R\$ 50,00/);
       assert.match((await consultarOperacao(banco)).conversas[0].avisoEntrega??"",/Preparar troco para R\$ 50,00/);
+      const endereco=await atender("Rua Teste, 12, Centro",{falhaProvedor:true});
+      assert.equal(endereco.mensagens[0],"Endereço registrado.");
+      assert.match(endereco.mensagens[1],/nome de quem vai receber/);
       const cartao=await atender("Prefiro cartão", {falhaProvedor:true});
       assert.equal(cartao.mensagens.length,3);assert.match(cartao.mensagens[0],/maquininha/);
-      assert.match(cartao.mensagens[1],/sendo preparado/);assert.match(cartao.mensagens[2],/endereço/);
-      assert.match((await atender("Rua Teste, 12, Centro",{falhaProvedor:true})).texto,/Endereço registrado/);
+      assert.match(cartao.mensagens[1],/sendo preparado/);assert.match(cartao.mensagens[2],/nome de quem vai receber/);
+      assert.doesNotMatch(cartao.texto,/Qual é o endereço/);
+      assert.match((await atender("Marina de Souza",{falhaProvedor:true})).texto,/Nome de quem vai receber registrado/);
+      const destinatarios=await cliente.query<{detalhe:string}>("SELECT detalhe FROM atendeia_pedidos_eventos WHERE pedido_id=$1 AND tipo='destinatario_entrega' AND is_deleted=false",[p.id]);
+      assert.deepEqual(destinatarios.rows.map(e=>e.detalhe),["Marina de Souza"]);
       const chaveAnterior=process.env.FARMACIA_PIX_CHAVE;
       try {
         process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
@@ -260,7 +266,8 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
         assert.doesNotMatch((await atender("Já paguei",{falhaProvedor:true})).texto,/endereço/);
         const recibo=await atender("",{falhaProvedor:true},config,true);
-        assert.match(recibo.mensagens[0],/conferir o comprovante/);assert.match(recibo.mensagens[1],/endereço/);
+        assert.match(recibo.mensagens[0],/conferir o comprovante/);
+        assert.equal(recibo.mensagens.length,1);
         assert.match((await consultarOperacao(banco)).conversas[0].avisoEntrega??"",/Comprovante Pix/);
         assert.match((await atender("Rua Teste, 30, Centro",{falhaProvedor:true})).texto,/Endereço registrado/);
         const enderecos=await cliente.query<{detalhe:string}>("SELECT detalhe FROM atendeia_pedidos_eventos WHERE pedido_id=$1 AND tipo='endereco_entrega' AND is_deleted=false",[p.id]);
@@ -271,7 +278,7 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       }
       await atender("Dinheiro",{falhaProvedor:true});
       const semTroco=await atender("Não",{falhaProvedor:true});
-      assert.match(semTroco.mensagens[0],/sem troco/);assert.match(semTroco.mensagens[1],/endereço/);
+      assert.match(semTroco.mensagens[0],/sem troco/);assert.equal(semTroco.mensagens.length,1);
       assert.equal((await consultarOperacao(banco)).conversas[0].avisoEntrega,null);
       assert.doesNotMatch((await atender("Como está meu pedido?",{acao:"consultar_pedido",pedidoId:p.id})).texto,new RegExp(`${p.numero}|válida até`));
       assert.equal((await consultarProdutos(banco,admin,{termo:"DIP-30-TESTE"})).produtos[0].fisico,28);
