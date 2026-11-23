@@ -75,10 +75,11 @@ export function valorParaTroco(texto:string) {
   return valor ? `${valor[1]}.${valor[2]??"00"}` : undefined;
 }
 
-const chaveDemonstracao = "Pix de demonstração. Chave fictícia: 99999999. Não faça uma transferência.";
+const chaveDemonstracao = "Segue a chave Pix de demonstração. Chave fictícia: 99999999. Não faça transferência.";
+const comprovanteDemonstracao = "Quando concluir a simulação, me envie o comprovante de teste para a gente finalizar o pedido e simular o envio para entrega.";
 export function respostaPixSemPedido():{mensagens:string[]} {
   const aviso="Confirme os itens com a equipe para receber os dados de pagamento deste pedido.";
-  return {mensagens:process.env.FARMACIA_PIX_CHAVE?.trim()?[aviso]:[chaveDemonstracao,aviso]};
+  return {mensagens:process.env.FARMACIA_PIX_CHAVE?.trim()?[aviso]:[chaveDemonstracao,comprovanteDemonstracao]};
 }
 
 export function respostaPagamento(pg:Pagamento,total:string):{mensagens:string[]} {
@@ -89,7 +90,7 @@ export function respostaPagamento(pg:Pagamento,total:string):{mensagens:string[]
     if(!chave)return {mensagens:[
       chaveDemonstracao,
       `Valor simulado do pedido: ${valor}. Aguardando pagamento simulado.`,
-      "Ao concluir a simulação, envie um comprovante de teste por aqui.",
+      comprovanteDemonstracao,
     ]};
     return {mensagens:[chave,`Pagamento por Pix registrado. Valor do pedido: ${valor}. Aguardando pagamento.`,
       `${recebedor?`Recebedor: ${recebedor}. `:""}Quando concluir o pagamento, envie o comprovante aqui para a equipe conferir.`]};

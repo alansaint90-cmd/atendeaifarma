@@ -74,7 +74,7 @@ test('Pix diferencia a chave configurada da demonstração e dinheiro diferencia
   try {
     delete process.env.FARMACIA_PIX_CHAVE;
     const teste=respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'},'19.00').mensagens;
-    assert.equal(teste.length,3);assert.match(teste[0],/99999999.*Não faça uma transferência/);
+    assert.equal(teste.length,3);assert.match(teste[0],/99999999.*Não faça transferência/);
     assert.match(teste[1],/Aguardando pagamento simulado/);assert.match(teste[2],/comprovante de teste/);
     process.env.FARMACIA_PIX_CHAVE=`${randomUUID()}@example.invalid`;
     const {mensagens}=respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'},'19.00');

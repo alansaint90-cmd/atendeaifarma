@@ -172,7 +172,10 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const anterior=process.env.FARMACIA_PIX_CHAVE;
       try {
         delete process.env.FARMACIA_PIX_CHAVE;
-        assert.match((await atender("Kd a chave pix ?",{falhaProvedor:true})).mensagens[0],/99999999.*Não faça uma transferência/);
+        const demonstracao=await atender("Kd a chave pix ?",{falhaProvedor:true});
+        assert.equal(demonstracao.mensagens.length,2);
+        assert.match(demonstracao.mensagens[0],/Segue a chave Pix.*99999999.*Não faça transferência/);
+        assert.match(demonstracao.mensagens[1],/comprovante de teste.*finalizar o pedido.*entrega/);
         process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
         const semPedido=await atender("Kd a chave pix ?",{falhaProvedor:true});
         assert.match(semPedido.texto,/Confirme os itens/);assert.doesNotMatch(semPedido.texto,/example.invalid/);
@@ -252,7 +255,7 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         assert.deepEqual((await atender("kd a chave pix",{falhaProvedor:true})).mensagens,pix.mensagens);
         delete process.env.FARMACIA_PIX_CHAVE;
         const teste=await atender("Cadê a chave do Pix?",{falhaProvedor:true});
-        assert.match(teste.mensagens[0],/99999999.*Não faça uma transferência/);
+        assert.match(teste.mensagens[0],/99999999.*Não faça transferência/);
         assert.match(teste.mensagens[2],/comprovante de teste/);
         process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
         assert.doesNotMatch((await atender("Já paguei",{falhaProvedor:true})).texto,/endereço/);
