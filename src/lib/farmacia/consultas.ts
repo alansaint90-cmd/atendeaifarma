@@ -24,15 +24,15 @@ export async function listarPedidos(banco:BancoSql,ator:AtorFarmacia,entrada:unk
     const [c]=linhas<{total:number}>(await tx.execute(sql`SELECT count(*)::int total FROM atendeia_pedidos o JOIN atendeia_contacts c ON c.id=o.contato_id WHERE ${filtro}`));
     const pedidos=linhas<Omit<PedidoLista,"pagamento">&{confirmado:boolean}>(await tx.execute(sql`SELECT o.id,o.numero,c.name cliente,c.phone telefone,o.total::text,o.status,o.origem,u.name responsavel,o.created_at::text data,
       to_char(o.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') "atualizadoEm",o.confirmado_em IS NOT NULL confirmado,
-      o.conferencia,o.conversa_id "conversaId",(SELECT min(expira_em)::text FROM atendeia_pedidos_reservas r WHERE r.pedido_id=o.id AND ${reservaAtiva}) expira
+      o.conferencia,o.conversa_id "conversaId",(SELECT min(expira_em)::text FROM atendeia_pedidos_reservas r WHERE r.pedido_id=o.id AND ${reservaAtiva}) expira,
+      coalesce((SELECT jsonb_agg(jsonb_build_object('produtoId',i.produto_id,'descricao',i.descricao,'quantidade',i.quantidade,
+        'preco',i.preco::text,'receita',pr.receita OR pr.controle<>'') ORDER BY i.id)
+        FROM atendeia_pedidos_itens i JOIN atendeia_produtos pr ON pr.id=i.produto_id WHERE i.pedido_id=o.id AND i.is_deleted=false),'[]'::jsonb) itens,
+      coalesce((SELECT jsonb_agg(jsonb_build_object('tipo',e.tipo,'detalhe',e.detalhe,'data',e.created_at::text,'autor',autor.name) ORDER BY e.created_at,e.id)
+        FROM atendeia_pedidos_eventos e JOIN atendeia_users autor ON autor.id=e.modified_by
+        WHERE e.pedido_id=o.id AND e.is_deleted=false),'[]'::jsonb) eventos
       FROM atendeia_pedidos o JOIN atendeia_contacts c ON c.id=o.contato_id LEFT JOIN atendeia_users u ON u.id=o.responsavel_id
       WHERE ${filtro} ORDER BY o.created_at DESC,o.id LIMIT 30 OFFSET ${(v.pagina-1)*30}`));
-    for (const p of pedidos) {
-      p.itens=linhas(await tx.execute(sql`SELECT i.produto_id "produtoId",i.descricao,i.quantidade,i.preco::text,(pr.receita OR pr.controle<>'') receita
-        FROM atendeia_pedidos_itens i JOIN atendeia_produtos pr ON pr.id=i.produto_id WHERE i.pedido_id=${p.id} AND i.is_deleted=false ORDER BY i.id`));
-      p.eventos=linhas(await tx.execute(sql`SELECT e.tipo,e.detalhe,e.created_at::text data,u.name autor FROM atendeia_pedidos_eventos e JOIN atendeia_users u ON u.id=e.modified_by
-        WHERE e.pedido_id=${p.id} AND e.is_deleted=false ORDER BY e.created_at,e.id`));
-    }
     const resultado=pedidos.map(({confirmado,eventos,...pedido}):PedidoLista=>({
       ...pedido,pagamento:estadoPagamento(pedido.status,confirmado,eventos),
       eventos:eventos.map(e=>e.tipo==="pagamento"?{...e,detalhe:descreverPagamento(e.detalhe)}:e),

@@ -207,11 +207,20 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.equal(transferencias,antes);
     });
     await t.test("pedido confirma, acrescenta no mesmo registro e pergunta pagamento sem expor códigos",async()=>{
-      const r=await atender("Quero uma embalagem de dipirona",{acao:"criar_pedido",itens:[{produtoId:id,quantidade:1}]});
+      const selecao=await atender("Quero só a dipirona",{falhaProvedor:true});
+      assert.match(selecao.mensagens[0],/Dipirona.*R\$ 9,50/);
+      assert.equal(selecao.mensagens[1],"Quantas embalagens você deseja?");
+      assert.equal((await listarPedidos(banco,admin,{termo:numero})).total,0);
+      const r=await atender("Uma embalagem",{falhaProvedor:true});
       assert.equal(r.mensagens.length,2);assert.match(r.mensagens[0],/Pedido registrado:.*Dipirona.*R\$ 9,50/s);
       assert.equal(r.mensagens[1],"Confirma os itens para fazer a compra?");
       assert.doesNotMatch(r.texto,/F-[A-Z0-9-]+|válida até|temporariamente/);
       const p=(await cliente.query<{id:string;numero:string}>("SELECT id,numero FROM atendeia_pedidos")).rows[0];
+      const painel=(await listarPedidos(banco,admin,{termo:numero})).pedidos;
+      assert.equal(painel[0].id,p.id);assert.equal(painel[0].status,"aguardando_confirmacao");
+      const resumo=await atender("Só a dipirona",{falhaProvedor:true});
+      assert.match(resumo.texto,/Pedido registrado:.*1 × Dipirona.*R\$ 9,50/s);
+      assert.equal((await listarPedidos(banco,admin,{termo:numero})).total,1);
       assert.equal((await atender("Sim",{acao:"reservar",pedidoId:p.id})).texto,"Itens confirmados. Deseja acrescentar mais alguma coisa?");
       assert.equal((await atender("Sim",{acao:"adicionar",pedidoId:p.id})).texto,"Qual produto você deseja acrescentar ao pedido?");
       const antes=transferencias;
@@ -310,6 +319,14 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         else process.env.FARMACIA_PIX_CHAVE=chaveAnterior;
       }
       assert.match((await atender("Dinheiro",{falhaProvedor:true})).texto,/Pix deste pedido já está registrado/);
+      const eventosAntesDaSelecao=await contarEventos();
+      for(const texto of ["Quero só a dipirona","1 dipirona"]) {
+        const retorno=await atender(texto,{falhaProvedor:true});
+        assert.match(retorno.texto,/Dipirona.*R\$ 19,00.*em andamento para entrega/s);
+        assert.doesNotMatch(retorno.texto,/informe o nome|antes de alterar|confirma os itens/i);
+      }
+      assert.equal(await contarEventos(),eventosAntesDaSelecao);
+      assert.equal((await listarPedidos(banco,admin,{termo:numero})).total,1);
       const consulta=await atender("Como está meu pedido?",{acao:"consultar_pedido",pedidoId:p.id});
       assert.match(consulta.texto,/Pix já está registrado.*em andamento/);
       assert.doesNotMatch(consulta.texto,new RegExp(`${p.numero}|válida até|será conferido`));

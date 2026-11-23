@@ -24,7 +24,30 @@ export function PedidosPage({gestor}:{gestor:boolean}) {
   const [erro,setErro]=useState("");const [novo,setNovo]=useState(false);const [id,setId]=useState("");const [referencia,setReferencia]=useState("");
   const [usuarios,setUsuarios]=useState<{id:string;nome:string;registro:string|null;habilitado:boolean|null}[]>([]);
   const carregar=useCallback(async()=>{const atual=++versao.current;try{const r=await carregarPedidos({status,pagina,termo,periodo:periodo?periodoFarmacia(periodo):null});if(atual!==versao.current)return;if(r.ok){setDados(r.dados);setErro("");}else setErro(r.erro);}catch{if(atual===versao.current)setErro("Não foi possível consultar os pedidos. Tente atualizar.");}},[status,pagina,termo,periodo]);
-  useEffect(()=>{const ini=setTimeout(()=>void carregar(),200);const timer=setInterval(()=>void carregar(),10000);return()=>{invalidar();clearTimeout(ini);clearInterval(timer);};},[carregar,invalidar]);
+  useEffect(()=>{
+    let ativo=true;
+    let atualizando=false;
+    let timer:ReturnType<typeof setTimeout>;
+    const atualizar=async()=>{
+      if(!ativo||atualizando||document.visibilityState==="hidden")return;
+      clearTimeout(timer);
+      atualizando=true;
+      await carregar();
+      atualizando=false;
+      if(ativo)timer=setTimeout(()=>void atualizar(),3000);
+    };
+    const aoVoltar=()=>void atualizar();
+    timer=setTimeout(aoVoltar,200);
+    window.addEventListener("focus",aoVoltar);
+    document.addEventListener("visibilitychange",aoVoltar);
+    return()=>{
+      ativo=false;
+      invalidar();
+      clearTimeout(timer);
+      window.removeEventListener("focus",aoVoltar);
+      document.removeEventListener("visibilitychange",aoVoltar);
+    };
+  },[carregar,invalidar]);
   useEffect(()=>{if(gestor)void carregarCadastrosFarmacia().then(r=>{if(r.ok)setUsuarios(r.dados.usuarios);});},[gestor]);
   const c=useConfirmacao(()=>{void carregar();setReferencia("");});const pedido=dados?.pedidos.find(p=>p.id===id);
   const acao=(p:PedidoLista,a:string,mensagem:string)=>{const chave=crypto.randomUUID();c.confirmar(mensagem,()=>alterarPedido({id:p.id,acao:a,chave,referencia,atualizadoEm:p.atualizadoEm}));};

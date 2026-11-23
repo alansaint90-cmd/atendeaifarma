@@ -1,5 +1,5 @@
 import {afterEach,expect,test,vi} from 'vitest';
-import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {act,cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
 import {FarmaciaDashboard} from '@/components/farmacia/dashboard';
 import {EstoquePage} from '@/components/farmacia/estoque';
 import {PedidosPage} from '@/components/farmacia/pedidos';
@@ -88,4 +88,22 @@ test('pedidos mostram indicadores reais e enviam busca e período ao servidor',a
   fireEvent.change(screen.getByLabelText('Período'),{target:{value:''}});
   await waitFor(()=>expect(a.carregarPedidos).toHaveBeenLastCalledWith({status:'em_andamento',pagina:1,termo:'Dipirona',periodo:null}));
   expect(screen.queryByRole('button',{name:'Confirmar venda e pagamento'})).not.toBeInTheDocument();
+});
+
+test('lista aberta exibe o novo pedido após uma atualização automática e refresca ao voltar',async()=>{
+  vi.useFakeTimers();
+  try {
+    const resposta={ok:true,dados:{total:0,pedidos:[]}};
+    a.carregarPedidos.mockResolvedValue(resposta);
+    render(<PedidosPage gestor={false}/>);
+    await act(()=>vi.advanceTimersByTimeAsync(200));
+    expect(screen.getByText('Nenhum pedido encontrado.')).toBeInTheDocument();
+    a.carregarPedidos.mockResolvedValueOnce({ok:true,dados:{total:1,pedidos:[{id:crypto.randomUUID(),numero:'F-NOVO',cliente:'Cliente WhatsApp',
+      total:'9.50',status:'aguardando_confirmacao',data:'2026-10-14T12:00:00Z',pagamento:{forma:null,estado:'pendente'},itens:[],eventos:[]}]}});
+    await act(()=>vi.advanceTimersByTimeAsync(3000));
+    expect(screen.getByText('F-NOVO')).toBeInTheDocument();
+    expect(a.carregarPedidos).toHaveBeenCalledTimes(2);
+    await act(async()=>{fireEvent.focus(window);});
+    expect(a.carregarPedidos).toHaveBeenCalledTimes(3);
+  } finally { vi.useRealTimers(); }
 });

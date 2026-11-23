@@ -7,7 +7,7 @@ import type { IncomingMessage } from "../agent/message";
 import type { ContinuidadeEstoque, Turn, RespostaGerada } from "../agent/providers";
 import { consultarProdutos, type Produto } from "./catalogo";
 import { criarPedido, executarPedido } from "./pedidos";
-import { listarPedidos } from "./consultas";
+import { listarPedidos, type PedidoLista } from "./consultas";
 import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
 import { personaDoAgente } from "../agent/nome";
@@ -16,14 +16,14 @@ import { registrarEtapaPedido, respostaPagamento, respostaPixSemPedido, pagament
 import { continuidadeDaConsulta, conviteContinuarPedido, descricaoComercial } from "./continuidade";
 import { NOME_FARMACIA } from "./configuracao-agente";
 const sistema={sistema:true} as const;
+function textoDaOferta(produto:Produto) {
+  const embalagem=produto.embalagem>1&&!/\d/.test(produto.apresentacao)?` (${produto.embalagem} unidades por embalagem)`:"";
+  return `${descricaoComercial(produto)}${embalagem}, por R$ ${(produto.promocional??produto.preco).replace(".",",")}.${produto.receita||produto.controle?" A liberação exige conferência de receita pelo farmacêutico.":""}`;
+}
 export function respostaProduto(produtos:Produto[],total:number):RespostaGerada {
   const disponiveis=produtos.filter(p=>p.ativo&&p.disponivel>0).slice(0,8);
   if(!disponiveis.length)return {mensagens:[],transferirEstoque:true};
-  const lista=disponiveis.map(p=>{
-    const embalagem=p.embalagem>1&&!/\d/.test(p.apresentacao)?` (${p.embalagem} unidades por embalagem)`:"";
-    const descricao=descricaoComercial(p);
-    return `${descricao}${embalagem}, por R$ ${(p.promocional??p.preco).replace(".",",")}.${p.receita||p.controle?" A liberação exige conferência de receita pelo farmacêutico.":""}`;
-  });
+  const lista=disponiveis.map(textoDaOferta);
   const oferta=lista.length===1?`Temos sim ${lista[0]}`:`Temos estas opções disponíveis:\n${lista.map(t=>`• ${t}`).join("\n")}`;
   return {mensagens:[`${oferta}${total>8?"\nHá outras apresentações disponíveis. Informe a concentração ou apresentação que procura.":""}`,
     "Gostaria de fazer o seu pedido ou acrescentar mais alguma coisa?"]};
@@ -32,15 +32,16 @@ async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMess
   const [c]=linhas<{id:string;contato_id:string}>(await banco.execute(sql`SELECT c.id,c.contact_id contato_id FROM atendeia_conversations c JOIN atendeia_channels ch ON ch.id=c.channel_id
     WHERE ch.instance_name=${instancia} AND ch.is_deleted=false AND c.remote_jid=${`${m.number}@s.whatsapp.net`} AND c.status<>'closed' AND c.is_deleted=false`));
   if(!c)throw new ErroDeNegocio("Conversa indisponível.");
-  const produtos=linhas<ContextoFarmacia["produtos"][number]>(await banco.execute(sql`SELECT p.id,p.nome,p.concentracao,p.apresentacao,
+  const produtos=linhas<ContextoFarmacia["produtos"][number]>(await banco.execute(sql`SELECT p.id,p.nome,p.concentracao,p.apresentacao,p.principio,p.generico,p.aliases,p.sku,
     to_char(max(q.created_at) AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') "consultadoEm" FROM atendeia_produtos p
     LEFT JOIN atendeia_produtos_consultas q ON p.id=q.produto_id AND q.conversa_id=${c.id}
       AND q.created_at>now()-interval '24 hours' AND q.is_deleted=false
     WHERE p.is_deleted=false AND (q.id IS NOT NULL OR EXISTS(SELECT 1 FROM atendeia_pedidos_itens i JOIN atendeia_pedidos pedido ON pedido.id=i.pedido_id
       WHERE i.produto_id=p.id AND i.is_deleted=false AND pedido.is_deleted=false AND pedido.conversa_id=${c.id}
-        AND pedido.status IN ('aguardando_confirmacao','aguardando_pagamento')))
-    GROUP BY p.id,p.nome,p.concentracao,p.apresentacao ORDER BY max(q.created_at) DESC NULLS FIRST,p.id LIMIT 90`));
+        AND pedido.status IN ('aguardando_confirmacao','aguardando_pagamento','pagamento_confirmado','em_separacao')))
+    GROUP BY p.id,p.nome,p.concentracao,p.apresentacao,p.principio,p.generico,p.aliases,p.sku ORDER BY max(q.created_at) DESC NULLS FIRST,p.id LIMIT 90`));
   const pedidos=linhas<ContextoFarmacia["pedidos"][number]>(await banco.execute(sql`SELECT p.id,p.numero,p.status,
+    ARRAY(SELECT i.produto_id FROM atendeia_pedidos_itens i WHERE i.pedido_id=p.id AND i.is_deleted=false ORDER BY i.id) "produtoIds",
     to_char(p.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') "atualizadoEm",
     (SELECT tipo FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.is_deleted=false
       AND e.tipo NOT IN ('endereco_entrega','destinatario_entrega','adicionar','conferir')
@@ -84,7 +85,7 @@ export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,i
     if(a.pedidoId&&!pendente)return "Não encontrei esse pedido em andamento neste atendimento. Nossa equipe pode ajudar.";
     const id=await criarPedido(banco,sistema,{contatoId:contexto.contatoId,conversaId:contexto.conversaId,chave:`ia:${identidade}`,itens:a.itens},pendente?.id,ajustarQuantidade);
     const [p]=(await listarPedidos(banco,sistema,{id})).pedidos;
-    return {mensagens:[`Pedido registrado:\n${p.itens.map(i=>`${i.quantidade} × ${i.descricao} — R$ ${i.preco.replace(".",",")} cada`).join("\n")}\nTotal: R$ ${p.total.replace(".",",")}.${p.itens.some(i=>i.receita)?" A liberação exige conferência do farmacêutico.":""}`,"Confirma os itens para fazer a compra?"]};
+    return {mensagens:[resumoPedido(p),"Confirma os itens para fazer a compra?"]};
   }
   if(!contexto.pedidos.some(p=>p.id===a.pedidoId))return "Não encontrei esse pedido neste atendimento. Nossa equipe pode ajudar.";
   if(a.acao==="reservar") {
@@ -110,6 +111,70 @@ function pedidoEmPagamento(contexto:ContextoFarmacia) {
   const pendentes=contexto.pedidos.filter(p=>p.status==="aguardando_pagamento"&&
     ["finalizar","pagamento","comprovante_pix","pix_conferido"].includes(p.etapa??""));
   return pendentes.length===1?pendentes[0]:undefined;
+}
+
+function resumoPedido(p:PedidoLista) {
+  const itens=p.itens.map(i=>`${i.quantidade} × ${i.descricao} — R$ ${i.preco.replace(".",",")} cada`).join("\n");
+  return `Pedido registrado:\n${itens}\nTotal: R$ ${p.total.replace(".",",")}.${p.itens.some(i=>i.receita)?" A liberação exige conferência do farmacêutico.":""}`;
+}
+
+const perguntaQuantidade = "Quantas embalagens você deseja?";
+const numeros:Record<string,number>={um:1,uma:1,dois:2,duas:2,tres:3,quatro:4,cinco:5};
+function correspondeProduto(produto:ContextoFarmacia["produtos"][number],termo:string,alternativos=false) {
+  const nomes=alternativos?[produto.principio,produto.generico,...(produto.aliases?.split(/[,;\n]/)??[])]:[produto.nome];
+  return nomes.some(nome=>nome&&[nome,`${nome} ${produto.concentracao}`,`${nome} ${produto.concentracao} ${produto.apresentacao}`]
+    .some(descricao=>normalizarPedido(descricao)===termo));
+}
+
+type Selecao = {termo:string;quantidade?:number;produtoId?:string;acrescentar:boolean};
+function selecaoDoCliente(texto:string,contexto:ContextoFarmacia,historico:Turn[]):Selecao|undefined {
+  const quantidade=/^(?:quero )?(\d{1,4}|um|uma|dois|duas|tres|quatro|cinco)(?: (?:embalag(?:em|ens)|caixas?))?$/.exec(texto);
+  const ultima=historico.findLast(turno=>turno.role==="assistant")?.content;
+  if(quantidade) {
+    if(!ultima?.endsWith(perguntaQuantidade))return;
+    const citados=contexto.produtos.filter(produto=>[", por R$ "," ("].some(sufixo=>ultima.startsWith(`Temos sim ${descricaoComercial(produto)}${sufixo}`)));
+    if(citados.length===1)return {termo:citados[0].nome,produtoId:citados[0].id,quantidade:numeros[quantidade[1]]??Number(quantidade[1]),acrescentar:false};
+    return;
+  }
+  const expresso=/^(?:nao[, ]+)?(?:eu )?(?:quero|gostaria de|vou levar|pode colocar|coloque|deixe|ajuste para|acrescente|adicione)?\s*(?:(so|apenas|somente|mais)\s+)?(\d{1,4}|um|uma|dois|duas|tres|quatro|cinco)\s+(?:(?:caixas?|embalag(?:em|ens)|unidades?)\s+(?:de\s+)?)?(.+?)(?:\s+(?:so|apenas|somente|por favor))?$/.exec(texto);
+  if(expresso)return {termo:expresso[3],quantidade:numeros[expresso[2]]??Number(expresso[2]),acrescentar:expresso[1]==="mais"||/\b(?:acrescente|adicione)\b/.test(texto)};
+  const semQuantidade=/^(?:(?:nao[, ]+)?(?:eu )?(?:quero(?: comprar)?|vou levar|pode colocar|pode ser|gostaria de)(?:\s+(?:so|somente|apenas))?|(?:so|somente|apenas))\s+(?:(?:a|o)\s+)?([\p{L}\p{N}][\p{L}\p{N} .-]{1,118}?)(?:\s+(?:so|somente|apenas|por favor))?$/u.exec(texto);
+  if(semQuantidade&&!/^(?:saber|pagar|falar|fazer|finalizar|acrescentar|incluir|adicionar|confirmar|corrigir|cancelar|alterar|pedido|isso|esse mesmo|essa mesma|outro produto|outra opcao|atendimento|atendente|ajuda|suporte)\b/.test(semQuantidade[1]))return {termo:semQuantidade[1],acrescentar:false};
+}
+
+function pedidoPago(pedido:ContextoFarmacia["pedidos"][number]) {
+  return etapaPixPago(pedido.etapa)||["pagamento_confirmado","em_separacao"].includes(pedido.status);
+}
+
+async function responderSelecao(banco:BancoSql,contexto:ContextoFarmacia,selecao:Selecao,historico:Turn[],identidade:string):Promise<RespostaGerada> {
+  const consultar=():RespostaGerada=>({consultarEstoque:selecao.termo.slice(0,120),continuidade:continuidadeDaConsulta(contexto,historico)});
+  const porNome=contexto.produtos.filter(p=>selecao.produtoId?p.id===selecao.produtoId:correspondeProduto(p,selecao.termo));
+  const candidatos=porNome.length||selecao.produtoId?porNome:contexto.produtos.filter(p=>correspondeProduto(p,selecao.termo,true));
+  if(!candidatos.length)return consultar();
+  const abertos=contexto.pedidos.filter(p=>["aguardando_confirmacao","aguardando_pagamento","pagamento_confirmado","em_separacao"].includes(p.status));
+  const vinculados=abertos.filter(p=>candidatos.some(item=>p.produtoIds?.includes(item.id)));
+  if(vinculados.length>1)return "Encontrei esse produto em mais de um pedido. Qual pedido você quer consultar?";
+  const vinculado=vinculados[0];
+  if(vinculado&&(pedidoPago(vinculado)||selecao.quantidade===undefined)) {
+    const [p]=(await listarPedidos(banco,sistema,{id:vinculado.id})).pedidos;
+    if(!p)throw new ErroDeNegocio("Pedido indisponível.");
+    if(p.status==="cancelado"||p.status==="concluido")return {mensagens:[resumoPedido(p),p.status==="cancelado"?"Esse pedido foi cancelado.":"Esse pedido já foi concluído."]};
+    if(p.pagamento.estado==="pago")return comPerguntaEntrega([resumoPedido(p),"O pagamento já está registrado e seu pedido está em andamento para entrega."],vinculado);
+    const seguinte=p.status==="aguardando_confirmacao"?"Confirma os itens para fazer a compra?":"Seu pedido está em andamento.";
+    return {mensagens:[resumoPedido(p),seguinte]};
+  }
+  const pendentes=abertos.filter(p=>!pedidoPago(p));
+  const opcoes=vinculado&&!selecao.acrescentar?candidatos.filter(item=>vinculado.produtoIds?.includes(item.id)):candidatos;
+  if(pendentes.length>1)return "Encontrei mais de um pedido em andamento. Qual deles você quer atualizar?";
+  if(opcoes.length!==1)return "Qual apresentação você prefere? Pode me informar a concentração ou a embalagem.";
+  const [produto]=opcoes;
+  if(selecao.quantidade===undefined) {
+    const atual=produto.sku&&(await consultarProdutos(banco,sistema,{termo:produto.sku,disponibilidade:"disponivel"})).produtos.find(p=>p.id===produto.id);
+    return atual?{mensagens:[`Temos sim ${textoDaOferta(atual)}`,perguntaQuantidade]}:consultar();
+  }
+  if(!selecao.quantidade)return "Informe uma quantidade maior que zero.";
+  if(!pendentes.length&&abertos.some(pedidoPago))return "Seu pedido já está pago e segue para entrega. Fale com a farmácia para combinar um pedido separado.";
+  return atenderIntencao(banco,contexto,{acao:"criar_pedido",pedidoId:pendentes[0]?.id??"",termo:"",itens:[{produtoId:produto.id,quantidade:selecao.quantidade}]},identidade,!selecao.acrescentar&&pendentes.length===1);
 }
 
 const entregaRegistrada="Certo! Os dados de entrega já estão registrados e a equipe vai dar continuidade ao pedido.";
@@ -141,6 +206,8 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
       const forma=formaMencionada(texto);
       if(forma==="pix"&&!pedido)return respostaPixSemPedido();
       if(forma==="cartao"&&!pedido)return "O pagamento com cartão pode ser feito na entrega, com maquininha. A equipe pode confirmar essa opção no seu pedido.";
+      const selecao=forma||encerramentoSemAlteracao.test(textoNormal)?undefined:selecaoDoCliente(textoNormal,contexto,historico);
+      if(selecao)return await responderSelecao(banco,contexto,selecao,historico,m.identity);
       if(pedido) {
         const pg=pedido.etapa==="finalizar"?undefined:pagamentoSalvo(pedido.pagamento);
         const executarPagamento=(pagamento:unknown)=>atenderIntencao(banco,contexto,
@@ -188,18 +255,6 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         }
       }
       const consultar=(termo:string):RespostaGerada=>({consultarEstoque:termo.slice(0,120),continuidade:continuidadeDaConsulta(contexto,historico)});
-      const escolha=/^(?:nao[, ]+)?(?:eu )?(?:quero|gostaria de|vou levar|pode colocar|coloque|deixe|ajuste para|acrescente|adicione)?\s*(?:(so|apenas|somente|mais)\s+)?(\d{1,4}|um|uma|dois|duas|tres|quatro|cinco)\s+(?:(?:caixas?|embalag(?:em|ens)|unidades?)\s+(?:de\s+)?)?(.+?)(?:\s+(?:so|apenas|somente|por favor))?$/.exec(textoNormal);
-      if(escolha) {
-        const termo=escolha[3];
-        const candidatos=contexto.produtos.filter(p=>[p.nome,`${p.nome} ${p.concentracao}`,`${p.nome} ${p.concentracao} ${p.apresentacao}`].some(n=>normalizarPedido(n)===termo));
-        if(!candidatos.length)return consultar(termo);
-        if(candidatos.length!==1||pendentes.length>1)return "Qual apresentação e pedido você quer ajustar? Nossa equipe pode ajudar se houver mais de um pedido.";
-        const numeros:Record<string,number>={um:1,uma:1,dois:2,duas:2,tres:3,quatro:4,cinco:5};
-        const quantidade=Number(escolha[2])||numeros[escolha[2]];
-        if(!quantidade)return "Informe uma quantidade maior que zero.";
-        const acrescentar=escolha[1]==="mais"||/\b(?:acrescente|adicione)\b/.test(textoNormal);
-        return await atenderIntencao(banco,contexto,{acao:"criar_pedido",pedidoId:pendentes[0]?.id??"",termo:"",itens:[{produtoId:candidatos[0].id,quantidade}]},m.identity,!acrescentar&&pendentes.length===1);
-      }
       const intencao=await interpretarIntencao(config,historico,texto,contexto,request);
       if(pedido?.temEndereco&&pedido.temDestinatario&&intencao.acao==="pagamento")return entregaRegistrada;
       if(pedido&&(intencao.acao==="adicionar"||intencao.acao==="finalizar")) {
