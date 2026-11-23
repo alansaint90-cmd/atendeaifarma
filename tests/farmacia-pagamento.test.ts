@@ -69,14 +69,17 @@ test('PostgreSQL 16 real mantém pedido e histórico de pagamento idempotentes',
   const cliente=postgres(url.toString(),{max:2,onnotice:()=>{}});
   try{assert.match((await cliente`SHOW server_version`)[0].server_version,/^16\./);await verificar(drizzlePostgres(cliente));}finally{await cliente.end();}
 });
-test('Pix só informa chave configurada e dinheiro diferencia necessidade de troco',()=>{
+test('Pix diferencia a chave configurada da demonstração e dinheiro diferencia necessidade de troco',()=>{
   const anterior=process.env.FARMACIA_PIX_CHAVE;
   try {
     delete process.env.FARMACIA_PIX_CHAVE;
-    assert.match(respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'},'19.00').mensagens[0],/equipe.*informar a chave/);
+    const teste=respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'},'19.00').mensagens;
+    assert.equal(teste.length,3);assert.match(teste[0],/99999999.*Não faça uma transferência/);
+    assert.match(teste[1],/Aguardando pagamento simulado/);assert.match(teste[2],/comprovante de teste/);
     process.env.FARMACIA_PIX_CHAVE=`${randomUUID()}@example.invalid`;
     const {mensagens}=respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'},'19.00');
-    assert.deepEqual(mensagens.slice(0,2),[process.env.FARMACIA_PIX_CHAVE,'Valor do pedido: R$ 19,00.']);
+    assert.equal(mensagens[0],process.env.FARMACIA_PIX_CHAVE);
+    assert.match(mensagens[1],/Pagamento por Pix registrado.*Valor do pedido: R\$ 19,00.*Aguardando pagamento/);
     assert.equal(mensagens.length,3);assert.match(mensagens[2],/envie o comprovante/);
     assert.match(respostaPagamento({forma:'dinheiro',troco:'nao',valor:'0.00'},'19.00').mensagens[0],/sem troco/);
     assert.match(respostaPagamento({forma:'dinheiro',troco:'sim',valor:'0.00'},'19.00').mensagens[0],/qual valor/);

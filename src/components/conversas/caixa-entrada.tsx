@@ -2,9 +2,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AvatarContato } from "./avatar";
 import { AudioMensagem } from "./audio-mensagem";
+import type { EstadoIaConversa } from "@/lib/operacao/estado-ia";
 
 export interface MensagemConversa { id: string; conteudo: string | null; direcao: string; instante: string; tipo?: string; audioDisponivel?: boolean }
-export interface ConversaLista { id: string; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; avisoEntrega?: string | null; fotoUrl?: string | null; mensagens: MensagemConversa[] }
+export interface ConversaLista { id: string; nome: string; telefone: string | null; canal: string; status: string; estadoIa?: EstadoIaConversa; aguardaHumano?: boolean; avisoEntrega?: string | null; fotoUrl?: string | null; mensagens: MensagemConversa[] }
 interface CaixaEntradaProps {
   conversas: ConversaLista[]; selecionada: string; aoSelecionar: (id: string) => void;
   resposta?: ReactNode; acoesConversa?: ReactNode; atualizar: () => void; atualizando?: boolean;
@@ -14,6 +15,13 @@ const normalizar = (texto: string) => texto.normalize("NFD").replace(/[\u0300-\u
 const hora = (instante: string) => new Date(instante).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
 const dia = (instante: string) => new Date(instante).toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 const status: Record<string, string> = { open: "Em atendimento", pending: "Pendente", closed: "Encerrada" };
+const rotulosIa: Record<EstadoIaConversa, string> = {
+  ativa: "Atendimento com IA",
+  pausada: "IA pausada",
+  humano: "Atendimento humano",
+  desativada: "IA desativada",
+  indisponivel: "IA indisponível",
+};
 
 /** Apresentação compartilhável entre instalações; autenticação e envio ficam no adaptador. */
 export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, acoesConversa, atualizar, atualizando = false, fonteAudio }: CaixaEntradaProps) {
@@ -53,7 +61,14 @@ export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, a
     <div className="conversas-principal">
       {conversa ? <><header className="conversas-barra conversas-cabecalho">
         <button type="button" className="conversas-voltar" onClick={() => { definirAberta(false); campoBusca.current?.focus(); }} aria-label="Voltar para a lista de conversas">←</button>
-        <AvatarContato nome={conversa.nome} fotoUrl={conversa.fotoUrl} /><div><h2 ref={titulo} tabIndex={-1}>{conversa.nome}</h2><span>{conversa.telefone ?? "Sem telefone"} · {conversa.canal} · {status[conversa.status] ?? conversa.status}</span></div>
+        <AvatarContato nome={conversa.nome} fotoUrl={conversa.fotoUrl} />
+        <div>
+          <div className="conversas-titulo">
+            <h2 ref={titulo} tabIndex={-1}>{conversa.nome}</h2>
+            {conversa.estadoIa && <span className="conversas-estado-ia" data-estado={conversa.estadoIa}>{rotulosIa[conversa.estadoIa]}</span>}
+          </div>
+          <span>{conversa.telefone ?? "Sem telefone"} · {conversa.canal} · {status[conversa.status] ?? conversa.status}</span>
+        </div>
         {acoesConversa}
       </header>
       <div className="conversas-historico" ref={historico} role="region" aria-label={`Histórico de ${conversa.nome}`} tabIndex={0}

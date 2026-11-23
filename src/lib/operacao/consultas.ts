@@ -1,10 +1,11 @@
 import { sql } from "drizzle-orm";
 import { linhas, type BancoSql } from "../db/porta";
 import { LIMITE_CONTATOS } from "./limites";
+import type { EstadoIaConversa, OrigemEstadoIa, consultarEstadosIa } from "./estado-ia";
 
 export interface ContatoOperacional { id: string; version: number; nome: string; telefone: string | null; email: string | null; origem: string | null; status: string }
 export interface MensagemOperacional { id: string; conteudo: string | null; direcao: string; instante: string; tipo?: string; audioDisponivel?: boolean }
-export interface ConversaOperacional { id: string; version: number; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; avisoEntrega?: string | null; fotoUrl?: string | null; mensagens: MensagemOperacional[] }
+export interface ConversaOperacional { id: string; version: number; nome: string; telefone: string | null; canal: string; status: string; estadoIa?: EstadoIaConversa; aguardaHumano?: boolean; avisoEntrega?: string | null; fotoUrl?: string | null; mensagens: MensagemOperacional[] }
 export interface ResumoOperacional {
   abertas: number; pendentes: number; qualificados: number; taxaResposta: number; totalContatos: number;
   contatos: ContatoOperacional[]; conversas: ConversaOperacional[]; volume: { dia: string; total: number }[];
@@ -12,8 +13,8 @@ export interface ResumoOperacional {
 }
 
 /** Leituras coerentes em um snapshot; os filtros preservam a exclusão lógica do schema ativo. */
-export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacional> {
-  return banco.transaction(async tx => {
+export async function consultarOperacao(banco: BancoSql, consultarIa?: typeof consultarEstadosIa): Promise<ResumoOperacional> {
+  const { resumo, origens } = await banco.transaction(async tx => {
     await tx.execute(sql`SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY`);
     const contagem = linhas<{ abertas: number; pendentes: number; recebidas: number; respondidas: number }>(await tx.execute(sql`
       WITH atendimento AS (
@@ -32,7 +33,8 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
       count(*) FILTER (WHERE lead_status='qualificado')::int qualificados FROM atendeia_contacts WHERE is_deleted=false`))[0];
     const contatos = linhas<ContatoOperacional>(await tx.execute(sql`SELECT id,version,name nome,phone telefone,email,source origem,lead_status status
       FROM atendeia_contacts WHERE is_deleted=false ORDER BY created_at DESC,id LIMIT ${LIMITE_CONTATOS}`));
-    const conversas = linhas<Omit<ConversaOperacional, "mensagens">>(await tx.execute(sql`SELECT c.id,c.version,p.name nome,p.phone telefone,ch.name canal,c.status,p.foto_url "fotoUrl",
+    const conversas = linhas<Omit<ConversaOperacional, "mensagens"> & OrigemEstadoIa>(await tx.execute(sql`SELECT c.id,c.version,p.name nome,p.phone telefone,ch.name canal,c.status,p.foto_url "fotoUrl",
+      ch.instance_name instancia,c.remote_jid jid,c.human_takeover assumida,(c.assigned_to IS NOT NULL) atribuida,
       (c.status='pending' AND c.human_takeover=true AND c.assigned_to IS NULL) "aguardaHumano",
       (SELECT aviso FROM atendeia_pedidos pedido
         CROSS JOIN LATERAL (SELECT CASE
@@ -51,7 +53,9 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
       FROM atendeia_conversations c JOIN atendeia_contacts p ON p.id=c.contact_id JOIN atendeia_channels ch ON ch.id=c.channel_id
       WHERE c.is_deleted=false AND p.is_deleted=false AND ch.is_deleted=false ORDER BY c.last_message_at DESC NULLS LAST,c.id LIMIT 50`));
     const historicos: ConversaOperacional[] = [];
-    for (const conversa of conversas) {
+    const origens: OrigemEstadoIa[] = [];
+    for (const { instancia, jid, assumida, atribuida, ...conversa } of conversas) {
+      origens.push({ id: conversa.id, status: conversa.status, instancia, jid, assumida, atribuida });
       const mensagens = linhas<MensagemOperacional>(await tx.execute(sql`SELECT id,content conteudo,direction direcao,message_type tipo,
         (message_type='audio' AND provider_message_id IS NOT NULL) "audioDisponivel",
         to_char(sent_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') instante FROM atendeia_messages
@@ -64,8 +68,11 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
         JOIN atendeia_contacts p ON p.id=c.contact_id JOIN atendeia_channels ch ON ch.id=c.channel_id
         WHERE m.is_deleted=false AND c.is_deleted=false AND p.is_deleted=false AND ch.is_deleted=false) m
       ON (m.sent_at AT TIME ZONE 'UTC')::date=d.dia::date GROUP BY d.dia ORDER BY d.dia`));
-    return { abertas: contagem.abertas, pendentes: contagem.pendentes, qualificados: totais.qualificados,
+    return { origens, resumo: { abertas: contagem.abertas, pendentes: contagem.pendentes, qualificados: totais.qualificados,
       taxaResposta: contagem.recebidas ? Math.round(contagem.respondidas / contagem.recebidas * 100) : 0,
-      totalContatos: totais.total, contatos, conversas: historicos, volume, atualizadoEm: new Date().toISOString() };
+      totalContatos: totais.total, contatos, conversas: historicos, volume, atualizadoEm: new Date().toISOString() } };
   });
+  if (!consultarIa) return resumo;
+  const estados = await consultarIa(origens);
+  return { ...resumo, conversas: resumo.conversas.map(conversa => ({ ...conversa, estadoIa: estados.get(conversa.id) })) };
 }

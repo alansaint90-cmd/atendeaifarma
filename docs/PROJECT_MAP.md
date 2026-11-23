@@ -6,7 +6,7 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 231 |
+| Arquivos TS/TSX | 232 |
 | Tabelas (Drizzle) | 45 |
 | Server Actions (arquivos) | 16 |
 | Rotas de API | 8 |
@@ -241,6 +241,7 @@ lib/
     apagar-conversa.ts
     atribuir-ia.ts
     consultas.ts
+    estado-ia.ts
     evento.ts
     excluir-contato.ts
     fotos.ts

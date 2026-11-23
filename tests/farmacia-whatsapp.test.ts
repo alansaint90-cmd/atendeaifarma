@@ -218,8 +218,15 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       try {
         process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
         const pix=await atender("Pix",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"pix",troco:"sim",valor:"50.00"}});
-        assert.deepEqual(pix.mensagens.slice(0,2),["pagamento@example.invalid","Valor do pedido: R$ 19,00."]);
+        assert.equal(pix.mensagens[0],"pagamento@example.invalid");
+        assert.match(pix.mensagens[1],/Valor do pedido: R\$ 19,00/);
         assert.match(pix.mensagens[2],/envie o comprovante/);
+        assert.deepEqual((await atender("kd a chave pix",{falhaProvedor:true})).mensagens,pix.mensagens);
+        delete process.env.FARMACIA_PIX_CHAVE;
+        const teste=await atender("Cadê a chave do Pix?",{falhaProvedor:true});
+        assert.match(teste.mensagens[0],/99999999.*Não faça uma transferência/);
+        assert.match(teste.mensagens[2],/comprovante de teste/);
+        process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
         assert.doesNotMatch((await atender("Já paguei",{falhaProvedor:true})).texto,/endereço/);
         const recibo=await atender("",{falhaProvedor:true},config,true);
         assert.match(recibo.mensagens[0],/conferir o comprovante/);assert.match(recibo.mensagens[1],/endereço/);

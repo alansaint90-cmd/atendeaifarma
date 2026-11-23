@@ -127,6 +127,11 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         const pg=pedido.etapa==="finalizar"?undefined:pagamentoSalvo(pedido.pagamento);
         const executarPagamento=(pagamento:unknown)=>atenderIntencao(banco,contexto,
           {acao:"pagamento",pedidoId:pedido.id,termo:"",itens:[],pagamento},m.identity);
+        if(forma==="pix"&&pg?.forma==="pix"&&["comprovante_pix","endereco_entrega"].includes(pedido.etapa??"")) {
+          return pedido.etapa==="comprovante_pix"
+            ?{mensagens:["A equipe já recebeu o comprovante para conferência.",perguntaEndereco]}
+            :"A equipe já recebeu o comprovante e o endereço.";
+        }
         if(forma)return await executarPagamento({forma});
         if(pg?.forma==="dinheiro"&&pedido.etapa==="pagamento") {
           if(pg.valor==="0.00"&&pg.troco!=="nao") {

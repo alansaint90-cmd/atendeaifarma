@@ -56,8 +56,8 @@ export function pagamentoSalvo(detalhe?:string|null) {
 }
 
 export function formaMencionada(texto:string):Pagamento["forma"]|undefined {
-  const normalizado=texto.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase().trim();
-  const chave= /^(?:(?:me (?:mande|envie)|qual(?: e)?)\s+)?(?:a\s+)?chave\s+(?:do\s+)?pix[\s?!.]*$/;
+  const normalizado=texto.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase().trim().replace(/\s+/g," ");
+  const chave=/^(?:(?:kd|cade|qual(?: e)?|(?:me )?(?:mande|envie|manda|passa|passe))\s+)?(?:a\s+)?chave\s+(?:(?:d[oe])\s+)?pix(?:[, ]+por favor)?[\s?!.:]*$/;
   if(chave.test(normalizado))return "pix";
   const pedido=/^(?:(?:quero|vou|prefiro|posso|pode ser|gostaria de)\s+(?:pagar\s+)?)?(?:(?:no|na|em|por|com|via)\s+)?(pix|dinheiro|cartao)(?:\s+(?:por favor|na entrega|de credito|de debito))?[\s?!.]*$/.exec(normalizado);
   return z.enum(["pix","dinheiro","cartao"]).safeParse(pedido?.[1]).data;
@@ -79,9 +79,14 @@ export function respostaPagamento(pg:Pagamento,total:string):{mensagens:string[]
   if(pg.forma==="pix") {
     const chave=process.env.FARMACIA_PIX_CHAVE?.trim();
     const recebedor=process.env.FARMACIA_PIX_RECEBEDOR?.trim();
-    return {mensagens:chave?[chave,`Valor do pedido: R$ ${total.replace(".",",")}.`,
-      `${recebedor?`Recebedor: ${recebedor}. `:""}Quando concluir o pagamento, envie o comprovante aqui para a equipe conferir.`]
-      :["Pagamento por Pix registrado. A equipe da farmácia vai informar a chave para pagamento."]};
+    const valor=`R$ ${total.replace(".",",")}`;
+    if(!chave)return {mensagens:[
+      "Pix de demonstração. Chave fictícia: 99999999. Não faça uma transferência.",
+      `Valor simulado do pedido: ${valor}. Aguardando pagamento simulado.`,
+      "Ao concluir a simulação, envie um comprovante de teste por aqui.",
+    ]};
+    return {mensagens:[chave,`Pagamento por Pix registrado. Valor do pedido: ${valor}. Aguardando pagamento.`,
+      `${recebedor?`Recebedor: ${recebedor}. `:""}Quando concluir o pagamento, envie o comprovante aqui para a equipe conferir.`]};
   }
   if(pg.forma==="cartao")return {mensagens:["O entregador levará a maquininha para você passar o cartão na hora da entrega.","Seu pedido está sendo preparado.",perguntaEndereco]};
   if(pg.troco==="pendente")return {mensagens:["O pagamento em dinheiro será feito na entrega. Você vai precisar de troco?"]};

@@ -17,6 +17,16 @@ function Tela() {
   return <CaixaEntrada conversas={conversas} selecionada={id} aoSelecionar={selecionar} atualizar={vi.fn()} resposta={<textarea aria-label="Responder"/>}/>;
 }
 
+test("mostra o estado da IA ao lado do nome e atualiza após assumir a conversa",()=>{
+  const props={selecionada:"a",aoSelecionar:vi.fn(),atualizar:vi.fn()};
+  const tela=render(<CaixaEntrada {...props} conversas={[{...conversas[0],estadoIa:"ativa"}]}/>);
+  const cabecalho=screen.getByRole("heading",{name:"Álvaro Silva"}).parentElement!;
+  expect(within(cabecalho).getByText("Atendimento com IA")).toBeInTheDocument();
+  tela.rerender(<CaixaEntrada {...props} conversas={[{...conversas[0],estadoIa:"humano"}]}/>);
+  expect(within(cabecalho).getByText("Atendimento humano")).toBeInTheDocument();
+  expect(within(cabecalho).queryByText("Atendimento com IA")).not.toBeInTheDocument();
+});
+
 test("notifica internamente a equipe e remove aviso ao assumir a conversa",()=>{
  const lista=conversas.map(c=>({...c,aguardaHumano:c.id==="a"}));
  const tela=render(<CaixaEntrada conversas={lista} selecionada="a" aoSelecionar={vi.fn()} atualizar={vi.fn()}/>);

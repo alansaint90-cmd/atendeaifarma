@@ -28,6 +28,16 @@
 .conversas-canal { font-size:10px; color:var(--muted); }
 .conversas-principal { min-width:0; min-height:0; display:flex; flex-direction:column; }
 .conversas-cabecalho { flex-shrink:0; }
+.conversas-titulo { display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-bottom:3px; }
+.conversas-titulo h2 { margin:0; }
+.conversas-titulo span.conversas-estado-ia {
+  max-width:100%; padding:3px 10px; border:1px solid var(--line); border-radius:999px;
+  color:var(--text); background:var(--bg); font-size:12px; font-weight:600; overflow-wrap:anywhere;
+}
+.conversas-titulo .conversas-estado-ia[data-estado=ativa] {
+  color:color-mix(in srgb,var(--marca-acao) 70%,var(--text));
+  background:color-mix(in srgb,var(--marca-acao) 9%,var(--surface));
+}
 .conversas-cabecalho > div:not(.conversas-menu) { flex:1; }
 .conversas-cabecalho .conversas-menu { margin-left:auto; flex-shrink:0; }
 .conversas-menu .fila-menu-botao { width:44px; height:44px; border:0; background:transparent; font-size:26px; color:var(--muted); cursor:pointer; }

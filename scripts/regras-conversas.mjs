@@ -3,7 +3,8 @@ export function regrasConversas(rel, content) {
   const regras = [
     ["src/lib/farmacia/agente.ts", [/normalizarPedido\(texto\)/, /etapa:"revisar"/, /candidatos.length!==1/, /if\(intencao.acao==="criar_pedido"\)/]],
     ["src/lib/farmacia/pedidos.ts", [/ajustarQuantidade\?i.quantidade/, /ultima\?\.tipo==="revisar"/, /itens_corrigidos/, /await travarEstoque\(tx\)/]],
-    ["src/lib/farmacia/pagamento.ts", [/comprovante_pix/, /endereco_entrega/, /travarEstoque\(tx\)/, /conversa_id=\$\{v.conversaId\}/, /await evento\(tx/, /FARMACIA_PIX_CHAVE/]],
+    ["src/lib/farmacia/pagamento.ts", [/comprovante_pix/, /endereco_entrega/, /travarEstoque\(tx\)/, /conversa_id=\$\{v.conversaId\}/, /await evento\(tx/, /FARMACIA_PIX_CHAVE/, /99999999\. Não faça uma transferência/]],
+    ["src/lib/operacao/estado-ia.ts", [/agentKeys.heartbeat/, /portas.pausada/, /conversa.assumida/, /instancias.includes/, /catch[\s\S]*indisponivel/]],
     ["src/lib/farmacia/configuracao-agente.ts", [/perguntarNome = false/, /openingMessages = undefined/, /Farmácia WE/]],
     ["src/lib/operacao/atribuir-ia.ts", [/z.strictObject/, /banco.transaction/, /FOR UPDATE OF c/, /ON CONFLICT DO NOTHING RETURNING id/, /mensagem_ia_registrada/, /version=\$\{conversa.version\}/, /if \(!origemId\) return/]],
     ["src/lib/farmacia/audio-historico.ts", [/autorizar\(tx, ator, "operador"\)/, /m.is_deleted=false AND c.is_deleted=false/, /configurarCanalManual/, /jsonLimitado/, /redirect: "error"/, /bytes.toString\("base64"\)/]],
