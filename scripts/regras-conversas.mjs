@@ -5,7 +5,7 @@ export function regrasConversas(rel, content) {
     ["src/lib/farmacia/foto-conversa.ts", [/autorizar\(tx,ator,"operador"\)/, /c.is_deleted=false AND ch.is_deleted=false AND p.is_deleted=false/, /configurarCanalManual/, /redirect:"error"/, /fotoHttps\(url\)/]],
     ["src/lib/farmacia/atendimento.ts", [/alterarPausaSchema=z.strictObject/, /c.version=\$\{dados.version\}/, /ai_resumed_at=CASE/, /ia_despausada_no_painel/]],
     ["src/lib/agent/pausa.ts", [/duracaoPausaManual > retomadaEm/, /aliasKey\(conversation\)/]],
-    ["src/lib/farmacia/agente.ts", [/normalizarPedido\(texto\)/, /etapa:"revisar"/, /candidatos.length!==1/, /if\(intencao.acao==="criar_pedido"\)/]],
+    ["src/lib/farmacia/agente.ts", [/normalizarPedido\(texto\)/, /etapa:"revisar"/, /candidatos.length!==1/, /if\(intencao.acao==="criar_pedido"\)/, /encerramentoSemAlteracao.test/, /forma==="cartao"&&pg\?\.forma==="cartao"/]],
     ["src/lib/farmacia/pedidos.ts", [/ajustarQuantidade\?i.quantidade/, /ultima\?\.tipo==="revisar"/, /itens_corrigidos/, /await travarEstoque\(tx\)/]],
     ["src/lib/farmacia/pagamento.ts", [/comprovante_pix/, /endereco_entrega/, /destinatario_entrega/, /dados.temEndereco/, /travarEstoque\(tx\)/, /conversa_id=\$\{v.conversaId\}/, /await evento\(tx/, /FARMACIA_PIX_CHAVE/, /99999999\. Não faça transferência/, /comprovante de teste/]],
     ["src/lib/operacao/estado-ia.ts", [/agentKeys.heartbeat/, /portas.pausada/, /conversa.assumida/, /instancias.includes/, /catch[\s\S]*indisponivel/]],

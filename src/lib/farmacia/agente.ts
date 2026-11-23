@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
 import { personaDoAgente } from "../agent/nome";
 import { registrarEtapaPedido, respostaPagamento, respostaPixSemPedido, pagamentoSalvo, formaMencionada, enderecoInformado, destinatarioInformado,
-  perguntaEndereco, perguntaDestinatario, comPerguntaEntrega, podeColetarEntrega, valorParaTroco } from "./pagamento";
+  perguntaEndereco, perguntaDestinatario, comPerguntaEntrega, podeColetarEntrega, valorParaTroco, ReservaDoPedidoInvalida, marcosFinalizacao } from "./pagamento";
 import { continuidadeDaConsulta, conviteContinuarPedido, descricaoComercial } from "./continuidade";
 import { NOME_FARMACIA } from "./configuracao-agente";
 const sistema={sistema:true} as const;
@@ -43,13 +43,18 @@ async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMess
   const pedidos=linhas<ContextoFarmacia["pedidos"][number]>(await banco.execute(sql`SELECT p.id,p.numero,p.status,
     to_char(p.updated_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') "atualizadoEm",
     (SELECT tipo FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.is_deleted=false
-      AND e.tipo NOT IN ('endereco_entrega','destinatario_entrega') ORDER BY e.created_at DESC,e.id DESC LIMIT 1) etapa,
+      AND e.tipo NOT IN ('endereco_entrega','destinatario_entrega','adicionar')
+      AND (e.tipo<>'reservar' OR compra.tipo IS DISTINCT FROM 'finalizar')
+      ORDER BY e.created_at DESC,e.id DESC LIMIT 1) etapa,
     EXISTS(SELECT 1 FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.tipo='endereco_entrega' AND e.is_deleted=false) "temEndereco",
     EXISTS(SELECT 1 FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.tipo='destinatario_entrega' AND e.is_deleted=false) "temDestinatario",
     EXISTS(SELECT 1 FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.tipo='destinatario_entrega'
       AND e.chave=${`fluxo:${m.identity}`} AND e.is_deleted=false) "destinatarioNestaMensagem",
     (SELECT detalhe FROM atendeia_pedidos_eventos e WHERE e.pedido_id=p.id AND e.tipo='pagamento' AND e.is_deleted=false ORDER BY e.created_at DESC,e.id DESC LIMIT 1) pagamento
-    FROM atendeia_pedidos p WHERE p.conversa_id=${c.id} AND p.is_deleted=false ORDER BY p.created_at DESC,p.id LIMIT 10`));
+    FROM atendeia_pedidos p
+    LEFT JOIN LATERAL (SELECT tipo FROM atendeia_pedidos_eventos WHERE pedido_id=p.id AND is_deleted=false
+      AND ${marcosFinalizacao} ORDER BY created_at DESC,id DESC LIMIT 1) compra ON true
+    WHERE p.conversa_id=${c.id} AND p.is_deleted=false ORDER BY p.created_at DESC,p.id LIMIT 10`));
   return {conversaId:c.id,contatoId:c.contato_id,produtos,pedidos};
 }
 export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,intencao:unknown,identidade:string,ajustarQuantidade=false):Promise<RespostaGerada> {
@@ -104,6 +109,9 @@ function pedidoEmPagamento(contexto:ContextoFarmacia) {
   return pendentes.length===1?pendentes[0]:undefined;
 }
 
+const entregaRegistrada="Certo! Os dados de entrega já estão registrados e a equipe vai dar continuidade ao pedido.";
+const encerramentoSemAlteracao=/^(?:ok(?:[, ]+(?:obrigad[oa]|valeu))?|okay|certo|beleza|obrigad[oa]|valeu|tudo certo|so (?:isso|esse mesmo|essa mesma|quero esse mesmo|quero essa mesma)|nao(?:[, ]+(?:so isso|so esse mesmo|so essa mesma))?)$/;
+
 export async function responderComprovanteFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage):Promise<RespostaGerada|null> {
   if(!m.midia)return null;
   const contexto=await contextoDaConversa(banco,instancia,m);
@@ -129,6 +137,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
       const pedido=pedidoEmPagamento(contexto);
       const forma=formaMencionada(texto);
       if(forma==="pix"&&!pedido)return respostaPixSemPedido();
+      if(forma==="cartao"&&!pedido)return "O pagamento com cartão pode ser feito na entrega, com maquininha. A equipe pode confirmar essa opção no seu pedido.";
       if(pedido) {
         const pg=pedido.etapa==="finalizar"?undefined:pagamentoSalvo(pedido.pagamento);
         const executarPagamento=(pagamento:unknown)=>atenderIntencao(banco,contexto,
@@ -136,10 +145,13 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         if(forma==="pix"&&pg?.forma==="pix"&&pedido.etapa==="comprovante_pix") {
           return comPerguntaEntrega(["A equipe já recebeu o comprovante para conferência."],pedido);
         }
+        if(forma==="cartao"&&pg?.forma==="cartao") {
+          return comPerguntaEntrega(["O pagamento com cartão na entrega já está registrado. O entregador leva a maquininha."],pedido);
+        }
         if(forma) {
           try { return await executarPagamento({forma}); }
           catch(erro) {
-            if(forma==="pix"&&erro instanceof ErroDeNegocio)return respostaPixSemPedido();
+            if(forma==="pix"&&erro instanceof ErroDeNegocio&&!(erro instanceof ReservaDoPedidoInvalida))return respostaPixSemPedido();
             throw erro;
           }
         }
@@ -151,6 +163,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
           const valor=valorParaTroco(texto);
           if(pg.troco!=="nao"&&valor)return await executarPagamento({forma:"dinheiro",troco:"sim",valor});
         }
+        if(pedido.temEndereco&&pedido.temDestinatario&&encerramentoSemAlteracao.test(textoNormal))return entregaRegistrada;
         const coletarEntrega=podeColetarEntrega(pg,pedido.etapa==="comprovante_pix");
         if(coletarEntrega&&enderecoInformado(texto)) {
           await registrarEtapaPedido(banco,{id:pedido.id,conversaId:contexto.conversaId,chave:m.identity,etapa:"endereco_entrega",endereco:texto});
@@ -185,6 +198,14 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         return await atenderIntencao(banco,contexto,{acao:"criar_pedido",pedidoId:pendentes[0]?.id??"",termo:"",itens:[{produtoId:candidatos[0].id,quantidade}]},m.identity,!acrescentar&&pendentes.length===1);
       }
       const intencao=await interpretarIntencao(config,historico,texto,contexto,request);
+      if(pedido?.temEndereco&&pedido.temDestinatario&&intencao.acao==="pagamento")return entregaRegistrada;
+      if(pedido&&(intencao.acao==="adicionar"||intencao.acao==="finalizar")) {
+        if(/^(?:(?:eu )?(?:quero|gostaria de|posso) )?(?:adicionar|acrescentar|incluir)(?: (?:algo|mais alguma coisa|mais um item))?$/.test(textoNormal)) {
+          return "Qual produto você deseja acrescentar ao pedido?";
+        }
+        if(pedido.temEndereco&&pedido.temDestinatario)return entregaRegistrada;
+        return "O pedido continua registrado. Você quer alterar algum item ou conferir o andamento?";
+      }
       if(intencao.acao==="criar_pedido") {
         const pergunta=/^(?:voces? )?(?:tem disponivel|tem|ha|quanto custa|qual (?:e )?o preco d[oa]|consultar)\s+(.+)$/.exec(textoNormal);
         if(pergunta&&pergunta[1].length>=2)return consultar(pergunta[1]);
@@ -202,6 +223,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
       if(intencao.acao==="humano"&&config.atendimento?.transferHuman===false)return "Essa solicitação precisa da avaliação da equipe da farmácia. O encaminhamento automático está indisponível neste canal; procure o atendimento da farmácia para continuar.";
       return await atenderIntencao(banco,contexto,intencao,m.identity);
     }catch(e){
+      if(e instanceof ReservaDoPedidoInvalida)return e.message;
       if(e instanceof ErroDeNegocio)return `${e.message} Nossa equipe pode ajudar a concluir o atendimento.`;
       return "Não consegui consultar o sistema agora. Não posso confirmar preço, disponibilidade ou pedido. Tente novamente ou solicite atendimento humano.";
     }

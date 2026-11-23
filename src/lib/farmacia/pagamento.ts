@@ -12,6 +12,13 @@ export const perguntaEndereco = "Qual é o endereço da entrega? Envie rua, núm
 export const perguntaDestinatario = "Qual é o nome de quem vai receber o remédio?";
 
 export interface DadosEntrega { temEndereco?:boolean; temDestinatario?:boolean }
+// Renovar a reserva do mesmo carrinho não desfaz a finalização dos itens.
+export const marcosFinalizacao = sql`tipo IN ('finalizar','itens_acrescentados','itens_corrigidos','revisar')`;
+export class ReservaDoPedidoInvalida extends ErroDeNegocio {
+  constructor() {
+    super("A reserva do seu pedido não está mais válida. A equipe precisa reconfirmar a disponibilidade antes de continuar.");
+  }
+}
 
 export function comPerguntaEntrega(mensagens:string[],dados:DadosEntrega) {
   const pergunta=dados.temEndereco?(dados.temDestinatario?undefined:perguntaDestinatario):perguntaEndereco;
@@ -48,10 +55,10 @@ export async function registrarEtapaPedido(banco:BancoSql,entrada:unknown) {
     if(repetido){if(repetido.tipo!==v.etapa||repetido.detalhe!==detalhe)throw new ErroDeNegocio("Operação já utilizada com outros dados.");return p.total;}
     if(v.etapa==="finalizar"||v.etapa==="pagamento") {
       const invalidos=linhas(await tx.execute(sql`SELECT i.id FROM atendeia_pedidos_itens i WHERE i.pedido_id=${v.id} AND i.is_deleted=false AND i.quantidade<>(SELECT coalesce(sum(r.quantidade),0) FROM atendeia_pedidos_reservas r JOIN atendeia_produtos_lotes l ON l.id=r.lote_id JOIN atendeia_produtos p ON p.id=l.produto_id WHERE r.pedido_id=i.pedido_id AND p.id=i.produto_id AND ${reservaAtiva} AND ${elegivel})`));
-      if(invalidos.length)throw new ErroDeNegocio("Preciso reconfirmar a disponibilidade dos itens com a equipe antes de continuar.");
+      if(invalidos.length)throw new ReservaDoPedidoInvalida();
     }
     if(v.etapa==="pagamento") {
-      const [finalizado]=linhas<{tipo:string}>(await tx.execute(sql`SELECT tipo FROM atendeia_pedidos_eventos WHERE pedido_id=${v.id} AND tipo IN ('finalizar','reservar','itens_acrescentados','adicionar') AND is_deleted=false ORDER BY created_at DESC,id DESC LIMIT 1`));
+      const [finalizado]=linhas<{tipo:string}>(await tx.execute(sql`SELECT tipo FROM atendeia_pedidos_eventos WHERE pedido_id=${v.id} AND ${marcosFinalizacao} AND is_deleted=false ORDER BY created_at DESC,id DESC LIMIT 1`));
       if(finalizado?.tipo!=="finalizar")throw new ErroDeNegocio("Conclua a escolha dos itens antes do pagamento.");
       const pg=pagamentoSchema.parse(v.pagamento);
       if(pg.forma!=="dinheiro"&&(pg.troco!=="pendente"||pg.valor!=="0.00"))throw new ErroDeNegocio("Troco só se aplica ao pagamento em dinheiro.");
@@ -60,7 +67,7 @@ export async function registrarEtapaPedido(banco:BancoSql,entrada:unknown) {
     }
     if(v.etapa==="comprovante_pix"||v.etapa==="endereco_entrega"||v.etapa==="destinatario_entrega") {
       const [ultimo]=linhas<{tipo:string;detalhe:string}>(await tx.execute(sql`SELECT tipo,detalhe FROM atendeia_pedidos_eventos
-        WHERE pedido_id=${v.id} AND is_deleted=false AND tipo IN ('finalizar','reservar','itens_acrescentados','adicionar','pagamento','comprovante_pix')
+        WHERE pedido_id=${v.id} AND is_deleted=false AND (${marcosFinalizacao} OR tipo IN ('pagamento','comprovante_pix'))
         ORDER BY created_at DESC,id DESC LIMIT 1`));
       const pg=ultimo?.tipo==="pagamento"?pagamentoSalvo(ultimo.detalhe):undefined;
       const permitido=v.etapa==="comprovante_pix"?pg?.forma==="pix":podeColetarEntrega(pg,ultimo?.tipo==="comprovante_pix");
@@ -85,6 +92,8 @@ export function formaMencionada(texto:string):Pagamento["forma"]|undefined {
   const normalizado=texto.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase().trim().replace(/\s+/g," ");
   const chave=/^(?:(?:kd|cade|qual(?: e)?|(?:me )?(?:mande|envie|manda|passa|passe))\s+)?(?:a\s+)?chave\s+(?:(?:d[oe])\s+)?pix(?:[, ]+por favor)?[\s?!.:;]*$/;
   if(chave.test(normalizado))return "pix";
+  const maquininha=/^(?:(?:(?:voces?|o entregador|o motoboy)\s+)?(?:pode\s+)?(?:traz(?:er|em)?|leva(?:r|m)?|manda(?:r)?|envia(?:r)?)\s+(?:a\s+|uma\s+)?|(?:quero|preciso de|tem)\s+(?:a\s+|uma\s+)?)?maquininha(?:\s+(?:de cartao|na entrega))?(?:[, ]+por favor)?[\s?!.]*$/;
+  if(maquininha.test(normalizado))return "cartao";
   const pedido=/^(?:(?:quero|vou|prefiro|posso|pode ser|gostaria de)\s+(?:pagar\s+)?)?(?:(?:no|na|em|por|com|via)\s+)?(pix|dinheiro|cartao)(?:\s+(?:por favor|na entrega|de credito|de debito))?[\s?!.]*$/.exec(normalizado);
   return z.enum(["pix","dinheiro","cartao"]).safeParse(pedido?.[1]).data;
 }

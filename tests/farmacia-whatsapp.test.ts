@@ -15,6 +15,7 @@ import { salvarChatbotServidor, chatbotDaInstancia } from "../src/lib/chatbots/s
 import { criarChatbotFarmacia, promptAtendimentoFarmacia } from "../src/lib/farmacia/prompt";
 import { consultaEstoqueFarmacia, geradorFarmacia, responderComprovanteFarmacia } from "../src/lib/farmacia/agente";
 import { consultarOperacao } from "../src/lib/operacao/consultas";
+import { executarPedido } from "../src/lib/farmacia/pedidos";
 import { salvarProduto, entradaEstoque, consultarProdutos } from "../src/lib/farmacia/catalogo";
 import { alterarPausaIa, assumirConversa, estadoPausaIa } from "../src/lib/farmacia/atendimento";
 import type { ProdutoEntrada } from "../src/lib/farmacia/validacao";
@@ -244,13 +245,25 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const endereco=await atender("Rua Teste, 12, Centro",{falhaProvedor:true});
       assert.equal(endereco.mensagens[0],"Endereço registrado.");
       assert.match(endereco.mensagens[1],/nome de quem vai receber/);
-      const cartao=await atender("Prefiro cartão", {falhaProvedor:true});
+      const cartao=await atender("Pode trazer a maquininha?", {acao:"humano"});
       assert.equal(cartao.mensagens.length,3);assert.match(cartao.mensagens[0],/maquininha/);
       assert.match(cartao.mensagens[1],/sendo preparado/);assert.match(cartao.mensagens[2],/nome de quem vai receber/);
       assert.doesNotMatch(cartao.texto,/Qual é o endereço/);
       assert.match((await atender("Marina de Souza",{falhaProvedor:true})).texto,/Nome de quem vai receber registrado/);
       const destinatarios=await cliente.query<{detalhe:string}>("SELECT detalhe FROM atendeia_pedidos_eventos WHERE pedido_id=$1 AND tipo='destinatario_entrega' AND is_deleted=false",[p.id]);
       assert.deepEqual(destinatarios.rows.map(e=>e.detalhe),["Marina de Souza"]);
+      const contarEventos=async()=>(await cliente.query<{total:number}>("SELECT count(*)::int total FROM atendeia_pedidos_eventos WHERE pedido_id=$1 AND is_deleted=false",[p.id])).rows[0].total;
+      const eventosDaEntrega=await contarEventos();
+      const transferenciasAntes=transferencias;
+      const maquininha=await atender("Pode trazer a maquininha?",{acao:"humano"});
+      assert.match(maquininha.texto,/cartão na entrega já está registrado.*maquininha/s);
+      for(const texto of ["Ok","Só quero esse mesmo","Ok, pode seguir"]) {
+        const resposta=await atender(texto,{acao:texto==="Só quero esse mesmo"?"finalizar":"adicionar",pedidoId:p.id});
+        assert.match(resposta.texto,/dados de entrega já estão registrados/);
+        assert.doesNotMatch(resposta.texto,/disponibilidade|acrescentar|confirme/i);
+      }
+      assert.equal(await contarEventos(),eventosDaEntrega);
+      assert.equal(transferencias,transferenciasAntes);
       const chaveAnterior=process.env.FARMACIA_PIX_CHAVE;
       try {
         process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
@@ -283,6 +296,16 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.doesNotMatch((await atender("Como está meu pedido?",{acao:"consultar_pedido",pedidoId:p.id})).texto,new RegExp(`${p.numero}|válida até`));
       assert.equal((await consultarProdutos(banco,admin,{termo:"DIP-30-TESTE"})).produtos[0].fisico,28);
       assert.equal((await cliente.query<{status:string}>("SELECT status FROM atendeia_pedidos WHERE id=$1",[p.id])).rows[0].status,"aguardando_pagamento");
+      await cliente.query("UPDATE atendeia_pedidos_reservas SET expira_em=now()-interval '1 minute' WHERE pedido_id=$1 AND is_deleted=false",[p.id]);
+      const eventosAntesDaTroca=await contarEventos();
+      const vencida=await atender("Pode trazer a maquininha?",{acao:"humano"});
+      assert.match(vencida.texto,/reserva do seu pedido não está mais válida/);
+      assert.doesNotMatch(vencida.texto,/sendo preparado|não tenho essa resposta/i);
+      assert.equal(await contarEventos(),eventosAntesDaTroca);
+      await executarPedido(banco,admin,{id:p.id,acao:"reservar",chave:randomUUID()});
+      const recuperada=await atender("Pode trazer a maquininha?",{acao:"humano"});
+      assert.match(recuperada.texto,/levará a maquininha/);
+      assert.doesNotMatch(recuperada.texto,/Qual é o endereço|nome de quem vai receber|reconfirmar/);
     });
   } finally {await cliente.close();}
 });
