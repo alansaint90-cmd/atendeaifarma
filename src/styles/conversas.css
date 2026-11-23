@@ -101,3 +101,6 @@
   .pagina-conversas .conversas-caixa { height:max(440px,calc(100dvh - 250px)); }
   .sidebar-collapsed .pagina-conversas .conversas-caixa { height:max(440px,calc(100dvh - 190px)); }
 }
+.conversas-audio { width:280px; max-width:100%; }
+.conversas-audio audio { display:block; width:100%; max-width:100%; height:40px; }
+.conversas-audio button { text-decoration:underline; padding:6px 0; font:inherit; }

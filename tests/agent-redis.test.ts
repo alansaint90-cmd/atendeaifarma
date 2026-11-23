@@ -52,7 +52,7 @@ test("Redis real: espera de estoque retoma sem reenvio e permite atender outro c
   }
 });
 
-test("ecos dos dois balões da abertura não pausam a IA", { skip: !process.env.TEST_REDIS_URL }, async () => {
+test("ecos dos dois balões da resposta não pausam a IA", { skip: !process.env.TEST_REDIS_URL }, async () => {
   const url = process.env.TEST_REDIS_URL!; const alvo = new URL(url);
   assert.ok(["localhost", "127.0.0.1"].includes(alvo.hostname) && alvo.pathname === "/15");
   const client = agentRedis(url); await client.connect();
@@ -65,7 +65,7 @@ test("ecos dos dois balões da abertura não pausam a IA", { skip: !process.env.
     await runAgentTick({ settings: async () => ({ AI_ENABLED: "true", OPENAI_API_KEY: "sk-test-only", OPENAI_MODEL: "modelo",
       EVOLUTION_API_URL: "https://example.invalid", EVOLUTION_API_KEY: "teste", EVOLUTION_INSTANCE_NAME: instancia, REDIS_URL: url }),
     chatbot: async () => ({ ...chatbotExample, context: "Prompt", openingMessages: ["Bem-vindo.", "Qual seu nome?"] }),
-    registrarEnvio: async () => {}, generate: async () => { throw new Error("Não gerar abertura"); },
+    registrarEnvio: async () => {}, generate: async () => ({ mensagens: ["Bem-vindo.", "Qual produto procura?"] }),
     send: async () => { const id = randomUUID(); ids.push(id); return id; } });
     assert.equal(ids.length, 2);
     for (const id of ids) await enqueueEvolutionEventWithClient(client, evento(id, true));

@@ -3,7 +3,7 @@ import { linhas, type BancoSql } from "../db/porta";
 import { LIMITE_CONTATOS } from "./limites";
 
 export interface ContatoOperacional { id: string; version: number; nome: string; telefone: string | null; email: string | null; origem: string | null; status: string }
-export interface MensagemOperacional { id: string; conteudo: string | null; direcao: string; instante: string }
+export interface MensagemOperacional { id: string; conteudo: string | null; direcao: string; instante: string; tipo?: string; audioDisponivel?: boolean }
 export interface ConversaOperacional { id: string; version: number; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; fotoUrl?: string | null; mensagens: MensagemOperacional[] }
 export interface ResumoOperacional {
   abertas: number; pendentes: number; qualificados: number; taxaResposta: number; totalContatos: number;
@@ -38,7 +38,8 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
       WHERE c.is_deleted=false AND p.is_deleted=false AND ch.is_deleted=false ORDER BY c.last_message_at DESC NULLS LAST,c.id LIMIT 50`));
     const historicos: ConversaOperacional[] = [];
     for (const conversa of conversas) {
-      const mensagens = linhas<MensagemOperacional>(await tx.execute(sql`SELECT id,content conteudo,direction direcao,
+      const mensagens = linhas<MensagemOperacional>(await tx.execute(sql`SELECT id,content conteudo,direction direcao,message_type tipo,
+        (message_type='audio' AND provider_message_id IS NOT NULL) "audioDisponivel",
         to_char(sent_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') instante FROM atendeia_messages
         WHERE conversation_id=${conversa.id} AND is_deleted=false ORDER BY sent_at DESC,created_at DESC,id LIMIT 50`)).reverse();
       historicos.push({ id: conversa.id, version: conversa.version, nome: conversa.nome, telefone: conversa.telefone, canal: conversa.canal, status: conversa.status, aguardaHumano: conversa.aguardaHumano, fotoUrl: conversa.fotoUrl, mensagens });

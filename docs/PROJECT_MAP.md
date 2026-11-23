@@ -6,12 +6,12 @@
 
 | Metrica | Total |
 |---------|-------|
-| Arquivos TS/TSX | 227 |
+| Arquivos TS/TSX | 231 |
 | Tabelas (Drizzle) | 45 |
 | Server Actions (arquivos) | 16 |
-| Rotas de API | 7 |
+| Rotas de API | 8 |
 | Paginas | 5 |
-| Componentes | 41 |
+| Componentes | 42 |
 
 ## Arvore (profundidade 3)
 
@@ -60,6 +60,7 @@ components/
     paciente-form.tsx
     page.tsx
   conversas/
+    audio-mensagem.tsx
     avatar.tsx
     caixa-entrada.tsx
   farmacia/
@@ -209,10 +210,12 @@ lib/
     campanhas/
     agente.ts
     atendimento.ts
+    audio-historico.ts
     cadastro.ts
     canal-manual.ts
     catalogo.ts
     comum.ts
+    configuracao-agente.ts
     consultas.ts
     continuidade.ts
     crm.ts
@@ -427,6 +430,7 @@ _(colunas nao detectadas)_
 | `/api/auth/login` | POST |
 | `/api/auth/passkey` | POST |
 | `/api/farmacia/[recurso]` | GET, POST |
+| `/api/farmacia/audio/[id]` | GET |
 | `/api/settings/agent` | GET |
 | `/api/settings/evolution-webhook` | POST |
 | `/api/settings/integrations` | GET, PUT |

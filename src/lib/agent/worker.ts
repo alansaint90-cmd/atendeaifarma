@@ -3,7 +3,8 @@ import { z } from "zod";
 import { effectiveSettings } from "../settings/repository";
 import { evolutionEventSchema } from "../evolution/schema";
 import { streamKey } from "../evolution/queue";
-import { agentBaseConfigSchema, configurarAgente as configurarBase } from "./config";
+import { agentBaseConfigSchema } from "./config";
+import { configurarAgenteFarmacia as configurarAgente } from "../farmacia/configuracao-agente";
 import { consultaEstoqueFarmacia, geradorFarmacia } from "../farmacia/agente";
 import { atendimentoHumanoAtivo } from "../farmacia/atendimento";
 import { incomingMessage, digest } from "./message";
@@ -19,18 +20,13 @@ import { executarAgendamentos } from "../agendamentos/worker";
 import { executarCampanhas } from "../farmacia/campanhas/worker";
 import { chatbotDaInstancia } from "../chatbots/server-repository";
 import { db } from "../db/client";
-import { registrarEnvioIa } from "../operacao/atribuir-ia";
+import { registrarEnvioIa, type MensagemConfirmadaIa } from "../operacao/atribuir-ia";
 import { pausaManualAtiva, pausarTransferencia } from "./pausa";
 import { transferirAtendimento } from "../operacao/transferir";
 import { deveAguardarResposta } from "./espera";
 import { conversaApagadaAposMensagem } from "../operacao/apagar-conversa";
 
 const streamResult = z.array(z.tuple([z.string(), z.array(z.tuple([z.string(), z.array(z.string())]))]));
-const configurarAgente = (...args: Parameters<typeof configurarBase>) => {
-  const resultado = configurarBase(...args);
-  if (resultado.success) resultado.data.agendaConsultas = false;
-  return resultado;
-};
 let started = false;
 let lastLog = "";
 function report(status: string) {
@@ -41,7 +37,7 @@ const dependenciasPadrao = { settings: effectiveSettings, generate: generateRepl
   apagada: (instancia: string, numero: string, instante: number, identidade: string) => conversaApagadaAposMensagem(db(), instancia, numero, instante, identidade),
   transferir: (instancia: string, numero: string, destino: string, motivo?: "estoque_indisponivel") => transferirAtendimento(db(), instancia, numero, destino, motivo),
   consultarEstoque: (instancia: string, mensagem: Parameters<typeof consultaEstoqueFarmacia>[2], termo: string, continuidade?: ContinuidadeEstoque) => consultaEstoqueFarmacia(db(), instancia, mensagem)(termo, continuidade),
-  registrarEnvio: (instancia: string, id: string) => registrarEnvioIa(db(), instancia, id),
+  registrarEnvio: (instancia: string, id: string, mensagem?: MensagemConfirmadaIa) => registrarEnvioIa(db(), instancia, id, mensagem),
   chatbot: (instancia: string) => chatbotDaInstancia(db(), instancia) };
 export async function runAgentTick(substituicoes: Partial<typeof dependenciasPadrao> = {}) {
   const dependencies = { ...dependenciasPadrao, ...substituicoes,
@@ -97,9 +93,9 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
           : await pausaManualAtiva(client, message.conversation) ? "pausa_manual" : await processMessage(message, config.data, {
           ...store, generate: substituicoes.generate ?? geradorFarmacia(db(), instancia, message), send: dependencies.send, transcribe: transcribeAudio,
           consultarEstoque: (termo, continuidade) => dependencies.consultarEstoque(instancia, message, termo, continuidade),
-          registrarParte: async id => {
+          registrarParte: async (id, texto) => {
             await followups.outgoing(instancia, id);
-            await dependencies.registrarEnvio(instancia, id);
+            await dependencies.registrarEnvio(instancia, id, texto ? { numero: message.number, texto, origem: { identidade: message.identity, instante: message.timestamp } } : undefined);
           },
           transferir: async (destino, motivo) => {
             await dependencies.transferir(instancia, message.number, destino, motivo);
@@ -159,6 +155,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
         send: (number, text) => dependencies.send(config.data, number, text),
         delivered: async (id, text) => {
           await followups.outgoing(config.data.EVOLUTION_INSTANCE_NAME, id);
+          await dependencies.registrarEnvio(instancia, id, { numero: job.number, texto: text, origem: { identidade: job.identity, instante: job.started / 1000 } });
           await followups.history(job, text, digest(config.data.AI_SYSTEM_PROMPT));
         },
       });

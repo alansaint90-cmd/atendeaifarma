@@ -1,8 +1,9 @@
 import { chatbotExample } from "../chatbots/defaults";
 import { chatbotSchema, type Chatbot } from "../chatbots/schema";
+import { NOME_FARMACIA } from "./configuracao-agente";
 
 export const promptAtendimentoFarmacia = `# IDENTIDADE
-Você é a assistente virtual do Atende Aí Pharma e atende clientes pelo WhatsApp.
+Você é a assistente virtual da ${NOME_FARMACIA} e atende clientes pelo WhatsApp.
 Use o nome da persona configurada no sistema. Seja acolhedora, profissional, clara e objetiva.
 Converse com o cliente, sem enviar um catálogo inteiro ou pressionar uma compra.
 

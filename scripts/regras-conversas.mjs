@@ -1,6 +1,10 @@
 /** Exclusão visual usa o schema ativo e não pode contornar versão, papel ou auditoria. */
 export function regrasConversas(rel, content) {
   const regras = [
+    ["src/lib/farmacia/configuracao-agente.ts", [/perguntarNome = false/, /openingMessages = undefined/, /Farmácia WE/]],
+    ["src/lib/operacao/atribuir-ia.ts", [/z.strictObject/, /banco.transaction/, /FOR UPDATE OF c/, /ON CONFLICT DO NOTHING RETURNING id/, /mensagem_ia_registrada/, /version=\$\{conversa.version\}/, /if \(!origemId\) return/]],
+    ["src/lib/farmacia/audio-historico.ts", [/autorizar\(tx, ator, "operador"\)/, /m.is_deleted=false AND c.is_deleted=false/, /configurarCanalManual/, /jsonLimitado/, /redirect: "error"/, /bytes.toString\("base64"\)/]],
+    ["src/app/api/farmacia/audio/[id]/route.ts", [/administradorHttp\("operador"\)/, /private, no-store/, /nosniff/]],
     ["src/lib/operacao/excluir-contato.ts", [/z.strictObject/, /autorizar\(tx, sessao, "admin"\)/, /banco.transaction/, /travarTelefoneContato\(tx, identidade.telefone\)/, /FOR UPDATE/, /version=\$\{dados.version\}/, /marcaDeExclusao\(autor\)/, /e.status='enviando'/, /INSERT INTO atendeia_audit_logs/]],
     ["src/components/operacao/acoes-contato.tsx", [/ModalConfirmacaoBlock/, /definirConfirmacao\(\{ id, version \}\)/, /executando.current/, /Excluir contato/]],
     ["src/lib/operacao/apagar-conversa.ts", [/z.strictObject/, /autorizar\(tx, sessao, "admin"\)/, /banco.transaction/, /FOR UPDATE/, /version=\$\{dados.version\}/, /marcaDeExclusao\(autor\)/, /status='enviando'/, /INSERT INTO atendeia_audit_logs/]],

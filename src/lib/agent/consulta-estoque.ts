@@ -27,7 +27,7 @@ export async function processarConsultaEstoque(message: IncomingMessage, config:
     await salvar({ ...estado, status: "enviando" });
     try {
       const id = await port.send(config, message.number, texto);
-      await port.registrarParte?.(id);
+      await port.registrarParte?.(id, texto);
       // Só o chamador confirma a próxima etapa, junto com o ID desta saída.
       estado = { ...estado, providerId: id, providerIds: [...(estado.providerIds ?? []), id] };
       return null;

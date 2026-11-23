@@ -24,7 +24,7 @@ export interface ProcessingPort {
   cadastroConsulta?(texto: string, iniciar: boolean): Promise<string | null>;
   generate(config: AgentConfig, history: Turn[], text: string): Promise<RespostaGerada>;
   send(config: AgentConfig, number: string, text: string): Promise<string>;
-  registrarParte?(id: string): Promise<void>;
+  registrarParte?(id: string, texto?: string): Promise<void>;
 }
 
 export async function processMessage(message: IncomingMessage, config: AgentConfig, port: ProcessingPort): Promise<string> {
@@ -140,7 +140,7 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
     if (state.transferencia) await port.transferir!(config.atendimento!.destination);
     try {
       state.providerId = await port.send(config, message.number, partes[indice]);
-      await port.registrarParte?.(state.providerId);
+      await port.registrarParte?.(state.providerId, partes[indice]);
     } catch (error) {
       await port.write({ ...state, status: "incerta", code: error instanceof ProviderError ? error.code : "envio_incerto" });
       return "incerta";

@@ -72,6 +72,7 @@ function ListaOperacionalPage({ rota, podeApagarConversa, podeExcluirContato }: 
           <tbody>{dados.contatos.map(contato => <tr key={contato.id}><td>{contato.nome}</td><td>{contato.telefone || "—"}</td><td>{contato.email || "—"}</td><td>{contato.origem || "—"}</td><td>{contato.status}</td>{podeExcluirContato&&<td><AcoesContato id={contato.id} version={contato.version} nome={contato.nome} excluir={excluir}/></td>}</tr>)}</tbody></table></div>
           : <p>Nenhum contato cadastrado. Aguardando mensagens reais.</p>}</article>}
       {rota === "inbox" && <CaixaEntrada conversas={dados.conversas} selecionada={conversa?.id ?? ""} aoSelecionar={selecionar} atualizar={() => void carregar()} atualizando={ocupado}
+        fonteAudio={id => `/api/farmacia/audio/${encodeURIComponent(id)}`}
         acoesConversa={podeApagarConversa && conversa && <AcoesConversa key={conversa.id} id={conversa.id} version={conversa.version} nome={conversa.nome} apagar={apagar} />}
         resposta={conversa && <AtendimentoManual key={conversa.id} id={conversa.id} atualizar={() => void carregar()} />} />}
     </>}

@@ -8,7 +8,7 @@ import { systemUserId } from "../src/lib/db/bootstrap";
 import { receiveEvolutionEvent } from "../src/lib/evolution/webhook";
 import { receberOperacao } from "../src/lib/operacao/receber";
 import { incomingMessage } from "../src/lib/agent/message";
-import { configurarAgente } from "../src/lib/agent/config";
+import { configurarAgenteFarmacia as configurarAgente } from "../src/lib/farmacia/configuracao-agente";
 import { processMessage, type DeliveryState } from "../src/lib/agent/processor";
 import { sendReply, type Turn } from "../src/lib/agent/providers";
 import { salvarChatbotServidor, chatbotDaInstancia } from "../src/lib/chatbots/server-repository";
@@ -143,6 +143,7 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.equal(r.texto,"Qual concentração você procura?");
       const saudacao=await atender("Oi",{acao:"saudacao"});
       assert.match(saudacao.texto,/Assistente Atende Aí, assistente virtual/);
+      assert.match(saudacao.texto,/Farmácia WE/);assert.doesNotMatch(saudacao.texto,/qual.*seu nome/i);
     });
     await t.test("atendente humano pausa a resposta automática antes de consultar a IA",async()=>{
       const conversa=(await cliente.query<{id:string}>("SELECT id FROM atendeia_conversations WHERE remote_jid=$1",[`${numero}@s.whatsapp.net`])).rows[0].id;

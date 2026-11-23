@@ -42,6 +42,18 @@ test("exclusão entre partes desativa a continuação e libera o evento sem repe
   await runAgentTick(dependencias());
   expect(d.arquivar.mock.calls[0].at(-1)).toBe("conversa_apagada"); expect(d.followups.schedule).not.toHaveBeenCalled();
 });
+
+test("worker registra cada balão confirmado com texto e telefone sem pedir o nome", async () => {
+  const portas = dependencias();
+  portas.chatbot = async () => ({ ...chatbotExample, perguntarNome: true, context: "Teste fictício" });
+  d.processar.mockImplementationOnce(async (_mensagem, config, adaptador: { registrarParte: (id: string, texto: string) => Promise<void> }) => {
+    expect(config.perguntarNome).toBe(false); expect(config.AI_SYSTEM_PROMPT).toContain("Farmácia WE");
+    await adaptador.registrarParte("id-envio", "Resposta fictícia");
+    return "enviada";
+  });
+  await runAgentTick(portas);
+  expect(portas.registrarEnvio).toHaveBeenCalledWith("chip-ficticio", "id-envio", { numero: "5511999990001", texto: "Resposta fictícia", origem: { identidade: expect.any(String), instante: expect.any(Number) } });
+});
 test("job real de follow-up anterior à exclusão é cancelado sem envio", async () => {
   d.redis.xreadgroup.mockResolvedValue([]); d.apagada.mockResolvedValue(true);
   const job = { instance: "chip-ficticio", conversation: "conversa-ficticia", identity: "id-ficticio", number: "5511999990001", started: timestamp() * 1000,

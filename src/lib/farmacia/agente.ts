@@ -13,6 +13,7 @@ import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./in
 import { personaDoAgente } from "../agent/nome";
 import { registrarEtapaPedido, respostaPagamento } from "./pagamento";
 import { continuidadeDaConsulta, conviteContinuarPedido, descricaoComercial } from "./continuidade";
+import { NOME_FARMACIA } from "./configuracao-agente";
 const sistema={sistema:true} as const;
 export function respostaProduto(produtos:Produto[],total:number):RespostaGerada {
   const disponiveis=produtos.filter(p=>p.ativo&&p.disponivel>0).slice(0,8);
@@ -44,7 +45,7 @@ async function contextoDaConversa(banco:BancoSql,instancia:string,m:IncomingMess
 export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,intencao:unknown,identidade:string):Promise<RespostaGerada> {
   const a=intencaoSchema.parse(intencao);
   if(a.acao==="humano")return {transferir:true};
-  if(a.acao==="saudacao")return "Olá! Sou a assistente virtual do Atende Aí Pharma. Qual medicamento ou produto você procura?";
+  if(a.acao==="saudacao")return `Olá! Sou a assistente virtual da ${NOME_FARMACIA}. Qual medicamento ou produto você procura?`;
   if(a.acao==="esclarecer")return {
     produto:"Qual medicamento ou produto você procura?",concentracao:"Qual concentração você procura?",
     apresentacao:"Qual apresentação você procura?",quantidade:"Quantas embalagens você deseja?",
@@ -95,7 +96,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         consultarEstoque:intencao.termo.trim(),continuidade:continuidadeDaConsulta(contexto,historico)};
       if(intencao.acao==="saudacao") {
         const persona=personaDoAgente(config.AI_SYSTEM_PROMPT);
-        return persona ? `Olá! Sou ${persona}, assistente virtual do Atende Aí Pharma. Qual medicamento ou produto você procura?` : await atenderIntencao(banco,contexto,intencao,m.identity);
+        return persona ? `Olá! Sou ${persona}, assistente virtual da ${NOME_FARMACIA}. Qual medicamento ou produto você procura?` : await atenderIntencao(banco,contexto,intencao,m.identity);
       }
       if(intencao.acao==="humano"&&config.atendimento?.transferHuman===false)return "Essa solicitação precisa da avaliação da equipe da farmácia. O encaminhamento automático está indisponível neste canal; procure o atendimento da farmácia para continuar.";
       return await atenderIntencao(banco,contexto,intencao,m.identity);

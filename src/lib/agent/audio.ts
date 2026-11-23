@@ -11,7 +11,7 @@ const formatos: Record<string, string> = {
 };
 
 // Limita também corpos sem Content-Length, antes de decodificar o base64.
-async function jsonLimitado(response: Response, limite: number): Promise<unknown> {
+export async function jsonLimitado(response: Response, limite: number): Promise<unknown> {
   const reader = response.body?.getReader();
   if (!reader) throw new ProviderError("audio_resposta_invalida");
   const partes: Uint8Array[] = [];

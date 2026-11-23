@@ -1,12 +1,14 @@
 "use client";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { AvatarContato } from "./avatar";
+import { AudioMensagem } from "./audio-mensagem";
 
-export interface MensagemConversa { id: string; conteudo: string | null; direcao: string; instante: string }
+export interface MensagemConversa { id: string; conteudo: string | null; direcao: string; instante: string; tipo?: string; audioDisponivel?: boolean }
 export interface ConversaLista { id: string; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; fotoUrl?: string | null; mensagens: MensagemConversa[] }
 interface CaixaEntradaProps {
   conversas: ConversaLista[]; selecionada: string; aoSelecionar: (id: string) => void;
   resposta?: ReactNode; acoesConversa?: ReactNode; atualizar: () => void; atualizando?: boolean;
+  fonteAudio?: (id: string) => string;
 }
 const normalizar = (texto: string) => texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR");
 const hora = (instante: string) => new Date(instante).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
@@ -14,7 +16,7 @@ const dia = (instante: string) => new Date(instante).toLocaleDateString("pt-BR",
 const status: Record<string, string> = { open: "Em atendimento", pending: "Pendente", closed: "Encerrada" };
 
 /** Apresentação compartilhável entre instalações; autenticação e envio ficam no adaptador. */
-export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, acoesConversa, atualizar, atualizando = false }: CaixaEntradaProps) {
+export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, acoesConversa, atualizar, atualizando = false, fonteAudio }: CaixaEntradaProps) {
   const [busca, definirBusca] = useState("");
   const [aberta, definirAberta] = useState(false);
   const buscaId = useId();
@@ -61,7 +63,7 @@ export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, a
         {conversa.mensagens.map((m, i) => <div key={m.id} className="conversas-linha">
           {(i === 0 || dia(m.instante) !== dia(conversa.mensagens[i - 1].instante)) && <span className="conversas-dia">{dia(m.instante)}</span>}
           <article className={`conversas-balao ${m.direcao === "inbound" ? "recebida" : "enviada"}`} aria-label={m.direcao === "inbound" ? "Mensagem recebida" : "Mensagem enviada"}>
-            <p>{m.conteudo || "Mensagem sem texto"}</p><time dateTime={m.instante}>{hora(m.instante)}</time>
+            {m.tipo === "audio" ? <AudioMensagem fonte={fonteAudio?.(m.id)} disponivel={m.audioDisponivel} recebida={m.direcao === "inbound"} /> : <p>{m.conteudo || "Mensagem sem texto"}</p>}<time dateTime={m.instante}>{hora(m.instante)}</time>
           </article></div>)}
         {!conversa.mensagens.length && <p className="conversas-vazio">Nenhuma mensagem neste atendimento.</p>}
       </div><footer className="conversas-resposta">{resposta}</footer></> : <div className="conversas-sem-selecao"><h2>Seu atendimento começa aqui</h2><p>As conversas recebidas pelo WhatsApp aparecerão ao lado.</p></div>}
