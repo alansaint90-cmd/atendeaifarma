@@ -96,13 +96,15 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
             && !await iaPausada(instancia, message.number, message.conversation) && await client.get(agentKeys.lock) === token;
         };
         result = await dependencies.apagada(instancia, message.number, message.timestamp, message.identity) ? "conversa_apagada"
-          : pausada ? "pausa_manual" : await processMessage(message, config.data, {
+          : pausada && !(await store.read())?.confirmarEncaminhamento ? "pausa_manual" : await processMessage(message, config.data, {
           ...store, generate: substituicoes.generate ?? geradorFarmacia(db(), instancia, message), send: dependencies.send, transcribe: transcribeAudio,
           receberMidia: () => responderComprovanteFarmacia(db(), instancia, message),
           consultarEstoque: (termo, continuidade) => dependencies.consultarEstoque(instancia, message, termo, continuidade),
-          registrarParte: async (id, texto) => {
+          registrarParte: async (id, texto, encaminharEntrega) => {
             await followups.outgoing(instancia, id);
-            await dependencies.registrarEnvio(instancia, id, texto ? { numero: message.number, texto, origem: { identidade: message.identity, instante: message.timestamp } } : undefined);
+            await dependencies.registrarEnvio(instancia, id, texto ? { numero: message.number, texto,
+              origem: { identidade: message.identity, instante: message.timestamp }, ...(encaminharEntrega && { encaminharEntrega }) } : undefined);
+            if(encaminharEntrega)await pausarTransferencia(client, token, message.conversation, Date.now(), false);
           },
           transferir: async (destino, motivo) => {
             await dependencies.transferir(instancia, message.number, destino, motivo);
@@ -120,7 +122,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
             await dependencies.registrarEnvio(config.data.EVOLUTION_INSTANCE_NAME, state.providerId);
             await followups.outgoing(config.data.EVOLUTION_INSTANCE_NAME, state.providerId);
           }
-          if (!state.transferencia && !state.consulta && followupConfig.instance === config.data.EVOLUTION_INSTANCE_NAME && state.configHash === digest(JSON.stringify(config.data))) {
+          if (!state.transferencia && !state.consulta && !state.encaminharEntrega && followupConfig.instance === config.data.EVOLUTION_INSTANCE_NAME && state.configHash === digest(JSON.stringify(config.data))) {
             await followups.schedule(message, followupConfig);
           }
         }

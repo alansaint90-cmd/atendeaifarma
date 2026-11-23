@@ -8,6 +8,7 @@ import { systemUserId } from "../src/lib/db/bootstrap";
 import { registrarEnvioIa } from "../src/lib/operacao/atribuir-ia";
 import { receberOperacao } from "../src/lib/operacao/receber";
 import { consultarOperacao } from "../src/lib/operacao/consultas";
+import { assumirConversa, estadoPausaIa } from "../src/lib/farmacia/atendimento";
 import { recuperarAudioHistorico, decodificarAudioHistorico } from "../src/lib/farmacia/audio-historico";
 import { configurarAgenteFarmacia } from "../src/lib/farmacia/configuracao-agente";
 import { chatbotExample } from "../src/lib/chatbots/defaults";
@@ -64,6 +65,19 @@ test("histórico grava resposta sem eco, deduplica e recupera áudio apenas para
       const bot = await cliente.query<{ sender_type: string }>("SELECT sender_type FROM atendeia_messages WHERE provider_message_id='eco-primeiro' AND is_deleted=false");
       assert.equal(bot.rows[0].sender_type, "bot");
       assert.equal((await consultarOperacao(banco)).conversas[0].mensagens.length, 3);
+    });
+    await t.test("eco anterior permite pausar a conversa e reentrega não desrespeita a devolução à IA", async () => {
+      const conteudo={numero:"5511999990001",texto:"A equipe vai dar continuidade à entrega.",origem,encaminharEntrega:true as const};
+      await receber("eco-encaminhamento",true);
+      await registrarEnvioIa(banco,"chip-teste","eco-encaminhamento",conteudo);
+      const [encaminhada]=(await consultarOperacao(banco)).conversas;
+      assert.equal(encaminhada.aguardaHumano,true);
+      assert.equal((await estadoPausaIa(banco,"chip-teste",conteudo.numero))?.bloqueada,true);
+      await assumirConversa(banco,ator,{id:encaminhada.id,assumir:false});
+      await registrarEnvioIa(banco,"chip-teste","eco-encaminhamento",conteudo);
+      assert.equal((await estadoPausaIa(banco,"chip-teste",conteudo.numero))?.bloqueada,false);
+      const auditoria=await cliente.query("SELECT id FROM atendeia_audit_logs WHERE action='entrega_encaminhada_equipe' AND entity_id=$1 AND is_deleted=false",[encaminhada.id]);
+      assert.equal(auditoria.rows.length,1);
     });
     await t.test("falha da auditoria reverte recibo e resposta", async () => {
       await cliente.exec("CREATE FUNCTION impedir_auditoria() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.action='mensagem_ia_registrada' THEN RAISE EXCEPTION 'falha fictícia'; END IF; RETURN NEW; END $$; CREATE TRIGGER impedir_auditoria BEFORE INSERT ON atendeia_audit_logs FOR EACH ROW EXECUTE FUNCTION impedir_auditoria();");

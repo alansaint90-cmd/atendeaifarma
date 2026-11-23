@@ -11,14 +11,15 @@ export function regrasConversas(rel, content) {
     ["src/lib/operacao/receber.ts", [/banco.transaction/, /mensagens.some\(anexoRecebido\)\) await travarEstoque\(tx\)/, /anexoRecebido\(mensagem\)\) await registrarComprovanteRecebido\(tx/]],
     ["src/lib/operacao/estado-ia.ts", [/agentKeys.heartbeat/, /portas.pausada/, /conversa.assumida/, /instancias.includes/, /catch[\s\S]*indisponivel/]],
     ["src/lib/farmacia/configuracao-agente.ts", [/perguntarNome = false/, /openingMessages = undefined/, /Farmácia WE/]],
-    ["src/lib/operacao/atribuir-ia.ts", [/z.strictObject/, /banco.transaction/, /FOR UPDATE OF c/, /ON CONFLICT DO NOTHING RETURNING id/, /mensagem_ia_registrada/, /version=\$\{conversa.version\}/, /if \(!origemId\) return/]],
+    ["src/lib/operacao/atribuir-ia.ts", [/z.strictObject/, /banco.transaction/, /FOR UPDATE OF c/, /ON CONFLICT DO NOTHING RETURNING id/, /mensagem_ia_registrada/, /version=\$\{conversa.version\}/, /if \(!origemId\) return/, /encaminharEntrega&&novo\[0\]/, /human_takeover=human_takeover OR/, /entrega_encaminhada_equipe/]],
     ["src/lib/farmacia/audio-historico.ts", [/autorizar\(tx, ator, "operador"\)/, /m.is_deleted=false AND c.is_deleted=false/, /configurarCanalManual/, /jsonLimitado/, /redirect: "error"/, /bytes.toString\("base64"\)/]],
     ["src/app/api/farmacia/audio/[id]/route.ts", [/administradorHttp\("operador"\)/, /private, no-store/, /nosniff/]],
     ["src/lib/operacao/excluir-contato.ts", [/z.strictObject/, /autorizar\(tx, sessao, "admin"\)/, /banco.transaction/, /travarTelefoneContato\(tx, identidade.telefone\)/, /FOR UPDATE/, /version=\$\{dados.version\}/, /marcaDeExclusao\(autor\)/, /e.status='enviando'/, /INSERT INTO atendeia_audit_logs/]],
     ["src/components/operacao/acoes-contato.tsx", [/ModalConfirmacaoBlock/, /definirConfirmacao\(\{ id, version \}\)/, /executando.current/, /Excluir contato/]],
     ["src/lib/operacao/apagar-conversa.ts", [/z.strictObject/, /autorizar\(tx, sessao, "admin"\)/, /banco.transaction/, /FOR UPDATE/, /version=\$\{dados.version\}/, /marcaDeExclusao\(autor\)/, /status='enviando'/, /INSERT INTO atendeia_audit_logs/]],
     ["src/components/operacao/acoes-conversa.tsx", [/ModalConfirmacaoBlock/, /definirConfirmacao\(\{ id, version \}\)/, /executando.current/, /Mais opções da conversa/]],
-    ["src/lib/agent/worker.ts", [/conversaApagadaAposMensagem/, /dependencies.apagada\(instancia, message.number, message.timestamp, message.identity\)/, /dependencies.apagada\(instancia, job.number, job.started \/ 1000, job.identity\)/]],
+    ["src/lib/agent/processor.ts", [/state\?\.confirmarEncaminhamento/, /status:"gerada",confirmarEncaminhamento:true/, /await port.write\(state\);\s*return finalizarEncaminhamento/]],
+    ["src/lib/agent/worker.ts", [/conversaApagadaAposMensagem/, /dependencies.apagada\(instancia, message.number, message.timestamp, message.identity\)/, /dependencies.apagada\(instancia, job.number, job.started \/ 1000, job.identity\)/, /!state.encaminharEntrega/, /pausarTransferencia\(client, token, message.conversation, Date.now\(\), false\)/]],
   ];
   return regras.filter(([arquivo, obrigatorios]) => arquivo === rel && obrigatorios.some(re => !re.test(content)))
     .map(() => ({ level: "error", id: "conversa-exclusao-segura", file: rel, line: 1, msg: "Preserve confirmação, papel atual, versão, auditoria e bloqueio de eventos anteriores à exclusão." }));

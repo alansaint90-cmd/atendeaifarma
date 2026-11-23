@@ -13,6 +13,7 @@ import { followupStore, followupQueue } from "../src/lib/followups/queue";
 import { chatbotExample } from "../src/lib/chatbots/defaults";
 import { pausaManualAtiva, pausaManualKey, pausaManualParaEvento } from "../src/lib/agent/pausa";
 import type { Turn } from "../src/lib/agent/providers";
+import type { MensagemConfirmadaIa } from "../src/lib/operacao/atribuir-ia";
 
 test("Redis real: espera de estoque retoma sem reenvio e permite atender outro contato",{skip:!process.env.TEST_REDIS_URL},async()=>{
   const url=process.env.TEST_REDIS_URL!,alvo=new URL(url);
@@ -74,6 +75,45 @@ test("ecos dos dois balões da resposta não pausam a IA", { skip: !process.env.
     await client.del(streamKey, agentKeys.lock, agentKeys.heartbeat, agentKeys.archive,
       `atendeia:{evolution}:history:${mensagem.conversation}`, pausaManualKey(mensagem.conversation));
     client.disconnect();
+  }
+});
+
+test("Redis real: encaminhamento da entrega retoma com a IA pausada, cancela follow-up e não reenvia",{skip:!process.env.TEST_REDIS_URL},async()=>{
+  const url=process.env.TEST_REDIS_URL!,alvo=new URL(url);
+  assert.ok(["localhost","127.0.0.1"].includes(alvo.hostname)&&alvo.pathname==="/15");
+  const client=agentRedis(url);await client.connect();
+  const instancia=`entrega-${randomUUID()}`,numero="5511999990001";
+  const evento=(texto:string):EvolutionEvent=>({event:"messages.upsert",instance:instancia,data:{
+    key:{id:randomUUID(),fromMe:false,remoteJid:`${numero}@s.whatsapp.net`},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:texto}}});
+  const entrada=evento("Certo"),mensagem=incomingMessage(entrada,instancia)!;
+  const chave=`atendeia:{evolution}:reply:${mensagem.identity}`,followup=`atendeia:{evolution}:followup:${mensagem.conversation}`;
+  const aviso="A equipe vai dar continuidade à entrega.",envios:string[]=[];
+  let bloqueada=false,tentativas=0;
+  const dependencias={settings:async()=>({AI_ENABLED:"true" as const,OPENAI_API_KEY:"sk-test-only",OPENAI_MODEL:"modelo",
+    EVOLUTION_API_URL:"https://example.invalid",EVOLUTION_API_KEY:"teste",EVOLUTION_INSTANCE_NAME:instancia,REDIS_URL:url}),
+    chatbot:async()=>({...chatbotExample,transferHuman:false}),
+    pausaConversa:async()=>({bloqueada,retomadaEm:0}),
+    generate:async()=>({mensagens:[aviso],encaminharEntrega:true as const}),
+    registrarEnvio:async(_i:string,_id:string,info?:MensagemConfirmadaIa)=>{
+      assert.equal(info?.encaminharEntrega,true);bloqueada=true;
+      if(++tentativas===1)throw new Error("Falha simulada de registro");
+    },
+    send:async(_c:unknown,_n:string,texto:string)=>{envios.push(texto);return randomUUID();}};
+  try {
+    await enqueueEvolutionEventWithClient(client,entrada);
+    await assert.rejects(runAgentTick(dependencias),/Falha simulada/);
+    await client.set(followup,"Ciclo fictício");
+    await client.zadd(followupQueue,Date.now()+60000,mensagem.conversation);
+    await runAgentTick(dependencias);
+    assert.equal(await client.get(followup),null);
+    assert.equal(await client.zscore(followupQueue,mensagem.conversation),null);
+    assert.equal(await client.get(pausaManualKey(mensagem.conversation)),null);
+    await enqueueEvolutionEventWithClient(client,evento("Ok"));await runAgentTick(dependencias);
+    assert.deepEqual(envios,[aviso]);assert.equal(tentativas,2);assert.equal(await client.xlen(streamKey),0);
+  } finally {
+    await client.zrem(followupQueue,mensagem.conversation);
+    await client.del(streamKey,agentKeys.lock,agentKeys.heartbeat,agentKeys.archive,chave,followup,
+      `atendeia:{evolution}:history:${mensagem.conversation}`,pausaManualKey(mensagem.conversation));client.disconnect();
   }
 });
 

@@ -6,7 +6,7 @@ export const continuidadeEstoqueSchema = z.strictObject({ produtoIds: z.array(z.
   .refine(v => v.produtoIds.length > 0 || Boolean(v.pedidoId), "Informe uma oferta ou pedido anterior.");
 export type ContinuidadeEstoque = z.infer<typeof continuidadeEstoqueSchema>;
 export type RespostaConsultaEstoque = string | { mensagens: string[]; transferirEstoque?: true };
-export type RespostaGerada = RespostaConsultaEstoque | { transferir: true } | { agendar: true } | { consultarEstoque: string; continuidade?: ContinuidadeEstoque };
+export type RespostaGerada = RespostaConsultaEstoque | { mensagens: string[]; encaminharEntrega: true; transferirEstoque?: never } | { transferir: true } | { agendar: true } | { consultarEstoque: string; continuidade?: ContinuidadeEstoque };
 export class ProviderError extends Error {
   constructor(public readonly code: string) { super(code); }
 }

@@ -15,6 +15,7 @@ import { salvarChatbotServidor, chatbotDaInstancia } from "../src/lib/chatbots/s
 import { criarChatbotFarmacia, promptAtendimentoFarmacia } from "../src/lib/farmacia/prompt";
 import { consultaEstoqueFarmacia, geradorFarmacia, responderComprovanteFarmacia } from "../src/lib/farmacia/agente";
 import { consultarOperacao } from "../src/lib/operacao/consultas";
+import { registrarEnvioIa } from "../src/lib/operacao/atribuir-ia";
 import { listarPedidos } from "../src/lib/farmacia/consultas";
 import { executarPedido } from "../src/lib/farmacia/pedidos";
 import { salvarProduto, entradaEstoque, consultarProdutos } from "../src/lib/farmacia/catalogo";
@@ -76,6 +77,10 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         receberMidia:()=>responderComprovanteFarmacia(banco,instancia,mensagem),
         generate:async(...args:Parameters<typeof gerar>)=>{const r=await gerar(...args);adicional=typeof r!=="string"&&"consultarEstoque" in r&&!!r.continuidade;return r;},
         send:(_config:typeof config,destino:string,texto:string)=>sendReply(config,destino,texto,requisicao),
+        registrarParte:async(id:string,texto?:string,encaminharEntrega?:true)=>{
+          if(encaminharEntrega&&texto)await registrarEnvioIa(banco,instancia,id,{numero,texto,encaminharEntrega,
+            origem:{identidade:mensagem.identity,instante:mensagem.timestamp}});
+        },
         transferir:async()=>{transferencias++;},
         complete:async(estado:DeliveryState,turnos:Turn[])=>{estados.set(mensagem.identity,estado);historico.push(...turnos);}};
       let resultado=await processMessage(mensagem,configuracao,porta);
@@ -263,6 +268,12 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       assert.match(cartao.mensagens[1],/sendo preparado/);assert.match(cartao.mensagens[2],/nome de quem vai receber/);
       assert.doesNotMatch(cartao.texto,/Qual é o endereço/);
       assert.match((await atender("Marina de Souza",{falhaProvedor:true})).texto,/Nome de quem vai receber registrado/);
+      const [encaminhada]=(await consultarOperacao(banco)).conversas;
+      assert.equal(encaminhada.aguardaHumano,true);
+      assert.match(encaminhada.mensagens.at(-1)?.conteudo??"",/equipe vai dar continuidade à entrega/);
+      assert.equal((await estadoPausaIa(banco,instancia,numero))?.bloqueada,true);
+      assert.deepEqual((await atender("Ok",{falhaProvedor:true})).mensagens,[]);
+      await assumirConversa(banco,admin,{id:encaminhada.id,assumir:false});
       const destinatarios=await cliente.query<{detalhe:string}>("SELECT detalhe FROM atendeia_pedidos_eventos WHERE pedido_id=$1 AND tipo='destinatario_entrega' AND is_deleted=false",[p.id]);
       assert.deepEqual(destinatarios.rows.map(e=>e.detalhe),["Marina de Souza"]);
       const contarEventos=async()=>(await cliente.query<{total:number}>("SELECT count(*)::int total FROM atendeia_pedidos_eventos WHERE pedido_id=$1 AND is_deleted=false",[p.id])).rows[0].total;
@@ -270,11 +281,12 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const transferenciasAntes=transferencias;
       const maquininha=await atender("Pode trazer a maquininha?",{acao:"humano"});
       assert.match(maquininha.texto,/cartão na entrega já está registrado.*maquininha/s);
-      for(const texto of ["Ok","Só quero esse mesmo","Ok, pode seguir"]) {
-        const resposta=await atender(texto,{acao:texto==="Só quero esse mesmo"?"finalizar":"adicionar",pedidoId:p.id});
-        assert.match(resposta.texto,/dados de entrega já estão registrados/);
-        assert.doesNotMatch(resposta.texto,/disponibilidade|acrescentar|confirme/i);
-      }
+      const resposta=await atender("Certo",{falhaProvedor:true});
+      assert.match(resposta.texto,/dados de entrega já estão registrados/);
+      assert.doesNotMatch(resposta.texto,/disponibilidade|acrescentar|confirme/i);
+      assert.equal((await atender("Só quero esse mesmo",{falhaProvedor:true})).resultado,"pausada");
+      assert.deepEqual((await atender("Ok, pode seguir",{falhaProvedor:true})).mensagens,[]);
+      await assumirConversa(banco,admin,{id:encaminhada.id,assumir:false});
       assert.equal(await contarEventos(),eventosDaEntrega);
       assert.equal(transferencias,transferenciasAntes);
       await atender("Dinheiro",{falhaProvedor:true});

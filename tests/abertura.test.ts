@@ -84,3 +84,37 @@ test("mudança de configuração após primeiro balão não reinicia a abertura"
   assert.equal(await processMessage(mensagem, { ...config, openingMessages: ["Nova abertura"] }, f.port), "falhou");
   assert.deepEqual(f.envios, [abertura[0]]);
 });
+
+test("aviso de entrega aceito retoma o encaminhamento sem reenviar, mesmo com a IA já pausada", async () => {
+  const f=fixture();
+  const cfg={...config,openingMessages:undefined};
+  const aviso="Os dados estão registrados. A equipe vai dar continuidade à entrega.";
+  f.port.generate=async()=>({mensagens:["Pedido registrado.",aviso],encaminharEntrega:true});
+  let pausada=false, tentativas=0;
+  f.port.enabled=async()=>!pausada;
+  f.port.registrarParte=async(id,texto,encaminhar)=>{
+    if(!encaminhar) {
+      assert.equal(id,"id-1");assert.equal(pausada,false);return;
+    }
+    assert.equal(id,"id-2");assert.equal(texto,aviso);
+    pausada=true;
+    if(++tentativas===1)throw new Error("Falha simulada após gravar a pausa");
+  };
+  await assert.rejects(processMessage(mensagem,cfg,f.port),/Falha simulada/);
+  assert.equal(f.estado()?.confirmarEncaminhamento,true);
+  assert.equal(await processMessage(mensagem,cfg,f.port),"enviada");
+  assert.equal(await processMessage(mensagem,cfg,f.port),"enviada");
+  assert.equal(tentativas,2);
+  assert.deepEqual(f.envios,["Pedido registrado.",aviso]);
+  assert.equal(f.historico.length,2);
+});
+
+test("aviso de entrega incerto não conclui a pausa nem é reenviado", async () => {
+  const f=fixture();
+  const cfg={...config,openingMessages:undefined};
+  f.port.generate=async()=>({mensagens:["A equipe vai dar continuidade."],encaminharEntrega:true});
+  f.port.send=async()=>{throw new Error("Timeout");};
+  assert.equal(await processMessage(mensagem,cfg,f.port),"incerta");
+  assert.equal(await processMessage(mensagem,cfg,f.port),"incerta");
+  assert.deepEqual(f.registrados,[]);
+});

@@ -177,7 +177,7 @@ async function responderSelecao(banco:BancoSql,contexto:ContextoFarmacia,selecao
   return atenderIntencao(banco,contexto,{acao:"criar_pedido",pedidoId:pendentes[0]?.id??"",termo:"",itens:[{produtoId:produto.id,quantidade:selecao.quantidade}]},identidade,!selecao.acrescentar&&pendentes.length===1);
 }
 
-const entregaRegistrada="Certo! Os dados de entrega já estão registrados e a equipe vai dar continuidade ao pedido.";
+const entregaRegistrada={mensagens:["Certo! Os dados de entrega já estão registrados e a equipe vai dar continuidade ao pedido."],encaminharEntrega:true as const};
 const encerramentoSemAlteracao=/^(?:ok(?:[, ]+(?:obrigad[oa]|valeu))?|okay|certo|beleza|obrigad[oa]|valeu|tudo certo|so (?:isso|esse mesmo|essa mesma|quero esse mesmo|quero essa mesma)|nao(?:[, ]+(?:so isso|so esse mesmo|so essa mesma))?)$/;
 
 export async function responderComprovanteFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage):Promise<RespostaGerada|null> {
@@ -245,7 +245,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
             ?destinatarioInformado(texto):undefined;
           if(destinatario) {
             await registrarEtapaPedido(banco,{id:pedido.id,conversaId:contexto.conversaId,chave:m.identity,etapa:"destinatario_entrega",destinatario});
-            return "Nome de quem vai receber registrado. A equipe vai dar continuidade à entrega.";
+            return {mensagens:["Nome de quem vai receber registrado. A equipe vai dar continuidade à entrega."],encaminharEntrega:true};
           }
           if(/^.{1,6}$/u.test(texto.trim()))return perguntaDestinatario;
         }

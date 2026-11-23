@@ -8,7 +8,7 @@ import { mensagensDaConsulta } from "../consultas/fluxo";
 import { z } from "zod";
 import { processarConsultaEstoque, type EstadoConsultaEstoque } from "./consulta-estoque";
 
-export interface DeliveryState { status: "gerando" | "gerada" | "enviando" | "enviada" | "incerta" | "falhou"; attempts: number; reply?: string; partes?: string[]; providerIds?: string[]; transcript?: string; code?: string; configHash?: string; providerId?: string; transferencia?: boolean; consulta?: boolean; estoque?: EstadoConsultaEstoque }
+export interface DeliveryState { status: "gerando" | "gerada" | "enviando" | "enviada" | "incerta" | "falhou"; attempts: number; reply?: string; partes?: string[]; providerIds?: string[]; transcript?: string; code?: string; configHash?: string; providerId?: string; transferencia?: boolean; consulta?: boolean; estoque?: EstadoConsultaEstoque; encaminharEntrega?: true; confirmarEncaminhamento?: true }
 export interface ProcessingPort {
   read(): Promise<DeliveryState | null>;
   write(state: DeliveryState): Promise<void>;
@@ -25,11 +25,23 @@ export interface ProcessingPort {
   receberMidia?(): Promise<RespostaGerada | null>;
   generate(config: AgentConfig, history: Turn[], text: string): Promise<RespostaGerada>;
   send(config: AgentConfig, number: string, text: string): Promise<string>;
-  registrarParte?(id: string, texto?: string): Promise<void>;
+  registrarParte?(id: string, texto?: string, encaminharEntrega?: true): Promise<void>;
+}
+
+async function finalizarEncaminhamento(port:ProcessingPort,message:IncomingMessage,state:DeliveryState,revisao:string) {
+  if(!state.providerId||!state.reply||!port.registrarParte)throw new ProviderError("encaminhamento_entrega_indisponivel");
+  await port.registrarParte(state.providerId,state.partes?.at(-1)??state.reply,true);
+  await port.complete({...state,status:"enviada",confirmarEncaminhamento:undefined},[
+    {role:"user",content:state.transcript??message.text,revisao},{role:"assistant",content:state.reply,revisao},
+  ]);
+  return "enviada";
 }
 
 export async function processMessage(message: IncomingMessage, config: AgentConfig, port: ProcessingPort): Promise<string> {
   let state = await port.read();
+  const revisao = digest(config.AI_SYSTEM_PROMPT);
+  // O envio já foi aceito. Retome só o registro e a pausa, mesmo após uma falha entre os dois bancos.
+  if(state?.confirmarEncaminhamento)return finalizarEncaminhamento(port,message,state,revisao);
   if (state?.status === "enviada" || state?.status === "incerta" || state?.status === "falhou") return state.status;
   // Não repetir um envio cujo resultado se perdeu durante queda ou timeout.
   if (state?.status === "enviando") {
@@ -38,7 +50,6 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
   }
   if (!await port.enabled()) return "pausada";
   const configHash = digest(JSON.stringify(config));
-  const revisao = digest(config.AI_SYSTEM_PROMPT);
   if (state?.configHash !== configHash) {
     if (state?.providerIds?.length) {
       await port.write({ ...state, status: "falhou", code: "configuracao_alterada_entre_partes" }); return "falhou";
@@ -56,6 +67,7 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
     let reply: string;
     let transferencia = false;
     let consulta = false;
+    let encaminharEntrega: true | undefined;
     let partes: string[] | undefined;
     try {
       if (message.audio && !transcript) {
@@ -101,6 +113,10 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
       if (cadastro) { consulta = true; partes = undefined; reply = cadastro; }
       else if (typeof gerada !== "string" && "mensagens" in gerada) {
         partes = z.array(z.string().trim().min(1).max(6000)).min(1).max(3).parse(gerada.mensagens);
+        if("encaminharEntrega" in gerada&&gerada.encaminharEntrega) {
+          if(!port.registrarParte)throw new ProviderError("encaminhamento_entrega_indisponivel");
+          encaminharEntrega=true;
+        }
         reply = partes.join("\n\n");
       }
       else if (typeof gerada !== "string" && "agendar" in gerada) {
@@ -121,7 +137,7 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
       await port.write({ status: attempts >= 3 ? "falhou" : "gerando", attempts, code, configHash, transcript });
       return attempts >= 3 ? "falhou" : "repetir";
     }
-    state = { status: "gerada", attempts, reply, partes, configHash, transcript, transferencia, consulta };
+    state = { status: "gerada", attempts, reply, partes, configHash, transcript, transferencia, consulta, encaminharEntrega };
     await port.write(state);
   }
   if (state.estoque) return processarConsultaEstoque(message, config, port, state);
@@ -143,12 +159,17 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
     if (state.transferencia) await port.transferir!(config.atendimento!.destination);
     try {
       state.providerId = await port.send(config, message.number, partes[indice]);
-      await port.registrarParte?.(state.providerId, partes[indice]);
+      if(!state.encaminharEntrega||indice<partes.length-1)await port.registrarParte?.(state.providerId, partes[indice]);
     } catch (error) {
       await port.write({ ...state, status: "incerta", code: error instanceof ProviderError ? error.code : "envio_incerto" });
       return "incerta";
     }
     state = { ...state, providerIds: [...(state.providerIds ?? []), state.providerId!] };
+    if(state.encaminharEntrega&&indice===partes.length-1) {
+      state={...state,status:"gerada",confirmarEncaminhamento:true};
+      await port.write(state);
+      return finalizarEncaminhamento(port,message,state,revisao);
+    }
     if (indice < partes.length - 1) await port.write({ ...state, status: "gerada" });
   }
   // Estado e histórico são confirmados juntos. Se falhar, permanece "enviando".
