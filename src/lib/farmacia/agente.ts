@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
 import { personaDoAgente } from "../agent/nome";
 import { registrarEtapaPedido, respostaPagamento, respostaPixSemPedido, pagamentoSalvo, formaMencionada, enderecoInformado, destinatarioInformado,
-  perguntaEndereco, perguntaDestinatario, comPerguntaEntrega, podeColetarEntrega, valorParaTroco, ReservaDoPedidoInvalida, marcosFinalizacao } from "./pagamento";
+  perguntaEndereco, perguntaDestinatario, comPerguntaEntrega, podeColetarEntrega, valorParaTroco, ReservaDoPedidoInvalida, marcosFinalizacao, etapaPixPago } from "./pagamento";
 import { continuidadeDaConsulta, conviteContinuarPedido, descricaoComercial } from "./continuidade";
 import { NOME_FARMACIA } from "./configuracao-agente";
 const sistema={sistema:true} as const;
@@ -101,6 +101,9 @@ export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,i
     return {mensagens:["Pedido registrado, aguardando pagamento.","Qual forma de pagamento você prefere: Pix, dinheiro ou cartão?"]};
   }
   const [p]=(await listarPedidos(banco,sistema,{id:a.pedidoId})).pedidos;
+  if(p.status==="aguardando_pagamento"&&p.pagamento.forma==="pix"&&p.pagamento.estado==="pago") {
+    return `O Pix já está registrado. Seu pedido está em andamento para entrega. Total: R$ ${p.total.replace(".",",")}.`;
+  }
   return `Seu pedido está ${p.status.split("_").join(" ")}. Total: R$ ${p.total.replace(".",",")}.${p.status==="aguardando_pagamento"?" O pagamento será conferido pela equipe.":""}`;
 }
 function pedidoEmPagamento(contexto:ContextoFarmacia) {
@@ -116,12 +119,10 @@ export async function responderComprovanteFarmacia(banco:BancoSql,instancia:stri
   if(!m.midia)return null;
   const contexto=await contextoDaConversa(banco,instancia,m);
   const pedido=pedidoEmPagamento(contexto);
-  if(!pedido)return null;
-  if(pedido.etapa==="pix_conferido")return comPerguntaEntrega(["A equipe já confirmou o pagamento por Pix."],pedido);
-  if(pedido.etapa!=="comprovante_pix")return null;
+  if(!pedido||!etapaPixPago(pedido.etapa))return null;
   const comprovante=linhas(await banco.execute(sql`SELECT id FROM atendeia_pedidos_eventos WHERE pedido_id=${pedido.id}
     AND tipo='comprovante_pix' AND chave=${`fluxo:${m.identity}`} AND is_deleted=false`));
-  return comPerguntaEntrega([comprovante.length?"Recebi o anexo. A equipe vai conferir o comprovante.":"A equipe já recebeu um comprovante para conferência."],pedido);
+  return comPerguntaEntrega([comprovante.length?"Recebi o comprovante e registrei o Pix no pedido. Seu pedido segue em andamento para entrega.":"O Pix deste pedido já está registrado."],pedido);
 }
 
 export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage,request=fetch) {
@@ -144,11 +145,8 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         const pg=pedido.etapa==="finalizar"?undefined:pagamentoSalvo(pedido.pagamento);
         const executarPagamento=(pagamento:unknown)=>atenderIntencao(banco,contexto,
           {acao:"pagamento",pedidoId:pedido.id,termo:"",itens:[],pagamento},m.identity);
-        if(forma&&pedido.etapa==="pix_conferido") {
-          return comPerguntaEntrega(["A equipe já confirmou o pagamento por Pix."],pedido);
-        }
-        if(forma==="pix"&&pg?.forma==="pix"&&pedido.etapa==="comprovante_pix") {
-          return comPerguntaEntrega(["A equipe já recebeu o comprovante para conferência."],pedido);
+        if(forma&&etapaPixPago(pedido.etapa)) {
+          return comPerguntaEntrega(["O Pix deste pedido já está registrado."],pedido);
         }
         if(forma==="cartao"&&pg?.forma==="cartao") {
           return comPerguntaEntrega(["O pagamento com cartão na entrega já está registrado. O entregador leva a maquininha."],pedido);
@@ -169,7 +167,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
           if(pg.troco!=="nao"&&valor)return await executarPagamento({forma:"dinheiro",troco:"sim",valor});
         }
         if(pedido.temEndereco&&pedido.temDestinatario&&encerramentoSemAlteracao.test(textoNormal))return entregaRegistrada;
-        const coletarEntrega=podeColetarEntrega(pg,pedido.etapa==="comprovante_pix"||pedido.etapa==="pix_conferido");
+        const coletarEntrega=podeColetarEntrega(pg,etapaPixPago(pedido.etapa));
         if(coletarEntrega&&enderecoInformado(texto)) {
           await registrarEtapaPedido(banco,{id:pedido.id,conversaId:contexto.conversaId,chave:m.identity,etapa:"endereco_entrega",endereco:texto});
           return comPerguntaEntrega(["Endereço registrado."],{...pedido,temEndereco:true});
@@ -186,7 +184,7 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
         }
         if(coletarEntrega&&!pedido.temEndereco&&(/^.{1,6}$|\b(?:rua|avenida|bairro|cep|endere[cç]o)\b/iu.test(texto.trim())))return perguntaEndereco;
         if(pg?.forma==="pix"&&pedido.etapa==="pagamento"&&/^(?:j[aá]\s+)?(?:paguei|fiz o pix|pagamento (?:feito|conclu[ií]do))[\s!.]*$/iu.test(texto.trim())) {
-          return "Envie o comprovante por aqui para a equipe conferir.";
+          return "Envie o comprovante por aqui para registrar o Pix no pedido.";
         }
       }
       const consultar=(termo:string):RespostaGerada=>({consultarEstoque:termo.slice(0,120),continuidade:continuidadeDaConsulta(contexto,historico)});

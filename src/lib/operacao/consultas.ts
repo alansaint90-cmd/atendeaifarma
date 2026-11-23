@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { linhas, type BancoSql } from "../db/porta";
 import { LIMITE_CONTATOS } from "./limites";
 import type { EstadoIaConversa, OrigemEstadoIa, consultarEstadosIa } from "./estado-ia";
+import { tiposFluxoPagamento } from "../farmacia/pagamento";
 
 export interface ContatoOperacional { id: string; version: number; nome: string; telefone: string | null; email: string | null; origem: string | null; status: string }
 export interface MensagemOperacional { id: string; conteudo: string | null; direcao: string; instante: string; tipo?: string; audioDisponivel?: boolean }
@@ -39,7 +40,7 @@ export async function consultarOperacao(banco: BancoSql, consultarIa?: typeof co
       (c.status='pending' AND c.human_takeover=true AND c.assigned_to IS NULL) "aguardaHumano",
       (SELECT aviso FROM atendeia_pedidos pedido
         CROSS JOIN LATERAL (SELECT CASE
-          WHEN e.tipo='comprovante_pix' THEN 'Comprovante Pix recebido para conferência'
+          WHEN e.tipo IN ('comprovante_pix','pix_conferido') THEN 'Comprovante Pix registrado · aguardando entrega'
           WHEN e.tipo='pagamento' THEN CASE
             WHEN e.detalhe::jsonb->>'forma'='dinheiro' AND e.detalhe::jsonb->>'troco'='sim' THEN CASE
               WHEN e.detalhe::jsonb->>'valor'='0.00' THEN 'Cliente precisa de troco · valor a informar'
@@ -47,7 +48,7 @@ export async function consultarOperacao(banco: BancoSql, consultarIa?: typeof co
           END
           END aviso
           FROM atendeia_pedidos_eventos e WHERE e.pedido_id=pedido.id AND e.is_deleted=false
-            AND e.tipo IN ('pagamento','comprovante_pix','finalizar','adicionar','reservar','itens_acrescentados')
+            AND (${tiposFluxoPagamento})
           ORDER BY e.created_at DESC,e.id DESC LIMIT 1) entrega
         WHERE pedido.conversa_id=c.id AND pedido.is_deleted=false AND pedido.status='aguardando_pagamento' AND aviso IS NOT NULL
         ORDER BY pedido.created_at DESC,pedido.id LIMIT 1) "avisoEntrega"

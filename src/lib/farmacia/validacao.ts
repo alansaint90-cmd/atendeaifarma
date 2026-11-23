@@ -23,8 +23,8 @@ export function normalizarPreco(valor: string): string {
 export const ajusteSchema = z.strictObject({ loteId: z.uuid(), quantidade: z.number().int().min(0).max(1000000), motivo: z.string().trim().min(5).max(300), atualizadoEm: z.iso.datetime({offset:true}), chave: z.uuid() });
 export const buscaSchema = z.strictObject({ termo: z.string().trim().max(120).default(""), categoria: texto.default(""), disponibilidade: z.enum(["todos","disponivel","baixo","esgotado","vencendo","vencido"]).default("todos"), ordenar: z.enum(["nome","quantidade"]).default("nome"), pagina: z.number().int().min(1).max(100000).default(1), porPagina:z.union([z.literal(10),z.literal(20),z.literal(40)]).default(40) });
 export const novoPedidoSchema = z.strictObject({ contatoId: z.uuid(), conversaId: z.uuid().nullable(), chave: z.string().min(8).max(220).regex(/^[a-zA-Z0-9:_.-]+$/), itens: z.array(z.strictObject({ produtoId: z.uuid(), quantidade: z.number().int().min(1).max(10000) })).min(1).max(50) });
-export const comandoPedidoSchema = z.strictObject({ id: z.uuid(), acao: z.enum(["reservar","confirmar","separar","concluir","cancelar","conferir","conferir_pix","entregar"]), chave: z.uuid(), referencia: z.string().trim().max(300).default(""), atualizadoEm:z.iso.datetime({offset:true}).optional() })
-  .refine(v=>!(v.acao==="conferir_pix"||v.acao==="entregar")||!!v.atualizadoEm,"Atualize o pedido antes de confirmar a operação.");
+export const comandoPedidoSchema = z.strictObject({ id: z.uuid(), acao: z.enum(["reservar","confirmar","separar","concluir","cancelar","conferir","entregar"]), chave: z.uuid(), referencia: z.string().trim().max(300).default(""), atualizadoEm:z.iso.datetime({offset:true}).optional() })
+  .refine(v=>v.acao!=="entregar"||!!v.atualizadoEm,"Atualize o pedido antes de confirmar a entrega.");
 export const habilitacaoSchema = z.strictObject({ usuarioId: z.uuid(), registro: z.string().trim().regex(/^[\p{L}\p{N} /.-]{4,80}$/u), habilitado: z.boolean() });
 export function centavos(v: string): bigint { return BigInt(v.replace(".", "")); }
 export function decimal(v: bigint): string { return `${v / 100n}.${(v % 100n).toString().padStart(2,"0")}`; }

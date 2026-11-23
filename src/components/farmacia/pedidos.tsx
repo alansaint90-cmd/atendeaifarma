@@ -8,14 +8,13 @@ import { periodoFarmacia,type AtalhoPeriodo } from "@/lib/farmacia/periodo";
 import { EstoqueIcone as Icone } from "./estoque-icone";
 const nomes:Record<string,string>={novo:"Novo pedido",aguardando_confirmacao:"Aguardando confirmação",aguardando_pagamento:"Aguardando pagamento",pagamento_confirmado:"Pagamento confirmado",em_separacao:"Em separação",concluido:"Concluído",cancelado:"Cancelado"};
 const formas = {pix:"Pix",cartao:"Cartão",dinheiro:"Dinheiro"};
-const estados = {pendente:"Aguardando pagamento",na_entrega:"Pagar na entrega",informado:"Pago informado · conferir comprovante",pago:"Pago",cancelado:"Pedido cancelado"};
+const estados = {pendente:"Aguardando pagamento",na_entrega:"Pagar na entrega",pago:"Pago",cancelado:"Pedido cancelado"};
 function PagamentoDoPedido({pagamento}:{pagamento:PedidoLista["pagamento"]}) {
   return <><strong>{pagamento.forma?formas[pagamento.forma]:"Não informado"}</strong><small>{estados[pagamento.estado]}</small></>;
 }
 function etapaDoPedido(pedido:PedidoLista) {
   if(pedido.status!=="aguardando_pagamento")return nomes[pedido.status];
   if(pedido.pagamento.estado==="pago"||pedido.pagamento.estado==="na_entrega")return "Aguardando entrega";
-  if(pedido.pagamento.estado==="informado")return "Aguardando conferência do Pix";
   return nomes[pedido.status];
 }
 export function PedidosPage({gestor}:{gestor:boolean}) {
@@ -56,7 +55,6 @@ export function PedidosPage({gestor}:{gestor:boolean}) {
       <div className="farmacia-toolbar">{["aguardando_confirmacao","aguardando_pagamento"].includes(pedido.status)&&<><button onClick={()=>acao(pedido,"reservar","Confirmar os itens e reservar temporariamente o estoque? O saldo físico não será baixado.")}>Reservar estoque</button><button onClick={()=>acao(pedido,"conferir","Registrar a conferência humana deste pedido? Esta ação exige habilitação farmacêutica e protocolo.")}>Conferência farmacêutica</button></>}
       {gestor&&pedido.status==="aguardando_pagamento"&&<>
         {!pedido.pagamento.forma&&<button className="primary" disabled={referencia.trim().length<5} onClick={()=>acao(pedido,"confirmar",`Confirmar a venda de ${dinheiro(pedido.total)} e baixar definitivamente o estoque? Você declara ter conferido o pagamento. Referência: ${referencia}`)}>Confirmar venda e pagamento</button>}
-        {pedido.pagamento.estado==="informado"&&<button className="primary" disabled={referencia.trim().length<5} onClick={()=>acao(pedido,"conferir_pix",`Registrar que o Pix de ${dinheiro(pedido.total)} entrou na conta da farmácia? A baixa será feita na entrega.`)}>Confirmar pagamento Pix</button>}
         {(pedido.pagamento.estado==="pago"||pedido.pagamento.estado==="na_entrega")&&<button className="primary" disabled={pedido.pagamento.forma!=="pix"&&referencia.trim().length<5} onClick={()=>acao(pedido,"entregar",pedido.pagamento.forma==="pix"?"Confirmar a entrega e baixar o estoque do pedido pago?":"Confirmar que o pedido foi entregue e o pagamento foi recebido? O estoque será baixado.")}>Confirmar entrega</button>}
       </>}
       {pedido.status==="pagamento_confirmado"&&<button onClick={()=>acao(pedido,"separar","Iniciar separação? O estoque já foi baixado.")}>Iniciar separação</button>}

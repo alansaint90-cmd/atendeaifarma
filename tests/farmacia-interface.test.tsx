@@ -61,7 +61,6 @@ test('confirmação de venda exige referência e modal antes de chamar o servido
 });
 
 test.each([
-  ['pix','informado','Pago informado · conferir comprovante','Confirmar pagamento Pix'],
   ['pix','pago','Pago','Confirmar entrega'],
   ['cartao','na_entrega','Pagar na entrega','Confirmar entrega'],
   ['dinheiro','na_entrega','Pagar na entrega','Confirmar entrega'],
@@ -72,8 +71,11 @@ test.each([
   render(<PedidosPage gestor/>);
   expect(await screen.findByRole('columnheader',{name:'Pagamento'})).toBeInTheDocument();
   expect(screen.getByText(texto)).toBeInTheDocument();
+  expect(screen.getByText('Em andamento',{selector:'.pedidos-status'})).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'Abrir pedido'}));
   expect(screen.getByRole('button',{name:rotulo})).toBeInTheDocument();
+  if(forma==='pix')expect(screen.getByRole('button',{name:'Confirmar entrega'})).toBeEnabled();
+  expect(screen.queryByRole('button',{name:'Confirmar pagamento Pix'})).not.toBeInTheDocument();
   expect(screen.queryByRole('button',{name:'Confirmar venda e pagamento'})).not.toBeInTheDocument();
 });
 

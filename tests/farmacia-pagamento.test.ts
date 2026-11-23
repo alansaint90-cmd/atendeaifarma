@@ -13,7 +13,7 @@ import { systemUserId } from "../src/lib/db/bootstrap";
 import { produtoVazio } from "../src/lib/farmacia/cadastro";
 import { salvarProduto, consultarProdutos } from "../src/lib/farmacia/catalogo";
 import { criarPedido, executarPedido } from "../src/lib/farmacia/pedidos";
-import { registrarEtapaPedido, respostaPagamento } from "../src/lib/farmacia/pagamento";
+import { estadoPagamento, registrarEtapaPedido, respostaPagamento } from "../src/lib/farmacia/pagamento";
 import { listarPedidos } from "../src/lib/farmacia/consultas";
 import { receberOperacao } from "../src/lib/operacao/receber";
 
@@ -69,10 +69,9 @@ async function verificar(banco:BancoSql) {
   await executarPedido(banco,admin,{id,acao:'reservar',chave:randomUUID()});
   await registro('pagamento',{forma:'pix'});
   assert.deepEqual((await carregar()).pagamento,{forma:'pix',estado:'pendente'});
-  await assert.rejects(executarPedido(banco,admin,await comando('entregar')),/Confirme o recebimento/);
-  await assert.rejects(executarPedido(banco,admin,await comando('conferir_pix')),/comprovante Pix/);
+  await assert.rejects(executarPedido(banco,admin,await comando('entregar')),/Aguarde o comprovante Pix/);
   await assert.rejects(executarPedido(banco,admin,await comando('confirmar')),/fluxo de pagamento e entrega/);
-  const versaoSemComprovante=await comando('conferir_pix');
+  const versaoSemComprovante=await comando('entregar');
   const anexo=(messageTimestamp=Math.floor(Date.now()/1000),fromMe=false)=>({event:'messages.upsert' as const,instance:canal,data:{
     key:{id:randomUUID(),remoteJid:jid,fromMe},messageTimestamp,message:{documentMessage:{}}}});
   await receberOperacao(banco,anexo(Math.floor(Date.now()/1000)-60));
@@ -81,21 +80,18 @@ async function verificar(banco:BancoSql) {
   const comprovante=anexo();
   await Promise.all([receberOperacao(banco,comprovante),receberOperacao(banco,comprovante)]);
   const recebido=await carregar();
-  assert.deepEqual(recebido.pagamento,{forma:'pix',estado:'informado'});
+  assert.deepEqual(recebido.pagamento,{forma:'pix',estado:'pago'});
+  assert.equal(recebido.status,'aguardando_pagamento');
   assert.equal(recebido.eventos.filter(e=>e.tipo==='comprovante_pix').length,1);
+  assert.equal(recebido.eventos.filter(e=>e.tipo==='pix_conferido').length,0);
   await assert.rejects(executarPedido(banco,admin,versaoSemComprovante),/pedido foi atualizado/);
-  const conferirPix=await comando('conferir_pix');
-  await assert.rejects(executarPedido(banco,{sistema:true},conferirPix),/atendente autorizado/);
-  assert.deepEqual(await Promise.all([executarPedido(banco,admin,conferirPix),executarPedido(banco,admin,conferirPix)]),[id,id]);
-  const pago=await carregar();
-  assert.equal(pago.status,'aguardando_pagamento');assert.equal(pago.pagamento.estado,'pago');
-  assert.equal(pago.eventos.filter(e=>e.tipo==='pix_conferido').length,1);
-  await assert.rejects(registro('pagamento',{forma:'cartao'}),/já confirmou o Pix/i);
-  await assert.rejects(criarPedido(banco,{sistema:true},{...entrada,chave:randomUUID()},id),/já confirmou o Pix/i);
+  await assert.rejects(registro('pagamento',{forma:'cartao'}),/já está registrado como pago/i);
+  await assert.rejects(criarPedido(banco,{sistema:true},{...entrada,chave:randomUUID()},id),/já está registrado como pago/i);
   const saldoAtual=async()=>(await consultarProdutos(banco,admin,{termo:sku})).produtos[0].fisico;
   assert.equal(await saldoAtual(),10);
   await banco.execute(sql`UPDATE atendeia_pedidos_reservas SET expira_em=now()-interval '1 minute' WHERE pedido_id=${id} AND is_deleted=false`);
-  const entregar=await comando('entregar');
+  const entregar={...await comando('entregar'),referencia:''};
+  await assert.rejects(executarPedido(banco,{sistema:true},entregar),/atendente autorizado/);
   assert.deepEqual(await Promise.all([executarPedido(banco,admin,entregar),executarPedido(banco,admin,entregar)]),[id,id]);
   assert.equal((await carregar()).status,'concluido');assert.equal(await saldoAtual(),8);
 
@@ -116,8 +112,16 @@ async function verificar(banco:BancoSql) {
   }
 }
 
-test('pedido registra formas e comprovante, confere Pix e baixa estoque uma vez na entrega',async()=>{
+test('comprovante marca Pix pago sem confirmação manual e só a entrega baixa estoque',async()=>{
   const cliente=new PGlite();try{await verificar(drizzle(cliente));}finally{await cliente.close();}
+});
+test('comprovantes anteriores continuam válidos somente para a forma e etapa registradas',()=>{
+  const pix={tipo:'pagamento',detalhe:'{"forma":"pix"}'};
+  const comprovante={tipo:'comprovante_pix',detalhe:'Anexo recebido via WhatsApp. Confira o comprovante e o pagamento.'};
+  const cartao={tipo:'pagamento',detalhe:'{"forma":"cartao"}'};
+  assert.deepEqual(estadoPagamento('aguardando_pagamento',false,[pix,comprovante]),{forma:'pix',estado:'pago'});
+  assert.deepEqual(estadoPagamento('aguardando_pagamento',false,[pix,comprovante,cartao]),{forma:'cartao',estado:'na_entrega'});
+  assert.deepEqual(estadoPagamento('aguardando_pagamento',false,[pix,comprovante,cartao,pix]),{forma:'pix',estado:'pendente'});
 });
 test('PostgreSQL 16 real mantém pedido e histórico de pagamento idempotentes',{skip:!process.env.TEST_DATABASE_URL},async()=>{
   const url=new URL(process.env.TEST_DATABASE_URL!);assert.ok(['localhost','127.0.0.1'].includes(url.hostname)&&url.pathname==='/atendefarma_test');

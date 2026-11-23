@@ -15,11 +15,15 @@ export const perguntaDestinatario = "Qual é o nome de quem vai receber o reméd
 export interface DadosEntrega { temEndereco?:boolean; temDestinatario?:boolean }
 // Renovar a reserva do mesmo carrinho não desfaz a finalização dos itens.
 export const marcosFinalizacao = sql`tipo IN ('finalizar','itens_acrescentados','itens_corrigidos','revisar')`;
-const tiposFluxoPagamento = sql`${marcosFinalizacao} OR tipo IN ('pagamento','comprovante_pix','pix_conferido')`;
+export const tiposFluxoPagamento = sql`${marcosFinalizacao} OR tipo IN ('pagamento','comprovante_pix','pix_conferido')`;
 
 export interface EstadoPagamento {
   forma: Pagamento["forma"] | null;
-  estado: "pendente" | "na_entrega" | "informado" | "pago" | "cancelado";
+  estado: "pendente" | "na_entrega" | "pago" | "cancelado";
+}
+
+export function etapaPixPago(tipo?:string) {
+  return tipo==="comprovante_pix"||tipo==="pix_conferido";
 }
 
 export function estadoPagamento(status:string, confirmado:boolean, eventos:readonly {tipo:string;detalhe:string}[]):EstadoPagamento {
@@ -32,17 +36,22 @@ export function estadoPagamento(status:string, confirmado:boolean, eventos:reado
     } else if(tipo==="pagamento") {
       forma=pagamentoSalvo(detalhe)?.forma??null;
       estado=forma==="cartao"||forma==="dinheiro"?"na_entrega":"pendente";
-    } else if(forma==="pix"&&tipo==="comprovante_pix") estado="informado";
-    else if(forma==="pix"&&tipo==="pix_conferido") estado="pago";
+    } else if(forma==="pix"&&etapaPixPago(tipo)) estado="pago";
   }
   if(status==="cancelado")estado="cancelado";
   else if(confirmado)estado="pago";
   return {forma,estado};
 }
 
-export async function atualizarVersaoPagamento(tx:TransacaoSql,id:string,autor:string) {
+async function atualizarVersaoPagamento(tx:TransacaoSql,id:string,autor:string) {
   await tx.execute(sql`UPDATE atendeia_pedidos SET updated_at=greatest(clock_timestamp(),updated_at+interval '1 millisecond'),modified_by=${autor}
     WHERE id=${id} AND is_deleted=false`);
+}
+
+export async function ultimaEtapaPagamento(tx:TransacaoSql,id:string) {
+  const [etapa]=linhas<{tipo:string;detalhe:string}>(await tx.execute(sql`SELECT tipo,detalhe FROM atendeia_pedidos_eventos
+    WHERE pedido_id=${id} AND is_deleted=false AND (${tiposFluxoPagamento}) ORDER BY created_at DESC,id DESC LIMIT 1`));
+  return etapa;
 }
 
 /** Chamada dentro do recebimento autenticado, com a trava de estoque já obtida. */
@@ -57,7 +66,7 @@ export async function registrarComprovanteRecebido(tx:TransacaoSql,conversaId:st
   const [pedido]=candidatos;
   if(candidatos.length!==1||pedido.tipo!=="pagamento"||!pedido.enviadoDepois||pagamentoSalvo(pedido.detalhe)?.forma!=="pix")return;
   const autor=await autorizar(tx,{sistema:true},"operador",true);
-  await evento(tx,autor,pedido.id,"comprovante_pix","Anexo recebido via WhatsApp. Confira o comprovante e o pagamento.",`fluxo:${identidade}`);
+  await evento(tx,autor,pedido.id,"comprovante_pix","Pix registrado como pago pelo comprovante recebido no WhatsApp.",`fluxo:${identidade}`);
   await atualizarVersaoPagamento(tx,pedido.id,autor);
 }
 
@@ -99,10 +108,8 @@ export async function registrarEtapaPedido(banco:BancoSql,entrada:unknown) {
       :v.etapa==="revisar"?"Cliente recusou o resumo e deseja corrigir o pedido."
       :v.etapa==="adicionar"?"Cliente deseja acrescentar produtos.":"Itens concluídos; aguardando escolha do pagamento.";
     if(repetido){if(repetido.tipo!==v.etapa||repetido.detalhe!==detalhe)throw new ErroDeNegocio("Operação já utilizada com outros dados.");return p.total;}
-    if(v.etapa==="adicionar"||v.etapa==="finalizar"||v.etapa==="pagamento") {
-      const conferido=linhas(await tx.execute(sql`SELECT id FROM atendeia_pedidos_eventos WHERE pedido_id=${v.id} AND tipo='pix_conferido' AND is_deleted=false LIMIT 1`));
-      if(conferido.length)throw new ErroDeNegocio("A equipe já confirmou o Pix deste pedido. Fale com a farmácia para solicitar alterações.");
-    }
+    const ultimo=v.etapa==="revisar"?undefined:await ultimaEtapaPagamento(tx,v.id);
+    if((v.etapa==="adicionar"||v.etapa==="finalizar"||v.etapa==="pagamento")&&etapaPixPago(ultimo?.tipo))throw new ErroDeNegocio("O Pix deste pedido já está registrado como pago. Fale com a farmácia para solicitar alterações.");
     if((v.etapa==="finalizar"||v.etapa==="pagamento")&&!await reservaCobreItens(tx,v.id))throw new ReservaDoPedidoInvalida();
     if(v.etapa==="pagamento") {
       const [finalizado]=linhas<{tipo:string}>(await tx.execute(sql`SELECT tipo FROM atendeia_pedidos_eventos WHERE pedido_id=${v.id} AND ${marcosFinalizacao} AND is_deleted=false ORDER BY created_at DESC,id DESC LIMIT 1`));
@@ -113,11 +120,8 @@ export async function registrarEtapaPedido(banco:BancoSql,entrada:unknown) {
       if(pg.troco==="sim"&&pg.valor!=="0.00"&&BigInt(pg.valor.replace(".",""))<BigInt(p.total.replace(".","")))throw new ErroDeNegocio("O valor para troco precisa cobrir o total do pedido.");
     }
     if(v.etapa==="endereco_entrega"||v.etapa==="destinatario_entrega") {
-      const [ultimo]=linhas<{tipo:string;detalhe:string}>(await tx.execute(sql`SELECT tipo,detalhe FROM atendeia_pedidos_eventos
-        WHERE pedido_id=${v.id} AND is_deleted=false AND (${tiposFluxoPagamento})
-        ORDER BY created_at DESC,id DESC LIMIT 1`));
       const pg=ultimo?.tipo==="pagamento"?pagamentoSalvo(ultimo.detalhe):undefined;
-      const permitido=podeColetarEntrega(pg,ultimo?.tipo==="comprovante_pix"||ultimo?.tipo==="pix_conferido");
+      const permitido=podeColetarEntrega(pg,etapaPixPago(ultimo?.tipo));
       if(!permitido)throw new ErroDeNegocio("Conclua a etapa de pagamento antes de continuar.");
       if(v.etapa==="destinatario_entrega") {
         const endereco=linhas(await tx.execute(sql`SELECT id FROM atendeia_pedidos_eventos WHERE pedido_id=${v.id}
@@ -176,7 +180,7 @@ export function respostaPagamento(pg:Pagamento,total:string,entrega:DadosEntrega
       comprovanteDemonstracao,
     ]};
     return {mensagens:[chave,`Pagamento por Pix registrado. Valor do pedido: ${valor}. Aguardando pagamento.`,
-      `${recebedor?`Recebedor: ${recebedor}. `:""}Quando concluir o pagamento, envie o comprovante aqui para a equipe conferir.`]};
+      `${recebedor?`Recebedor: ${recebedor}. `:""}Quando concluir o pagamento, envie o comprovante aqui para registrar o Pix no pedido.`]};
   }
   if(pg.forma==="cartao")return comPerguntaEntrega(["O entregador levará a maquininha para você passar o cartão na hora da entrega.","Seu pedido está sendo preparado."],entrega);
   if(pg.troco==="pendente")return {mensagens:["O pagamento em dinheiro será feito na entrega. Você vai precisar de troco?"]};
@@ -187,6 +191,6 @@ export function respostaPagamento(pg:Pagamento,total:string,entrega:DadosEntrega
 export function descreverPagamento(detalhe:string):string {
   try {
     const p=pagamentoSchema.parse(JSON.parse(detalhe));
-    return p.forma==="pix"?"Pix · aguardando conferência":p.forma==="cartao"?"Cartão na entrega · levar maquininha":`Dinheiro na entrega · ${p.troco==="nao"?"sem troco":p.troco==="sim"&&p.valor!=="0.00"?`troco para R$ ${p.valor.replace(".",",")}`:"troco a informar"}`;
+    return p.forma==="pix"?"Pix · aguardando comprovante":p.forma==="cartao"?"Cartão na entrega · levar maquininha":`Dinheiro na entrega · ${p.troco==="nao"?"sem troco":p.troco==="sim"&&p.valor!=="0.00"?`troco para R$ ${p.valor.replace(".",",")}`:"troco a informar"}`;
   }catch{return "Preferência de pagamento indisponível.";}
 }

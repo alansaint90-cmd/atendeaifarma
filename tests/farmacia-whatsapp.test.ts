@@ -268,6 +268,20 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       }
       assert.equal(await contarEventos(),eventosDaEntrega);
       assert.equal(transferencias,transferenciasAntes);
+      await atender("Dinheiro",{falhaProvedor:true});
+      const semTroco=await atender("Não",{falhaProvedor:true});
+      assert.match(semTroco.mensagens[0],/sem troco/);assert.equal(semTroco.mensagens.length,1);
+      assert.equal((await consultarOperacao(banco)).conversas[0].avisoEntrega,null);
+      await cliente.query("UPDATE atendeia_pedidos_reservas SET expira_em=now()-interval '1 minute' WHERE pedido_id=$1 AND is_deleted=false",[p.id]);
+      const eventosAntesDaTroca=await contarEventos();
+      const vencida=await atender("Pode trazer a maquininha?",{acao:"humano"});
+      assert.match(vencida.texto,/reserva do seu pedido não está mais válida/);
+      assert.doesNotMatch(vencida.texto,/sendo preparado|não tenho essa resposta/i);
+      assert.equal(await contarEventos(),eventosAntesDaTroca);
+      await executarPedido(banco,admin,{id:p.id,acao:"reservar",chave:randomUUID()});
+      const recuperada=await atender("Pode trazer a maquininha?",{acao:"humano"});
+      assert.match(recuperada.texto,/levará a maquininha/);
+      assert.doesNotMatch(recuperada.texto,/Qual é o endereço|nome de quem vai receber|reconfirmar/);
       const chaveAnterior=process.env.FARMACIA_PIX_CHAVE;
       try {
         process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
@@ -283,9 +297,11 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
         assert.doesNotMatch((await atender("Já paguei",{falhaProvedor:true})).texto,/endereço/);
         const recibo=await atender("",{falhaProvedor:true},config,true);
-        assert.match(recibo.mensagens[0],/conferir o comprovante/);
+        assert.match(recibo.mensagens[0],/Recebi o comprovante.*em andamento para entrega/);
         assert.equal(recibo.mensagens.length,1);
-        assert.match((await consultarOperacao(banco)).conversas[0].avisoEntrega??"",/Comprovante Pix/);
+        const [pago]=(await listarPedidos(banco,admin,{id:p.id})).pedidos;
+        assert.deepEqual(pago.pagamento,{forma:"pix",estado:"pago"});
+        assert.match((await consultarOperacao(banco)).conversas[0].avisoEntrega??"",/Comprovante Pix registrado · aguardando entrega/);
         assert.match((await atender("Rua Teste, 30, Centro",{falhaProvedor:true})).texto,/Endereço registrado/);
         const enderecos=await cliente.query<{detalhe:string}>("SELECT detalhe FROM atendeia_pedidos_eventos WHERE pedido_id=$1 AND tipo='endereco_entrega' AND is_deleted=false",[p.id]);
         assert.ok(enderecos.rows.some(e=>e.detalhe==="Rua Teste, 30, Centro"));
@@ -293,23 +309,12 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
         if(chaveAnterior===undefined)delete process.env.FARMACIA_PIX_CHAVE;
         else process.env.FARMACIA_PIX_CHAVE=chaveAnterior;
       }
-      await atender("Dinheiro",{falhaProvedor:true});
-      const semTroco=await atender("Não",{falhaProvedor:true});
-      assert.match(semTroco.mensagens[0],/sem troco/);assert.equal(semTroco.mensagens.length,1);
-      assert.equal((await consultarOperacao(banco)).conversas[0].avisoEntrega,null);
-      assert.doesNotMatch((await atender("Como está meu pedido?",{acao:"consultar_pedido",pedidoId:p.id})).texto,new RegExp(`${p.numero}|válida até`));
+      assert.match((await atender("Dinheiro",{falhaProvedor:true})).texto,/Pix deste pedido já está registrado/);
+      const consulta=await atender("Como está meu pedido?",{acao:"consultar_pedido",pedidoId:p.id});
+      assert.match(consulta.texto,/Pix já está registrado.*em andamento/);
+      assert.doesNotMatch(consulta.texto,new RegExp(`${p.numero}|válida até|será conferido`));
       assert.equal((await consultarProdutos(banco,admin,{termo:"DIP-30-TESTE"})).produtos[0].fisico,28);
       assert.equal((await cliente.query<{status:string}>("SELECT status FROM atendeia_pedidos WHERE id=$1",[p.id])).rows[0].status,"aguardando_pagamento");
-      await cliente.query("UPDATE atendeia_pedidos_reservas SET expira_em=now()-interval '1 minute' WHERE pedido_id=$1 AND is_deleted=false",[p.id]);
-      const eventosAntesDaTroca=await contarEventos();
-      const vencida=await atender("Pode trazer a maquininha?",{acao:"humano"});
-      assert.match(vencida.texto,/reserva do seu pedido não está mais válida/);
-      assert.doesNotMatch(vencida.texto,/sendo preparado|não tenho essa resposta/i);
-      assert.equal(await contarEventos(),eventosAntesDaTroca);
-      await executarPedido(banco,admin,{id:p.id,acao:"reservar",chave:randomUUID()});
-      const recuperada=await atender("Pode trazer a maquininha?",{acao:"humano"});
-      assert.match(recuperada.texto,/levará a maquininha/);
-      assert.doesNotMatch(recuperada.texto,/Qual é o endereço|nome de quem vai receber|reconfirmar/);
     });
   } finally {await cliente.close();}
 });
