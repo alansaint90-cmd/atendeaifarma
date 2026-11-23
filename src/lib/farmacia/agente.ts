@@ -11,7 +11,7 @@ import { listarPedidos } from "./consultas";
 import { createHash } from "node:crypto";
 import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./interpretar";
 import { personaDoAgente } from "../agent/nome";
-import { registrarEtapaPedido, respostaPagamento } from "./pagamento";
+import { registrarEtapaPedido, respostaPagamento, pagamentoSalvo, formaMencionada, enderecoInformado, perguntaEndereco, valorParaTroco } from "./pagamento";
 import { continuidadeDaConsulta, conviteContinuarPedido, descricaoComercial } from "./continuidade";
 import { NOME_FARMACIA } from "./configuracao-agente";
 const sistema={sistema:true} as const;
@@ -79,18 +79,62 @@ export async function atenderIntencao(banco:BancoSql,contexto:ContextoFarmacia,i
     return "Itens confirmados. Deseja acrescentar mais alguma coisa?";
   }
   if(a.acao==="adicionar"||a.acao==="finalizar"||a.acao==="pagamento") {
-    await registrarEtapaPedido(banco,{id:a.pedidoId,conversaId:contexto.conversaId,chave:identidade,etapa:a.acao,...(a.acao==="pagamento"?{pagamento:a.pagamento}:{} )});
+    const pg=a.pagamento&&a.pagamento.forma!=="dinheiro"?{...a.pagamento,troco:"pendente" as const,valor:"0.00"}:a.pagamento;
+    const total=await registrarEtapaPedido(banco,{id:a.pedidoId,conversaId:contexto.conversaId,chave:identidade,etapa:a.acao,...(a.acao==="pagamento"?{pagamento:pg}:{} )});
     if(a.acao==="adicionar")return "Qual produto você deseja acrescentar ao pedido?";
-    if(a.acao==="pagamento")return respostaPagamento(a.pagamento!);
+    if(a.acao==="pagamento")return respostaPagamento(pg!,total);
     return {mensagens:["Pedido registrado, aguardando pagamento.","Qual forma de pagamento você prefere: Pix, dinheiro ou cartão?"]};
   }
   const [p]=(await listarPedidos(banco,sistema,{id:a.pedidoId})).pedidos;
   return `Seu pedido está ${p.status.split("_").join(" ")}. Total: R$ ${p.total.replace(".",",")}.${p.status==="aguardando_pagamento"?" O pagamento será conferido pela equipe.":""}`;
 }
+function pedidoEmPagamento(contexto:ContextoFarmacia) {
+  const pendentes=contexto.pedidos.filter(p=>p.status==="aguardando_pagamento"&&
+    ["finalizar","pagamento","comprovante_pix","endereco_entrega"].includes(p.etapa??""));
+  return pendentes.length===1?pendentes[0]:undefined;
+}
+
+export async function responderComprovanteFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage):Promise<RespostaGerada|null> {
+  if(!m.midia)return null;
+  const contexto=await contextoDaConversa(banco,instancia,m);
+  const pedido=pedidoEmPagamento(contexto);
+  if(!pedido||pagamentoSalvo(pedido.pagamento)?.forma!=="pix")return null;
+  if(pedido.etapa==="endereco_entrega")return "O comprovante e o endereço já foram encaminhados para conferência da equipe.";
+  if(pedido.etapa==="pagamento")await registrarEtapaPedido(banco,{id:pedido.id,conversaId:contexto.conversaId,chave:m.identity,etapa:"comprovante_pix"});
+  else if(pedido.etapa!=="comprovante_pix")return null;
+  return {mensagens:["Recebi o anexo. A equipe vai conferir o comprovante.",perguntaEndereco]};
+}
+
 export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessage,request=fetch) {
   return async(config:AgentConfig,historico:Turn[],texto:string):Promise<RespostaGerada>=>{
     try {
       const contexto=await contextoDaConversa(banco,instancia,m);
+      const pedido=pedidoEmPagamento(contexto);
+      if(pedido) {
+        const forma=formaMencionada(texto);
+        const pg=pedido.etapa==="finalizar"?undefined:pagamentoSalvo(pedido.pagamento);
+        const executarPagamento=(pagamento:unknown)=>atenderIntencao(banco,contexto,
+          {acao:"pagamento",pedidoId:pedido.id,termo:"",itens:[],pagamento},m.identity);
+        if(forma)return await executarPagamento({forma});
+        if(pg?.forma==="dinheiro"&&pedido.etapa==="pagamento") {
+          if(pg.valor==="0.00"&&pg.troco!=="nao") {
+            if(/^(?:sim(?:[, ]+(?:preciso|por favor))?|preciso|vou precisar)[\s!.]*$/iu.test(texto.trim()))return await executarPagamento({forma:"dinheiro",troco:"sim"});
+            if(/^(?:n[aã]o|sem troco|n[aã]o preciso)[\s!.]*$/iu.test(texto.trim()))return await executarPagamento({forma:"dinheiro",troco:"nao"});
+          }
+          const valor=valorParaTroco(texto);
+          if(pg.troco!=="nao"&&valor)return await executarPagamento({forma:"dinheiro",troco:"sim",valor});
+        }
+        const coletarEndereco=pedido.etapa==="comprovante_pix"||(pedido.etapa==="pagamento"&&
+          (pg?.forma==="cartao"||(pg?.forma==="dinheiro"&&(pg.troco==="nao"||(pg.troco==="sim"&&pg.valor!=="0.00")))));
+        if((coletarEndereco||pedido.etapa==="endereco_entrega")&&enderecoInformado(texto)) {
+          await registrarEtapaPedido(banco,{id:pedido.id,conversaId:contexto.conversaId,chave:m.identity,etapa:"endereco_entrega",endereco:texto});
+          return "Endereço registrado. A equipe vai dar continuidade à entrega.";
+        }
+        if(coletarEndereco&&/^.{1,6}$|\b(?:rua|avenida|bairro|cep|endere[cç]o)\b/iu.test(texto.trim()))return perguntaEndereco;
+        if(pg?.forma==="pix"&&pedido.etapa==="pagamento"&&/^(?:j[aá]\s+)?(?:paguei|fiz o pix|pagamento (?:feito|conclu[ií]do))[\s!.]*$/iu.test(texto.trim())) {
+          return "Envie o comprovante por aqui para a equipe conferir.";
+        }
+      }
       const intencao=await interpretarIntencao(config,historico,texto,contexto,request);
       if(intencao.acao==="buscar"&&intencao.termo.trim().length>=2)return {
         consultarEstoque:intencao.termo.trim(),continuidade:continuidadeDaConsulta(contexto,historico)};

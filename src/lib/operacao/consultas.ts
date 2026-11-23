@@ -4,7 +4,7 @@ import { LIMITE_CONTATOS } from "./limites";
 
 export interface ContatoOperacional { id: string; version: number; nome: string; telefone: string | null; email: string | null; origem: string | null; status: string }
 export interface MensagemOperacional { id: string; conteudo: string | null; direcao: string; instante: string; tipo?: string; audioDisponivel?: boolean }
-export interface ConversaOperacional { id: string; version: number; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; fotoUrl?: string | null; mensagens: MensagemOperacional[] }
+export interface ConversaOperacional { id: string; version: number; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; avisoEntrega?: string | null; fotoUrl?: string | null; mensagens: MensagemOperacional[] }
 export interface ResumoOperacional {
   abertas: number; pendentes: number; qualificados: number; taxaResposta: number; totalContatos: number;
   contatos: ContatoOperacional[]; conversas: ConversaOperacional[]; volume: { dia: string; total: number }[];
@@ -33,7 +33,21 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
     const contatos = linhas<ContatoOperacional>(await tx.execute(sql`SELECT id,version,name nome,phone telefone,email,source origem,lead_status status
       FROM atendeia_contacts WHERE is_deleted=false ORDER BY created_at DESC,id LIMIT ${LIMITE_CONTATOS}`));
     const conversas = linhas<Omit<ConversaOperacional, "mensagens">>(await tx.execute(sql`SELECT c.id,c.version,p.name nome,p.phone telefone,ch.name canal,c.status,p.foto_url "fotoUrl",
-      (c.status='pending' AND c.human_takeover=true AND c.assigned_to IS NULL) "aguardaHumano"
+      (c.status='pending' AND c.human_takeover=true AND c.assigned_to IS NULL) "aguardaHumano",
+      (SELECT aviso FROM atendeia_pedidos pedido
+        CROSS JOIN LATERAL (SELECT CASE
+          WHEN e.tipo='comprovante_pix' THEN 'Comprovante Pix recebido para conferência'
+          WHEN e.tipo='pagamento' THEN CASE
+            WHEN e.detalhe::jsonb->>'forma'='dinheiro' AND e.detalhe::jsonb->>'troco'='sim' THEN CASE
+              WHEN e.detalhe::jsonb->>'valor'='0.00' THEN 'Cliente precisa de troco · valor a informar'
+              ELSE 'Preparar troco para R$ ' || replace(e.detalhe::jsonb->>'valor','.',',') END
+          END
+          END aviso
+          FROM atendeia_pedidos_eventos e WHERE e.pedido_id=pedido.id AND e.is_deleted=false
+            AND e.tipo IN ('pagamento','comprovante_pix','finalizar','adicionar','reservar','itens_acrescentados')
+          ORDER BY e.created_at DESC,e.id DESC LIMIT 1) entrega
+        WHERE pedido.conversa_id=c.id AND pedido.is_deleted=false AND pedido.status='aguardando_pagamento' AND aviso IS NOT NULL
+        ORDER BY pedido.created_at DESC,pedido.id LIMIT 1) "avisoEntrega"
       FROM atendeia_conversations c JOIN atendeia_contacts p ON p.id=c.contact_id JOIN atendeia_channels ch ON ch.id=c.channel_id
       WHERE c.is_deleted=false AND p.is_deleted=false AND ch.is_deleted=false ORDER BY c.last_message_at DESC NULLS LAST,c.id LIMIT 50`));
     const historicos: ConversaOperacional[] = [];
@@ -42,7 +56,7 @@ export async function consultarOperacao(banco: BancoSql): Promise<ResumoOperacio
         (message_type='audio' AND provider_message_id IS NOT NULL) "audioDisponivel",
         to_char(sent_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') instante FROM atendeia_messages
         WHERE conversation_id=${conversa.id} AND is_deleted=false ORDER BY sent_at DESC,created_at DESC,id LIMIT 50`)).reverse();
-      historicos.push({ id: conversa.id, version: conversa.version, nome: conversa.nome, telefone: conversa.telefone, canal: conversa.canal, status: conversa.status, aguardaHumano: conversa.aguardaHumano, fotoUrl: conversa.fotoUrl, mensagens });
+      historicos.push({ ...conversa, mensagens });
     }
     const volume = linhas<{ dia: string; total: number }>(await tx.execute(sql`SELECT to_char(d.dia,'YYYY-MM-DD') dia,count(m.id)::int total
       FROM generate_series((now() AT TIME ZONE 'UTC')::date-6,(now() AT TIME ZONE 'UTC')::date,interval '1 day') d(dia)

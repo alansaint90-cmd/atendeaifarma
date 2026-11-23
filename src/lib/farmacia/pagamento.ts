@@ -6,7 +6,8 @@ import { autorizar, evento, travarEstoque, reservaAtiva, elegivel } from "./comu
 
 export const pagamentoSchema=z.strictObject({forma:z.enum(["pix","dinheiro","cartao"]),troco:z.enum(["pendente","nao","sim"]).default("pendente"),valor:z.string().regex(/^\d{1,9}\.\d{2}$/).default("0.00")});
 export type Pagamento=z.infer<typeof pagamentoSchema>;
-const registroSchema=z.strictObject({id:z.uuid(),conversaId:z.uuid(),chave:z.string().min(8).max(220),etapa:z.enum(["adicionar","finalizar","pagamento"]),pagamento:pagamentoSchema.optional()});
+const registroSchema=z.strictObject({id:z.uuid(),conversaId:z.uuid(),chave:z.string().min(8).max(220),etapa:z.enum(["adicionar","finalizar","pagamento","comprovante_pix","endereco_entrega"]),pagamento:pagamentoSchema.optional(),endereco:z.string().trim().min(8).max(500).optional()});
+export const perguntaEndereco = "Qual é o endereço da entrega? Envie rua, número, bairro e complemento, se houver.";
 
 /** Preferência comercial no histórico; nunca comprova pagamento ou baixa estoque. */
 export async function registrarEtapaPedido(banco:BancoSql,entrada:unknown) {
@@ -17,9 +18,12 @@ export async function registrarEtapaPedido(banco:BancoSql,entrada:unknown) {
     if(!p||p.status!=="aguardando_pagamento")throw new ErroDeNegocio("Confirme primeiro os itens do pedido.");
     const chave=`fluxo:${v.chave}`;
     const [repetido]=linhas<{tipo:string;detalhe:string}>(await tx.execute(sql`SELECT tipo,detalhe FROM atendeia_pedidos_eventos WHERE pedido_id=${v.id} AND chave=${chave} AND is_deleted=false`));
-    const detalhe=v.etapa==="pagamento"?JSON.stringify(pagamentoSchema.parse(v.pagamento)):v.etapa==="adicionar"?"Cliente deseja acrescentar produtos.":"Itens concluídos; aguardando escolha do pagamento.";
-    if(repetido){if(repetido.tipo!==v.etapa||repetido.detalhe!==detalhe)throw new ErroDeNegocio("Operação já utilizada com outros dados.");return;}
-    if(v.etapa!=="adicionar") {
+    const detalhe=v.etapa==="pagamento"?JSON.stringify(pagamentoSchema.parse(v.pagamento))
+      :v.etapa==="endereco_entrega"?registroSchema.shape.endereco.unwrap().parse(v.endereco)
+      :v.etapa==="comprovante_pix"?"Anexo recebido via WhatsApp. Confira o comprovante e o pagamento."
+      :v.etapa==="adicionar"?"Cliente deseja acrescentar produtos.":"Itens concluídos; aguardando escolha do pagamento.";
+    if(repetido){if(repetido.tipo!==v.etapa||repetido.detalhe!==detalhe)throw new ErroDeNegocio("Operação já utilizada com outros dados.");return p.total;}
+    if(v.etapa==="finalizar"||v.etapa==="pagamento") {
       const invalidos=linhas(await tx.execute(sql`SELECT i.id FROM atendeia_pedidos_itens i WHERE i.pedido_id=${v.id} AND i.is_deleted=false AND i.quantidade<>(SELECT coalesce(sum(r.quantidade),0) FROM atendeia_pedidos_reservas r JOIN atendeia_produtos_lotes l ON l.id=r.lote_id JOIN atendeia_produtos p ON p.id=l.produto_id WHERE r.pedido_id=i.pedido_id AND p.id=i.produto_id AND ${reservaAtiva} AND ${elegivel})`));
       if(invalidos.length)throw new ErroDeNegocio("Preciso reconfirmar a disponibilidade dos itens com a equipe antes de continuar.");
     }
@@ -31,20 +35,57 @@ export async function registrarEtapaPedido(banco:BancoSql,entrada:unknown) {
       if(pg.troco!=="sim"&&pg.valor!=="0.00")throw new ErroDeNegocio("Informe o valor somente quando precisar de troco.");
       if(pg.troco==="sim"&&pg.valor!=="0.00"&&BigInt(pg.valor.replace(".",""))<BigInt(p.total.replace(".","")))throw new ErroDeNegocio("O valor para troco precisa cobrir o total do pedido.");
     }
+    if(v.etapa==="comprovante_pix"||v.etapa==="endereco_entrega") {
+      const [ultimo]=linhas<{tipo:string;detalhe:string}>(await tx.execute(sql`SELECT tipo,detalhe FROM atendeia_pedidos_eventos
+        WHERE pedido_id=${v.id} AND is_deleted=false AND tipo IN ('finalizar','reservar','itens_acrescentados','adicionar','pagamento','comprovante_pix')
+        ORDER BY created_at DESC,id DESC LIMIT 1`));
+      const pg=ultimo?.tipo==="pagamento"?pagamentoSalvo(ultimo.detalhe):undefined;
+      const permitido=v.etapa==="comprovante_pix"?pg?.forma==="pix":ultimo?.tipo==="comprovante_pix"||
+        pg?.forma==="cartao"||(pg?.forma==="dinheiro"&&(pg.troco==="nao"||(pg.troco==="sim"&&pg.valor!=="0.00")));
+      if(!permitido)throw new ErroDeNegocio("Conclua a etapa de pagamento antes de continuar.");
+    }
     await evento(tx,autor,v.id,v.etapa,detalhe,chave);
+    return p.total;
   });
 }
 
-export function respostaPagamento(pg:Pagamento) {
+export function pagamentoSalvo(detalhe?:string|null) {
+  try { return pagamentoSchema.safeParse(JSON.parse(detalhe ?? "null")).data; }
+  catch { return undefined; }
+}
+
+export function formaMencionada(texto:string):Pagamento["forma"]|undefined {
+  const normalizado=texto.normalize("NFD").replace(/\p{M}/gu,"").toLowerCase().trim();
+  const chave= /^(?:(?:me (?:mande|envie)|qual(?: e)?)\s+)?(?:a\s+)?chave\s+(?:do\s+)?pix[\s?!.]*$/;
+  if(chave.test(normalizado))return "pix";
+  const pedido=/^(?:(?:quero|vou|prefiro|posso|pode ser|gostaria de)\s+(?:pagar\s+)?)?(?:(?:no|na|em|por|com|via)\s+)?(pix|dinheiro|cartao)(?:\s+(?:por favor|na entrega|de credito|de debito))?[\s?!.]*$/.exec(normalizado);
+  return z.enum(["pix","dinheiro","cartao"]).safeParse(pedido?.[1]).data;
+}
+
+export function enderecoInformado(texto:string) {
+  const endereco=texto.trim();
+  const temLogradouro=/\b(?:rua|avenida|av\.?|travessa|alameda|estrada|rodovia|ladeira|pra[cç]a|quadra)\s+\S/iu.test(endereco);
+  const temNumero=/\d|\bs\/?n\b/iu.test(endereco);
+  return endereco.length>=8 && endereco.length<=500 && temLogradouro && temNumero;
+}
+
+export function valorParaTroco(texto:string) {
+  const valor=/^(?:(?:troco\s+)?(?:pra|para)\s+)?(?:r\$\s*)?(\d{1,9})(?:[,.](\d{2}))?(?:\s+reais)?[\s!.]*$/iu.exec(texto.trim());
+  return valor ? `${valor[1]}.${valor[2]??"00"}` : undefined;
+}
+
+export function respostaPagamento(pg:Pagamento,total:string):{mensagens:string[]} {
   if(pg.forma==="pix") {
     const chave=process.env.FARMACIA_PIX_CHAVE?.trim();
     const recebedor=process.env.FARMACIA_PIX_RECEBEDOR?.trim();
-    return chave?`Pagamento por Pix.\nChave Pix: ${chave}\n${recebedor?`Recebedor: ${recebedor}.`:"Confira o recebedor no seu banco antes de pagar."}\nApós o pagamento, envie o comprovante para conferência da equipe.`:"Pagamento por Pix registrado. A equipe da farmácia vai informar a chave para pagamento.";
+    return {mensagens:chave?[chave,`Valor do pedido: R$ ${total.replace(".",",")}.`,
+      `${recebedor?`Recebedor: ${recebedor}. `:""}Quando concluir o pagamento, envie o comprovante aqui para a equipe conferir.`]
+      :["Pagamento por Pix registrado. A equipe da farmácia vai informar a chave para pagamento."]};
   }
-  if(pg.forma==="cartao")return "Pagamento por cartão na entrega registrado. O entregador levará a maquininha de cartão.";
-  if(pg.troco==="pendente")return "O pagamento em dinheiro será feito na entrega. Vai precisar de troco?";
-  if(pg.troco==="sim"&&pg.valor==="0.00")return "Vai precisar de troco para qual valor?";
-  return pg.troco==="nao"?"Pagamento em dinheiro na entrega, sem troco, registrado no pedido.":`Pagamento em dinheiro na entrega registrado. Troco para R$ ${pg.valor.replace(".",",")}.`;
+  if(pg.forma==="cartao")return {mensagens:["O entregador levará a maquininha para você passar o cartão na hora da entrega.","Seu pedido está sendo preparado.",perguntaEndereco]};
+  if(pg.troco==="pendente")return {mensagens:["O pagamento em dinheiro será feito na entrega. Você vai precisar de troco?"]};
+  if(pg.troco==="sim"&&pg.valor==="0.00")return {mensagens:["Vai precisar de troco para qual valor?"]};
+  return {mensagens:[pg.troco==="nao"?"Pagamento em dinheiro na entrega, sem troco, registrado no pedido.":`Troco para R$ ${pg.valor.replace(".",",")} registrado para a equipe.`,perguntaEndereco]};
 }
 
 export function descreverPagamento(detalhe:string):string {

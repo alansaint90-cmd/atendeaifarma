@@ -5,7 +5,7 @@ import { evolutionEventSchema } from "../evolution/schema";
 import { streamKey } from "../evolution/queue";
 import { agentBaseConfigSchema } from "./config";
 import { configurarAgenteFarmacia as configurarAgente } from "../farmacia/configuracao-agente";
-import { consultaEstoqueFarmacia, geradorFarmacia } from "../farmacia/agente";
+import { consultaEstoqueFarmacia, geradorFarmacia, responderComprovanteFarmacia } from "../farmacia/agente";
 import { atendimentoHumanoAtivo } from "../farmacia/atendimento";
 import { incomingMessage, digest } from "./message";
 import { generateReply, sendReply, type ContinuidadeEstoque } from "./providers";
@@ -76,7 +76,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
       const config = configurarAgente(settingsDaInstancia(settings, instancia), chatbot);
       const followupConfig = followupDaInstancia(settings, instancia);
       if (parsed.success && config.success) await followups.observe(parsed.data, instancia);
-      const message = parsed.success && config.success ? incomingMessage(parsed.data, instancia, Date.now(), config.data.atendimento?.transferMedia) : null;
+      const message = parsed.success && config.success ? incomingMessage(parsed.data, instancia, Date.now(), true) : null;
       let result = "ignorada";
       if (message && config.success) {
         if (!await pausaManualAtiva(client, message.conversation)
@@ -92,6 +92,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
         result = await dependencies.apagada(instancia, message.number, message.timestamp, message.identity) ? "conversa_apagada"
           : await pausaManualAtiva(client, message.conversation) ? "pausa_manual" : await processMessage(message, config.data, {
           ...store, generate: substituicoes.generate ?? geradorFarmacia(db(), instancia, message), send: dependencies.send, transcribe: transcribeAudio,
+          receberMidia: () => responderComprovanteFarmacia(db(), instancia, message),
           consultarEstoque: (termo, continuidade) => dependencies.consultarEstoque(instancia, message, termo, continuidade),
           registrarParte: async (id, texto) => {
             await followups.outgoing(instancia, id);

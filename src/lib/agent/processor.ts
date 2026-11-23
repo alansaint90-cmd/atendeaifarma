@@ -22,6 +22,7 @@ export interface ProcessingPort {
   consultarEstoque?(termo: string, continuidade?: ContinuidadeEstoque): Promise<RespostaGerada>;
   agora?(): number;
   cadastroConsulta?(texto: string, iniciar: boolean): Promise<string | null>;
+  receberMidia?(): Promise<RespostaGerada | null>;
   generate(config: AgentConfig, history: Turn[], text: string): Promise<RespostaGerada>;
   send(config: AgentConfig, number: string, text: string): Promise<string>;
   registrarParte?(id: string, texto?: string): Promise<void>;
@@ -83,7 +84,9 @@ export async function processMessage(message: IncomingMessage, config: AgentConf
       if (!cadastro && config.agendaConsultas && port.cadastroConsulta && deveConsultarAgenda(transcript ?? message.text, historico)) {
         cadastro = await port.cadastroConsulta(transcript ?? message.text, true);
       }
-      const gerada = cadastro ?? (partes ? partes.join("\n\n") : message.midia && config.atendimento?.transferMedia ? { transferir: true as const }
+      const midia = message.midia ? await port.receberMidia?.() : null;
+      if (message.midia && !midia && !config.atendimento?.transferMedia) return "ignorada";
+      const gerada = cadastro ?? midia ?? (partes ? partes.join("\n\n") : message.midia && config.atendimento?.transferMedia ? { transferir: true as const }
         : await port.generate({ ...config, AI_SYSTEM_PROMPT: instrucoes }, contextoAtual, transcript ?? message.text));
       if (typeof gerada !== "string" && "consultarEstoque" in gerada) {
         const termo = z.string().trim().min(2).max(120).parse(gerada.consultarEstoque);

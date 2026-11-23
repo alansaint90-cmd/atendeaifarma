@@ -73,10 +73,12 @@ test('Pix só informa chave configurada e dinheiro diferencia necessidade de tro
   const anterior=process.env.FARMACIA_PIX_CHAVE;
   try {
     delete process.env.FARMACIA_PIX_CHAVE;
-    assert.match(respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'}),/equipe.*informar a chave/);
+    assert.match(respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'},'19.00').mensagens[0],/equipe.*informar a chave/);
     process.env.FARMACIA_PIX_CHAVE=`${randomUUID()}@example.invalid`;
-    assert.ok(respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'}).includes(process.env.FARMACIA_PIX_CHAVE));
-    assert.match(respostaPagamento({forma:'dinheiro',troco:'nao',valor:'0.00'}),/sem troco/);
-    assert.match(respostaPagamento({forma:'dinheiro',troco:'sim',valor:'0.00'}),/qual valor/);
+    const {mensagens}=respostaPagamento({forma:'pix',troco:'pendente',valor:'0.00'},'19.00');
+    assert.deepEqual(mensagens.slice(0,2),[process.env.FARMACIA_PIX_CHAVE,'Valor do pedido: R$ 19,00.']);
+    assert.equal(mensagens.length,3);assert.match(mensagens[2],/envie o comprovante/);
+    assert.match(respostaPagamento({forma:'dinheiro',troco:'nao',valor:'0.00'},'19.00').mensagens[0],/sem troco/);
+    assert.match(respostaPagamento({forma:'dinheiro',troco:'sim',valor:'0.00'},'19.00').mensagens[0],/qual valor/);
   }finally{if(anterior===undefined)delete process.env.FARMACIA_PIX_CHAVE;else process.env.FARMACIA_PIX_CHAVE=anterior;}
 });

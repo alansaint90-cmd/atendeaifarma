@@ -13,7 +13,8 @@ import { processMessage, type DeliveryState } from "../src/lib/agent/processor";
 import { sendReply, type Turn } from "../src/lib/agent/providers";
 import { salvarChatbotServidor, chatbotDaInstancia } from "../src/lib/chatbots/server-repository";
 import { criarChatbotFarmacia, promptAtendimentoFarmacia } from "../src/lib/farmacia/prompt";
-import { consultaEstoqueFarmacia, geradorFarmacia } from "../src/lib/farmacia/agente";
+import { consultaEstoqueFarmacia, geradorFarmacia, responderComprovanteFarmacia } from "../src/lib/farmacia/agente";
+import { consultarOperacao } from "../src/lib/operacao/consultas";
 import { salvarProduto, entradaEstoque, consultarProdutos } from "../src/lib/farmacia/catalogo";
 import { assumirConversa, atendimentoHumanoAtivo } from "../src/lib/farmacia/atendimento";
 import type { ProdutoEntrada } from "../src/lib/farmacia/validacao";
@@ -41,15 +42,15 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
     const id=await salvarProduto(banco,admin,{id:null,atualizadoEm:null,produto:cadastro,
       estoqueInicial:{codigo:"LOTE-VALIDO",quantidade:25,validade:"2099-12-31",chave:randomUUID()}});
 
-    async function atender(texto:string,acao:object,configuracao=config) {
+    async function atender(texto:string,acao:object,configuracao=config,anexo=false) {
       const inicioSaidas=saidas.length;
-      const evento={event:"messages.upsert" as const,instance:instancia,data:{key:{id:randomUUID(),fromMe:false,remoteJid:`${numero}@s.whatsapp.net`},messageTimestamp:Math.floor(Date.now()/1000),message:{conversation:texto}}};
+      const evento={event:"messages.upsert" as const,instance:instancia,data:{key:{id:randomUUID(),fromMe:false,remoteJid:`${numero}@s.whatsapp.net`},messageTimestamp:Math.floor(Date.now()/1000),message:anexo?{imageMessage:{}}:{conversation:texto}}};
       let enfileirado=false;
       const resposta=await receiveEvolutionEvent(new Request("https://farmacia.example.invalid/api/webhooks/evolution",{
         method:"POST",headers:{"Content-Type":"application/json","x-webhook-secret":settings.EVOLUTION_WEBHOOK_SECRET},body:JSON.stringify(evento)}),
       settings,async()=>{enfileirado=true;return "queued";},evento=>receberOperacao(banco,evento));
       assert.equal(resposta.status,202);assert.equal(enfileirado,true);
-      const mensagem=incomingMessage(evento,instancia)!;assert.ok(mensagem);
+      const mensagem=incomingMessage(evento,instancia,Date.now(),true)!;assert.ok(mensagem);
       const requisicao:typeof fetch=async(url,inicio)=>{
         if(String(url)==="https://api.openai.com/v1/responses") {
           const corpo=JSON.parse(String(inicio?.body));
@@ -70,6 +71,7 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const gerar=geradorFarmacia(banco,instancia,mensagem,requisicao);
       const porta={agora:()=>agora,consultarEstoque:consultaEstoqueFarmacia(banco,instancia,mensagem),read:async()=>estados.get(mensagem.identity)??null,write:async(estado:DeliveryState)=>{estados.set(mensagem.identity,estado);},
         history:async()=>historico,enabled:async()=>!await atendimentoHumanoAtivo(banco,instancia,numero),
+        receberMidia:()=>responderComprovanteFarmacia(banco,instancia,mensagem),
         generate:async(...args:Parameters<typeof gerar>)=>{const r=await gerar(...args);adicional=typeof r!=="string"&&"consultarEstoque" in r&&!!r.continuidade;return r;},
         send:(_config:typeof config,destino:string,texto:string)=>sendReply(config,destino,texto,requisicao),
         transferir:async()=>{transferencias++;},
@@ -195,8 +197,34 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const dinheiro=await atender("Dinheiro",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"dinheiro",troco:"pendente",valor:"0.00"}});
       assert.match(dinheiro.texto,/na entrega.*precisar de troco/s);
       assert.match((await atender("Sim",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"dinheiro",troco:"sim",valor:"0.00"}})).texto,/qual valor/);
+      assert.match((await consultarOperacao(banco)).conversas[0].avisoEntrega??"",/precisa de troco/);
       assert.match((await atender("Para 50 reais",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"dinheiro",troco:"sim",valor:"50.00"}})).texto,/Troco para R\$ 50,00/);
-      assert.match((await atender("Prefiro cartão",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"cartao",troco:"pendente",valor:"0.00"}})).texto,/maquininha/);
+      assert.match((await consultarOperacao(banco)).conversas[0].avisoEntrega??"",/Preparar troco para R\$ 50,00/);
+      const cartao=await atender("Prefiro cartão", {falhaProvedor:true});
+      assert.equal(cartao.mensagens.length,3);assert.match(cartao.mensagens[0],/maquininha/);
+      assert.match(cartao.mensagens[1],/sendo preparado/);assert.match(cartao.mensagens[2],/endereço/);
+      assert.match((await atender("Rua Teste, 12, Centro",{falhaProvedor:true})).texto,/Endereço registrado/);
+      const chaveAnterior=process.env.FARMACIA_PIX_CHAVE;
+      try {
+        process.env.FARMACIA_PIX_CHAVE="pagamento@example.invalid";
+        const pix=await atender("Pix",{acao:"pagamento",pedidoId:p.id,pagamento:{forma:"pix",troco:"sim",valor:"50.00"}});
+        assert.deepEqual(pix.mensagens.slice(0,2),["pagamento@example.invalid","Valor do pedido: R$ 19,00."]);
+        assert.match(pix.mensagens[2],/envie o comprovante/);
+        assert.doesNotMatch((await atender("Já paguei",{falhaProvedor:true})).texto,/endereço/);
+        const recibo=await atender("",{falhaProvedor:true},config,true);
+        assert.match(recibo.mensagens[0],/conferir o comprovante/);assert.match(recibo.mensagens[1],/endereço/);
+        assert.match((await consultarOperacao(banco)).conversas[0].avisoEntrega??"",/Comprovante Pix/);
+        assert.match((await atender("Rua Teste, 30, Centro",{falhaProvedor:true})).texto,/Endereço registrado/);
+        const enderecos=await cliente.query<{detalhe:string}>("SELECT detalhe FROM atendeia_pedidos_eventos WHERE pedido_id=$1 AND tipo='endereco_entrega' AND is_deleted=false",[p.id]);
+        assert.ok(enderecos.rows.some(e=>e.detalhe==="Rua Teste, 30, Centro"));
+      } finally {
+        if(chaveAnterior===undefined)delete process.env.FARMACIA_PIX_CHAVE;
+        else process.env.FARMACIA_PIX_CHAVE=chaveAnterior;
+      }
+      await atender("Dinheiro",{falhaProvedor:true});
+      const semTroco=await atender("Não",{falhaProvedor:true});
+      assert.match(semTroco.mensagens[0],/sem troco/);assert.match(semTroco.mensagens[1],/endereço/);
+      assert.equal((await consultarOperacao(banco)).conversas[0].avisoEntrega,null);
       assert.doesNotMatch((await atender("Como está meu pedido?",{acao:"consultar_pedido",pedidoId:p.id})).texto,new RegExp(`${p.numero}|válida até`));
       assert.equal((await consultarProdutos(banco,admin,{termo:"DIP-30-TESTE"})).produtos[0].fisico,28);
       assert.equal((await cliente.query<{status:string}>("SELECT status FROM atendeia_pedidos WHERE id=$1",[p.id])).rows[0].status,"aguardando_pagamento");

@@ -4,7 +4,7 @@ import { AvatarContato } from "./avatar";
 import { AudioMensagem } from "./audio-mensagem";
 
 export interface MensagemConversa { id: string; conteudo: string | null; direcao: string; instante: string; tipo?: string; audioDisponivel?: boolean }
-export interface ConversaLista { id: string; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; fotoUrl?: string | null; mensagens: MensagemConversa[] }
+export interface ConversaLista { id: string; nome: string; telefone: string | null; canal: string; status: string; aguardaHumano?: boolean; avisoEntrega?: string | null; fotoUrl?: string | null; mensagens: MensagemConversa[] }
 interface CaixaEntradaProps {
   conversas: ConversaLista[]; selecionada: string; aoSelecionar: (id: string) => void;
   resposta?: ReactNode; acoesConversa?: ReactNode; atualizar: () => void; atualizando?: boolean;
@@ -45,7 +45,7 @@ export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, a
           onClick={() => { aoSelecionar(c.id); definirAberta(true); }}>
           <AvatarContato nome={c.nome} fotoUrl={c.fotoUrl} /><span className="conversas-resumo"><span className="conversas-identificacao"><strong>{c.nome}</strong>{ultima && <time dateTime={ultima.instante}>{hora(ultima.instante)}</time>}</span>
             <span className="conversas-previa">{ultima ? `${ultima.direcao === "outbound" ? "Você: " : ""}${ultima.conteudo || "Mensagem sem texto"}` : "Nenhuma mensagem no histórico"}</span>
-            <span className="conversas-canal">{c.canal} · {c.aguardaHumano ? "🔔 Aguardando atendente" : status[c.status] ?? c.status}</span></span>
+            <span className="conversas-canal">{c.canal} · {c.aguardaHumano ? "🔔 Aguardando atendente" : c.avisoEntrega ? `🔔 ${c.avisoEntrega}` : status[c.status] ?? c.status}</span></span>
         </button></li>;
       })}</ul>
       {!filtradas.length && <p className="conversas-vazio" role="status">{conversas.length ? "Nenhuma conversa encontrada para essa busca." : "Nenhuma conversa recebida. Aguardando mensagens do WhatsApp."}</p>}
@@ -60,6 +60,7 @@ export function CaixaEntrada({ conversas, selecionada, aoSelecionar, resposta, a
         onScroll={e => { const el = e.currentTarget; acompanhar.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
         <p className="conversas-aviso">Últimas 50 mensagens deste atendimento</p>
         {conversa.aguardaHumano && <p className="conversas-aviso" role="status">A equipe foi notificada para responder. Assuma a conversa para continuar; a IA está pausada.</p>}
+        {conversa.avisoEntrega && <p className="conversas-aviso" role="status">🔔 {conversa.avisoEntrega}</p>}
         {conversa.mensagens.map((m, i) => <div key={m.id} className="conversas-linha">
           {(i === 0 || dia(m.instante) !== dia(conversa.mensagens[i - 1].instante)) && <span className="conversas-dia">{dia(m.instante)}</span>}
           <article className={`conversas-balao ${m.direcao === "inbound" ? "recebida" : "enviada"}`} aria-label={m.direcao === "inbound" ? "Mensagem recebida" : "Mensagem enviada"}>
