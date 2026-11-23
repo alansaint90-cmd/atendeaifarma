@@ -91,7 +91,7 @@ test("Redis real: encaminhamento da entrega retoma com a IA pausada, cancela fol
   let bloqueada=false,tentativas=0;
   const dependencias={settings:async()=>({AI_ENABLED:"true" as const,OPENAI_API_KEY:"sk-test-only",OPENAI_MODEL:"modelo",
     EVOLUTION_API_URL:"https://example.invalid",EVOLUTION_API_KEY:"teste",EVOLUTION_INSTANCE_NAME:instancia,REDIS_URL:url}),
-    chatbot:async()=>({...chatbotExample,transferHuman:false}),
+    chatbot:async()=>({...chatbotExample,context:"Fluxo de entrega para teste.",transferHuman:false}),
     pausaConversa:async()=>({bloqueada,retomadaEm:0}),
     generate:async()=>({mensagens:[aviso],encaminharEntrega:true as const}),
     registrarEnvio:async(_i:string,_id:string,info?:MensagemConfirmadaIa)=>{
