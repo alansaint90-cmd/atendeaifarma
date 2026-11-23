@@ -6,7 +6,7 @@ import { autorizar, evento, travarEstoque, reservaAtiva, elegivel } from "./comu
 
 export const pagamentoSchema=z.strictObject({forma:z.enum(["pix","dinheiro","cartao"]),troco:z.enum(["pendente","nao","sim"]).default("pendente"),valor:z.string().regex(/^\d{1,9}\.\d{2}$/).default("0.00")});
 export type Pagamento=z.infer<typeof pagamentoSchema>;
-const registroSchema=z.strictObject({id:z.uuid(),conversaId:z.uuid(),chave:z.string().min(8).max(220),etapa:z.enum(["adicionar","finalizar","pagamento","comprovante_pix","endereco_entrega"]),pagamento:pagamentoSchema.optional(),endereco:z.string().trim().min(8).max(500).optional()});
+const registroSchema=z.strictObject({id:z.uuid(),conversaId:z.uuid(),chave:z.string().min(8).max(220),etapa:z.enum(["adicionar","finalizar","pagamento","comprovante_pix","endereco_entrega","revisar"]),pagamento:pagamentoSchema.optional(),endereco:z.string().trim().min(8).max(500).optional()});
 export const perguntaEndereco = "Qual é o endereço da entrega? Envie rua, número, bairro e complemento, se houver.";
 
 /** Preferência comercial no histórico; nunca comprova pagamento ou baixa estoque. */
@@ -15,12 +15,13 @@ export async function registrarEtapaPedido(banco:BancoSql,entrada:unknown) {
   return banco.transaction(async tx=>{
     await travarEstoque(tx);const autor=await autorizar(tx,{sistema:true},"operador",true);
     const [p]=linhas<{status:string;total:string}>(await tx.execute(sql`SELECT status,total::text FROM atendeia_pedidos WHERE id=${v.id} AND conversa_id=${v.conversaId} AND is_deleted=false FOR UPDATE`));
-    if(!p||p.status!=="aguardando_pagamento")throw new ErroDeNegocio("Confirme primeiro os itens do pedido.");
+    if(!p||p.status!==(v.etapa==="revisar"?"aguardando_confirmacao":"aguardando_pagamento"))throw new ErroDeNegocio("Confirme primeiro os itens do pedido.");
     const chave=`fluxo:${v.chave}`;
     const [repetido]=linhas<{tipo:string;detalhe:string}>(await tx.execute(sql`SELECT tipo,detalhe FROM atendeia_pedidos_eventos WHERE pedido_id=${v.id} AND chave=${chave} AND is_deleted=false`));
     const detalhe=v.etapa==="pagamento"?JSON.stringify(pagamentoSchema.parse(v.pagamento))
       :v.etapa==="endereco_entrega"?registroSchema.shape.endereco.unwrap().parse(v.endereco)
       :v.etapa==="comprovante_pix"?"Anexo recebido via WhatsApp. Confira o comprovante e o pagamento."
+      :v.etapa==="revisar"?"Cliente recusou o resumo e deseja corrigir o pedido."
       :v.etapa==="adicionar"?"Cliente deseja acrescentar produtos.":"Itens concluídos; aguardando escolha do pagamento.";
     if(repetido){if(repetido.tipo!==v.etapa||repetido.detalhe!==detalhe)throw new ErroDeNegocio("Operação já utilizada com outros dados.");return p.total;}
     if(v.etapa==="finalizar"||v.etapa==="pagamento") {

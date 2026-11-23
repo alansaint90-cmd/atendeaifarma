@@ -9,15 +9,23 @@ import { reservarItens, confirmarItens, cancelarItens } from "./transacoes";
 import { criarNegociacao, sincronizarNegociacao, atualizarValorNegociacao } from "./crm";
 
 export interface PedidoInterno { id:string; status:string; contato_id:string; conversa_id:string|null; total:string; confirmado_em:string|null; conferido_por:string|null }
-export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: unknown, acrescentarId?: string) {
+export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: unknown, acrescentarId?: string, ajustarQuantidade = false) {
   const v = novoPedidoSchema.parse(entrada);
   if(acrescentarId)z.uuid().parse(acrescentarId);
   if (new Set(v.itens.map(i=>i.produtoId)).size!==v.itens.length) throw new ErroDeNegocio("Agrupe as quantidades do mesmo produto.");
   const operacao=createHash("sha256").update(v.chave).digest("hex");
-  const assinatura=createHash("sha256").update(JSON.stringify([...v.itens].sort((a,b)=>a.produtoId.localeCompare(b.produtoId)))).digest("hex");
-  const chaveAcrescimo=`acrescentar:${operacao}:${assinatura}`;
+  const assinatura=createHash("sha256").update(JSON.stringify([...v.itens].sort((a,b)=>a.produtoId.localeCompare(b.produtoId))));
+  if(ajustarQuantidade)assinatura.update(":ajustar");
+  const chaveAcrescimo=`acrescentar:${operacao}:${assinatura.digest("hex")}`;
   return banco.transaction(async tx => {
     await travarEstoque(tx); const autor = await autorizar(tx,ator,"operador",true);
+    const [repetido] = linhas<{id:string;contato_id:string;conversa_id:string|null}>(await tx.execute(sql`SELECT id,contato_id,conversa_id FROM atendeia_pedidos WHERE chave=${v.chave} AND is_deleted=false`));
+    if (repetido) {
+      const anteriores=linhas<{produtoId:string;quantidade:number}>(await tx.execute(sql`SELECT produto_id "produtoId",quantidade FROM atendeia_pedidos_itens WHERE pedido_id=${repetido.id} AND is_deleted=false ORDER BY produto_id`));
+      const normalizar=(itens:{produtoId:string;quantidade:number}[])=>JSON.stringify([...itens].sort((a,b)=>a.produtoId.localeCompare(b.produtoId)));
+      if (repetido.contato_id!==v.contatoId || repetido.conversa_id!==v.conversaId || normalizar(anteriores)!==normalizar(v.itens)) throw new ErroDeNegocio("Identificador de operação já utilizado com outros itens ou cliente.");
+      return repetido.id;
+    }
     if(acrescentarId) {
       const [anterior]=linhas<{id:string}>(await tx.execute(sql`SELECT id FROM atendeia_pedidos WHERE id=${acrescentarId} AND contato_id=${v.contatoId} AND conversa_id=${v.conversaId} AND status IN ('aguardando_confirmacao','aguardando_pagamento') AND is_deleted=false FOR UPDATE`));
       if(!anterior)throw new ErroDeNegocio("Pedido indisponível para acrescentar itens.");
@@ -25,17 +33,10 @@ export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: 
       if(repeticao){if(repeticao.chave!==chaveAcrescimo)throw new ErroDeNegocio("Operação já utilizada com outros itens.");return anterior.id;}
       const anteriores=linhas<{produtoId:string;quantidade:number}>(await tx.execute(sql`SELECT produto_id "produtoId",quantidade FROM atendeia_pedidos_itens WHERE pedido_id=${anterior.id} AND is_deleted=false`));
       const somados=new Map(anteriores.map(i=>[i.produtoId,i.quantidade]));
-      for(const i of v.itens)somados.set(i.produtoId,(somados.get(i.produtoId)??0)+i.quantidade);
+      for(const i of v.itens)somados.set(i.produtoId,ajustarQuantidade?i.quantidade:(somados.get(i.produtoId)??0)+i.quantidade);
       v.itens=[...somados].map(([produtoId,quantidade])=>({produtoId,quantidade}));
       novoPedidoSchema.parse(v);
       await tx.execute(sql`UPDATE atendeia_pedidos_reservas SET status='liberada',updated_at=clock_timestamp(),modified_by=${autor} WHERE pedido_id=${anterior.id} AND status='ativa' AND is_deleted=false`);
-    }
-    const [repetido] = linhas<{id:string;contato_id:string;conversa_id:string|null}>(await tx.execute(sql`SELECT id,contato_id,conversa_id FROM atendeia_pedidos WHERE chave=${v.chave} AND is_deleted=false`));
-    if (repetido) {
-      const anteriores=linhas<{produtoId:string;quantidade:number}>(await tx.execute(sql`SELECT produto_id "produtoId",quantidade FROM atendeia_pedidos_itens WHERE pedido_id=${repetido.id} AND is_deleted=false ORDER BY produto_id`));
-      const normalizar=(itens:{produtoId:string;quantidade:number}[])=>JSON.stringify([...itens].sort((a,b)=>a.produtoId.localeCompare(b.produtoId)));
-      if (repetido.contato_id!==v.contatoId || repetido.conversa_id!==v.conversaId || normalizar(anteriores)!==normalizar(v.itens)) throw new ErroDeNegocio("Identificador de operação já utilizado com outros itens ou cliente.");
-      return repetido.id;
     }
     if (!linhas(await tx.execute(sql`SELECT id FROM atendeia_contacts WHERE id=${v.contatoId} AND is_deleted=false`)).length) throw new ErroDeNegocio("Contato indisponível.");
     if (v.conversaId && !linhas(await tx.execute(sql`SELECT id FROM atendeia_conversations WHERE id=${v.conversaId} AND contact_id=${v.contatoId} AND is_deleted=false`)).length) throw new ErroDeNegocio("Conversa não pertence ao cliente.");
@@ -56,7 +57,8 @@ export async function criarPedido(banco: BancoSql, ator: AtorFarmacia, entrada: 
     if(acrescentarId) {
       await tx.execute(sql`UPDATE atendeia_pedidos SET total=${decimal(total)},status='aguardando_confirmacao',conferido_por=NULL,conferencia=NULL,updated_at=clock_timestamp(),modified_by=${autor} WHERE id=${id} AND is_deleted=false`);
       for(const i of itens)await tx.execute(sql`INSERT INTO atendeia_pedidos_itens(pedido_id,produto_id,quantidade,preco,descricao,modified_by) VALUES (${id},${i.produtoId},${i.quantidade},${i.preco},${i.descricao},${autor}) ON CONFLICT (pedido_id,produto_id) DO UPDATE SET quantidade=EXCLUDED.quantidade,preco=EXCLUDED.preco,descricao=EXCLUDED.descricao,updated_at=clock_timestamp(),modified_by=EXCLUDED.modified_by`);
-      await evento(tx,autor,id,"itens_acrescentados","Itens acrescentados; aguarda nova confirmação.",chaveAcrescimo);
+      await evento(tx,autor,id,ajustarQuantidade?"itens_corrigidos":"itens_acrescentados",
+        ajustarQuantidade?"Quantidades corrigidas; aguarda nova confirmação.":"Itens acrescentados; aguarda nova confirmação.",chaveAcrescimo);
       await atualizarValorNegociacao(tx,autor,id);
       return id;
     }
@@ -83,7 +85,15 @@ export async function executarPedido(banco: BancoSql, ator: AtorFarmacia, entrad
     if (v.acao==="cancelar" && p.status==="cancelado") return p.id;
     if (v.acao==="confirmar" && p.confirmado_em && p.status!=="cancelado") return p.id;
     if (p.status==="cancelado") throw new ErroDeNegocio("Pedido cancelado.");
-    if (v.acao==="reservar") await reservarItens(tx,p,autor);
+    if (v.acao==="reservar") {
+      if("sistema" in ator) {
+        const [ultima]=linhas<{tipo:string}>(await tx.execute(sql`SELECT tipo FROM atendeia_pedidos_eventos
+          WHERE pedido_id=${v.id} AND tipo IN ('revisar','itens_corrigidos','itens_acrescentados') AND is_deleted=false
+          ORDER BY created_at DESC,id DESC LIMIT 1`));
+        if(ultima?.tipo==="revisar")throw new ErroDeNegocio("Informe quais itens ou quantidades deseja corrigir antes de confirmar.");
+      }
+      await reservarItens(tx,p,autor);
+    }
     if (v.acao==="confirmar") {
       if (v.referencia.length<5) throw new ErroDeNegocio("Registre a referência da conferência de pagamento.");
       await confirmarItens(tx,p,autor,v.referencia);

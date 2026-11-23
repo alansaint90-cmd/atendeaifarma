@@ -191,6 +191,16 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const acrescimo=await atender("Mais uma dipirona",{acao:"criar_pedido",itens:[{produtoId:id,quantidade:1}]});
       assert.match(acrescimo.texto,/2 ×.*Total: R\$ 19,00/s);
       assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,1);
+      const acaoErrada={acao:"criar_pedido",itens:[{produtoId:id,quantidade:1}]};
+      const paracetamol=await atender("Tem paracetamol?",acaoErrada);
+      assert.match(paracetamol.texto,/não temos esse produto disponível/);
+      assert.equal((await cliente.query<{total:string}>("SELECT total::text FROM atendeia_pedidos WHERE id=$1",[p.id])).rows[0].total,"19.00");
+      const recusa=await atender("Não",{acao:"reservar",pedidoId:p.id});
+      assert.match(recusa.texto,/Qual produto e quantidade/);
+      assert.match((await atender("Sim",{acao:"reservar",pedidoId:p.id})).texto,/corrigir antes de confirmar/);
+      assert.match((await atender("Eu quero uma dipirona só",acaoErrada)).texto,/1 ×.*Total: R\$ 9,50/s);
+      assert.match((await atender("Uma dipirona só",acaoErrada)).texto,/1 ×.*Total: R\$ 9,50/s);
+      assert.match((await atender("Mais uma dipirona",acaoErrada)).texto,/2 ×.*Total: R\$ 19,00/s);
       await atender("Sim",{acao:"reservar",pedidoId:p.id});
       const fim=await atender("Não, só isso",{acao:"finalizar",pedidoId:p.id});
       assert.deepEqual(fim.mensagens,["Pedido registrado, aguardando pagamento.","Qual forma de pagamento você prefere: Pix, dinheiro ou cartão?"]);

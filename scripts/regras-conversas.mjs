@@ -1,6 +1,8 @@
 /** Exclusão visual usa o schema ativo e não pode contornar versão, papel ou auditoria. */
 export function regrasConversas(rel, content) {
   const regras = [
+    ["src/lib/farmacia/agente.ts", [/normalizarPedido\(texto\)/, /etapa:"revisar"/, /candidatos.length!==1/, /if\(intencao.acao==="criar_pedido"\)/]],
+    ["src/lib/farmacia/pedidos.ts", [/ajustarQuantidade\?i.quantidade/, /ultima\?\.tipo==="revisar"/, /itens_corrigidos/, /await travarEstoque\(tx\)/]],
     ["src/lib/farmacia/pagamento.ts", [/comprovante_pix/, /endereco_entrega/, /travarEstoque\(tx\)/, /conversa_id=\$\{v.conversaId\}/, /await evento\(tx/, /FARMACIA_PIX_CHAVE/]],
     ["src/lib/farmacia/configuracao-agente.ts", [/perguntarNome = false/, /openingMessages = undefined/, /Farmácia WE/]],
     ["src/lib/operacao/atribuir-ia.ts", [/z.strictObject/, /banco.transaction/, /FOR UPDATE OF c/, /ON CONFLICT DO NOTHING RETURNING id/, /mensagem_ia_registrada/, /version=\$\{conversa.version\}/, /if \(!origemId\) return/]],
