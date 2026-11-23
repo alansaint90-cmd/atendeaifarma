@@ -19,6 +19,7 @@ export function regrasConversas(rel, content) {
     ["src/lib/operacao/apagar-conversa.ts", [/z.strictObject/, /autorizar\(tx, sessao, "admin"\)/, /banco.transaction/, /FOR UPDATE/, /version=\$\{dados.version\}/, /marcaDeExclusao\(autor\)/, /status='enviando'/, /INSERT INTO atendeia_audit_logs/]],
     ["src/components/operacao/acoes-conversa.tsx", [/ModalConfirmacaoBlock/, /definirConfirmacao\(\{ id, version \}\)/, /executando.current/, /Mais opções da conversa/]],
     ["src/lib/agent/processor.ts", [/state\?\.confirmarEncaminhamento/, /status:"gerada",confirmarEncaminhamento:true/, /await port.write\(state\);\s*return finalizarEncaminhamento/]],
+    ["src/lib/agent/consulta-estoque.ts", [/enviadas < 2/, /const partes = \[avisoIndisponibilidade, perguntaOutroProduto\]/]],
     ["src/lib/agent/worker.ts", [/conversaApagadaAposMensagem/, /dependencies.apagada\(instancia, message.number, message.timestamp, message.identity\)/, /dependencies.apagada\(instancia, job.number, job.started \/ 1000, job.identity\)/, /!state.encaminharEntrega/, /pausarTransferencia\(client, token, message.conversation, Date.now\(\), false\)/]],
   ];
   return regras.filter(([arquivo, obrigatorios]) => arquivo === rel && obrigatorios.some(re => !re.test(content)))

@@ -15,6 +15,8 @@ export const esperaConsultaEstoque = 15000;
 const aviso = "Um momento, vou consultar o estoque.";
 const consultando = "Consultando…";
 const falhaConsulta = "Não consegui consultar o sistema agora. Não posso confirmar preço ou disponibilidade. Tente novamente ou solicite atendimento humano.";
+export const avisoIndisponibilidade = "No momento não temos esse produto disponível.";
+export const perguntaOutroProduto = "Gostaria de consultar outro produto?";
 
 /** Cada saída e prazo ficam no checkpoint Redis; nenhuma espera mantém a lease ocupada. */
 export async function processarConsultaEstoque(message: IncomingMessage, config: AgentConfig, port: ProcessingPort, inicial: DeliveryState): Promise<string> {
@@ -71,6 +73,12 @@ export async function processarConsultaEstoque(message: IncomingMessage, config:
       estoque: { ...estado.estoque!, etapa: "transferir" } });
   }
   if (estado.estoque!.etapa === "resposta") {
+    // Um checkpoint anterior pode ter guardado um convite citando outro medicamento.
+    const enviadas = (estado.providerIds?.length ?? prefixo.length) - prefixo.length;
+    if (enviadas < 2 && estado.partes?.[0] === avisoIndisponibilidade && estado.partes[1] !== perguntaOutroProduto) {
+      const partes = [avisoIndisponibilidade, perguntaOutroProduto];
+      await salvar({ ...estado, partes, reply: [...prefixo, ...partes].join("\n\n") });
+    }
     for (let indice = (estado.providerIds?.length ?? prefixo.length) - prefixo.length; indice < estado.partes!.length; indice++) {
       const resultado = await enviar(estado.partes![indice]);
       if (resultado) return resultado;

@@ -13,7 +13,8 @@ import { intencaoSchema, interpretarIntencao, type ContextoFarmacia } from "./in
 import { personaDoAgente } from "../agent/nome";
 import { registrarEtapaPedido, respostaPagamento, respostaPixSemPedido, pagamentoSalvo, formaMencionada, enderecoInformado, destinatarioInformado,
   perguntaEndereco, perguntaDestinatario, comPerguntaEntrega, podeColetarEntrega, valorParaTroco, ReservaDoPedidoInvalida, marcosFinalizacao, etapaPixPago } from "./pagamento";
-import { continuidadeDaConsulta, conviteContinuarPedido, descricaoComercial } from "./continuidade";
+import { continuidadeDaConsulta, descricaoComercial } from "./continuidade";
+import { avisoIndisponibilidade, perguntaOutroProduto } from "../agent/consulta-estoque";
 import { NOME_FARMACIA } from "./configuracao-agente";
 const sistema={sistema:true} as const;
 function textoDaOferta(produto:Produto) {
@@ -195,6 +196,10 @@ export function geradorFarmacia(banco:BancoSql,instancia:string,m:IncomingMessag
     try {
       const contexto=await contextoDaConversa(banco,instancia,m);
       const textoNormal=normalizarPedido(texto);
+      const aceitouOutraConsulta=/^(?:sim(?:[, ]+(?:por favor|quero|gostaria))?|pode ser|quero|gostaria|(?:quero |gostaria de )?outr[oa] (?:produto|medicacao|medicamento))$/;
+      if(aceitouOutraConsulta.test(textoNormal)&&historico.findLast(t=>t.role==="assistant")?.content.endsWith(perguntaOutroProduto)) {
+        return "Qual medicamento ou produto você gostaria de consultar?";
+      }
       const pendentes=contexto.pedidos.filter(p=>["aguardando_confirmacao","aguardando_pagamento"].includes(p.status));
       const revisavel=pendentes.length===1&&pendentes[0].status==="aguardando_confirmacao"?pendentes[0]:undefined;
       const corrigir="Certo. Qual produto e quantidade você quer no pedido? Por exemplo: 1 dipirona.";
@@ -297,8 +302,7 @@ export function consultaEstoqueFarmacia(banco:BancoSql,instancia:string,m:Incomi
     const contexto=await contextoDaConversa(banco,instancia,m);
     const resposta=await atenderIntencao(banco,contexto,{acao:"buscar",termo,pedidoId:"",itens:[]},m.identity);
     if(continuidade&&typeof resposta!=="string"&&"mensagens" in resposta&&resposta.transferirEstoque) {
-      const convite=await conviteContinuarPedido(banco,contexto.conversaId,continuidade);
-      if(convite)return {mensagens:["No momento não temos esse produto disponível.",convite]};
+      return {mensagens:[avisoIndisponibilidade,perguntaOutroProduto]};
     }
     return resposta;
   };

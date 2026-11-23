@@ -134,10 +134,10 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const exata=await atender("Quero acrescentar dipirona caixa com 30 comprimidos",{acao:"buscar",termo:"Dipirona 30 comprimidos"});
       assert.equal(exata.todas[0],"Consultando…");assert.equal(exata.todas.length,3);
       assert.equal(exata.mensagens[0],"No momento não temos esse produto disponível.");
-      assert.match(exata.mensagens[1],/Gostaria de finalizar.*Dipirona.*500 mg.*comprimidos/s);
-      assert.doesNotMatch(exata.mensagens[1],/30 comprimidos/);assert.equal(transferencias,antes);
+      assert.equal(exata.mensagens[1],"Gostaria de consultar outro produto?");
+      assert.doesNotMatch(exata.texto,/dipirona|30 comprimidos/i);assert.equal(transferencias,antes);
       assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,0,"Oferta anterior não cria pedido nem assume quantidade.");
-      assert.equal((await atender("Sim",{acao:"esclarecer",campo:"quantidade"})).texto,"Quantas embalagens você deseja?");
+      assert.equal((await atender("Sim",{falhaProvedor:true})).texto,"Qual medicamento ou produto você gostaria de consultar?");
       const consultas=await cliente.query<{nome:string;apresentacao:string}>("SELECT p.nome,p.apresentacao FROM atendeia_produtos_consultas q JOIN atendeia_produtos p ON p.id=q.produto_id WHERE p.apresentacao='caixa com 30 comprimidos'");
       assert.equal(consultas.rows.length,0,"Opção indisponível não deve entrar no contexto de oferta.");
     });
@@ -231,16 +231,17 @@ test("WhatsApp da farmácia integra mensagem, prompt salvo, consulta real e resp
       const antes=transferencias;
       const indisponivel=await atender("Quero acrescentar produto inexistente",{acao:"buscar",termo:"Produto inexistente"});
       assert.equal(indisponivel.todas.length,3);assert.equal(indisponivel.todas[0],"Consultando…");
-      assert.match(indisponivel.mensagens[1],/finalizar.*Dipirona/s);assert.equal(transferencias,antes);
+      assert.equal(indisponivel.mensagens[1],"Gostaria de consultar outro produto?");assert.equal(transferencias,antes);
       assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,1);
-      assert.deepEqual((await atender("Sim",{acao:"finalizar",pedidoId:p.id})).mensagens,
+      assert.equal((await atender("Sim",{falhaProvedor:true})).texto,"Qual medicamento ou produto você gostaria de consultar?");
+      assert.deepEqual((await atender("Quero finalizar o pedido",{acao:"finalizar",pedidoId:p.id})).mensagens,
         ["Pedido registrado, aguardando pagamento.","Qual forma de pagamento você prefere: Pix, dinheiro ou cartão?"]);
       const acrescimo=await atender("Mais uma dipirona",{acao:"criar_pedido",itens:[{produtoId:id,quantidade:1}]});
       assert.match(acrescimo.texto,/2 ×.*Total: R\$ 19,00/s);
       assert.equal((await cliente.query("SELECT id FROM atendeia_pedidos")).rows.length,1);
       const acaoErrada={acao:"criar_pedido",itens:[{produtoId:id,quantidade:1}]};
-      const paracetamol=await atender("Tem paracetamol?",acaoErrada);
-      assert.match(paracetamol.texto,/não temos esse produto disponível/);
+      const metronidazol=await atender("Metronidazol",acaoErrada);
+      assert.deepEqual(metronidazol.mensagens,["No momento não temos esse produto disponível.","Gostaria de consultar outro produto?"]);
       assert.equal((await cliente.query<{total:string}>("SELECT total::text FROM atendeia_pedidos WHERE id=$1",[p.id])).rows[0].total,"19.00");
       const recusa=await atender("Não",{acao:"reservar",pedidoId:p.id});
       assert.match(recusa.texto,/Qual produto e quantidade/);
