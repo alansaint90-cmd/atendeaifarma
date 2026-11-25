@@ -37,7 +37,8 @@ test.each([
   render(<FormularioLogin />);
   preencherLogin();
   expect(await screen.findByRole("alert")).toHaveTextContent(mensagem);
-  expect(screen.queryByText(/convite/i)).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Primeiro acesso" })).toBeVisible();
+  expect(screen.queryByLabelText("Código de primeiro acesso")).not.toBeInTheDocument();
 });
 
 test("explica falha de conexão sem exibir detalhes internos", async () => {
@@ -47,10 +48,10 @@ test("explica falha de conexão sem exibir detalhes internos", async () => {
   expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
 });
 
-test("não mostra convite nem retorno ao painel", () => {
+test("oferece o link de primeiro acesso sem abrir o formulário de ativação no login", () => {
   render(<FormularioLogin />);
-  expect(screen.queryByText(/primeiro acesso com convite/i)).not.toBeInTheDocument();
-  expect(screen.queryByText(/voltar ao painel/i)).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Primeiro acesso" })).toHaveAttribute("href", "/entrar?modo=primeiro-acesso");
+  expect(screen.queryByLabelText("Código de primeiro acesso")).not.toBeInTheDocument();
 });
 
 const conviteTeste = "a".repeat(43);

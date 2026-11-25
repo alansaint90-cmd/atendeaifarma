@@ -82,6 +82,10 @@ export function FormularioLogin() {
       <CampoSenha id="login-senha" titulo="Senha" valor={senha} aoAlterar={setSenha} />
       <button type="submit" className="primary" disabled={carregando}>{carregando ? "Entrando…" : "Entrar"}</button>
     </form>
+    <Link href="/entrar?modo=primeiro-acesso" prefetch={false}
+      className="inline-flex min-h-11 w-fit items-center font-semibold underline underline-offset-4">
+      Primeiro acesso
+    </Link>
   </section>;
 }
 
