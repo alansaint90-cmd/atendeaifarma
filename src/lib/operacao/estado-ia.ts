@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { agentBaseConfigSchema } from "../agent/config";
+import { agentePermiteDestinatario } from "../agent/destinatarios";
 import { digest } from "../agent/message";
 import { pausaManualAtiva } from "../agent/pausa";
 import { agentKeys, agentRedis } from "../agent/redis";
@@ -38,6 +39,13 @@ export async function consultarEstadosIa(conversas: OrigemEstadoIa[], portas = p
       for (const conversa of candidatas) estados.set(conversa.id, "desativada");
       return estados;
     }
+    const elegiveis = candidatas.filter(conversa => {
+      const numero = conversa.jid.replace(/@s\.whatsapp\.net$/, "");
+      if (agentePermiteDestinatario(settings, numero)) return true;
+      estados.set(conversa.id, "desativada");
+      return false;
+    });
+    if (!elegiveis.length) return estados;
     const instancias = instanciasConfiguradas(settings);
     const config = agentBaseConfigSchema.safeParse(settings);
     if (!config.success) throw new Error("Configuração da IA incompleta.");
@@ -49,7 +57,7 @@ export async function consultarEstadosIa(conversas: OrigemEstadoIa[], portas = p
     if (!heartbeat.success || heartbeat.data.status !== "ativo") throw new Error("Processador da IA indisponível.");
 
     const client = redis;
-    const resultados = await Promise.all(candidatas.map(async (conversa): Promise<[string, EstadoIaConversa]> => {
+    const resultados = await Promise.all(elegiveis.map(async (conversa): Promise<[string, EstadoIaConversa]> => {
       if (!instancias.includes(conversa.instancia) || !/^[1-9]\d{6,14}@s\.whatsapp\.net$/.test(conversa.jid)) {
         return [conversa.id, "indisponivel"];
       }
@@ -58,7 +66,7 @@ export async function consultarEstadosIa(conversas: OrigemEstadoIa[], portas = p
     }));
     for (const [id, estado] of resultados) estados.set(id, estado);
   } catch {
-    for (const conversa of candidatas) estados.set(conversa.id, "indisponivel");
+    for (const conversa of candidatas) if (!estados.has(conversa.id)) estados.set(conversa.id, "indisponivel");
   } finally { redis?.disconnect(); }
   return estados;
 }

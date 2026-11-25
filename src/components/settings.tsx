@@ -48,7 +48,7 @@ export function Settings({ podeEditar = true }: { podeEditar?: boolean }) {
     try {
       const response = await fetch("/api/settings/integrations", {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ version: status?.version, values: Object.fromEntries(Object.entries(values).filter(([name, value]) => value.trim() || name in instanciasOpcionais).map(([name, value]) => [name, value.trim()])) }),
+        body: JSON.stringify({ version: status?.version, values: Object.fromEntries(Object.entries(values).filter(([name, value]) => value.trim() || name in instanciasOpcionais || name === "AI_TEST_WHATSAPP_NUMBER").map(([name, value]) => [name, value.trim()])) }),
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "Falha ao acessar o servidor.");
@@ -78,7 +78,8 @@ export function Settings({ podeEditar = true }: { podeEditar?: boolean }) {
       <small>Até três números podem usar a mesma Evolution, com prompts próprios em Chatbot IA. Deixe o campo do segundo ou terceiro número vazio para desativar aquele chip. Os outros campos vazios mantêm o valor atual. As configurações salvas prevalecem sobre as variáveis de ambiente. Redis deve começar com redis:// ou rediss://.</small>
       {podeEditar && <button className="primary" disabled={busy || confirm}>Salvar configurações</button>}
       <ModalConfirmacaoBlock aberto={confirm} titulo="Salvar configurações do agente"
-        mensagem="Ativar respostas autoriza o agente a responder novas mensagens de texto e áudio no WhatsApp usando o prompt salvo em Chatbot IA. Alterar o segredo exige atualizar também a Evolution."
+        mensagem={(values.AI_TEST_MODE === "true" ? "Com o Modo teste ativo, apenas o número informado receberá respostas da IA e follow-ups automáticos. O atendimento humano continua disponível."
+          : "Com o Modo teste desligado, todos os contatos elegíveis podem receber respostas automáticas quando o agente estiver ativado.") + " Alterar o segredo exige atualizar também a Evolution."}
         carregando={busy} onConfirmar={() => void salvar()} onCancelar={() => setConfirm(false)} textoConfirmar="Confirmar e salvar" />
     </form>}
     <ModalConfirmacaoBlock aberto={confirmarWebhook} titulo="Sincronizar webhook na Evolution"

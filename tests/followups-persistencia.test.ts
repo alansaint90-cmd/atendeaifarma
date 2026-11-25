@@ -6,7 +6,7 @@ import { drizzle } from "drizzle-orm/pglite";
 import { applyMigrations } from "../src/lib/db/migrate";
 import { systemUserId } from "../src/lib/db/bootstrap";
 import { defaultFollowup, parseFollowup } from "../src/lib/followups/schema";
-import { readSettings, saveSettings, InstanciasDuplicadas, SettingsConflict } from "../src/lib/settings/repository";
+import { readSettings, saveSettings, InstanciasDuplicadas, NumeroModoTesteObrigatorio, SettingsConflict } from "../src/lib/settings/repository";
 
 test("follow-ups são gravados e lidos novamente com auditoria no banco", async () => {
   const client = new PGlite();
@@ -64,6 +64,17 @@ test("follow-ups são gravados e lidos novamente com auditoria no banco", async 
     assert.equal(removido.values.EVOLUTION_SECOND_INSTANCE_NAME, "");
     assert.equal(parseFollowup(removido.values.FOLLOW_UP_SECOND_CONFIG).enabled, false);
     assert.deepEqual(parseFollowup(removido.values.FOLLOW_UP_CONFIG), config);
+    const telefone = "(11) 98123-4567";
+    await assert.rejects(saveSettings({ AI_TEST_MODE: "true", AI_TEST_WHATSAPP_NUMBER: "" }, removido.version,
+      systemUserId, database, async () => {}), NumeroModoTesteObrigatorio);
+    const modoTeste = await saveSettings({ AI_TEST_MODE: "true", AI_TEST_WHATSAPP_NUMBER: telefone }, removido.version,
+      systemUserId, database, async () => {});
+    assert.equal((await readSettings(database, async () => {})).values.AI_TEST_WHATSAPP_NUMBER, telefone);
+    await assert.rejects(saveSettings({ AI_TEST_WHATSAPP_NUMBER: "" }, modoTeste.version,
+      systemUserId, database, async () => {}), NumeroModoTesteObrigatorio);
+    const desativado = await saveSettings({ AI_TEST_MODE: "false" }, modoTeste.version, systemUserId, database, async () => {});
+    assert.equal(desativado.values.AI_TEST_MODE, "false");
+    assert.equal(desativado.values.AI_TEST_WHATSAPP_NUMBER, telefone);
   } finally {
     if (oldKey === undefined) delete process.env.SETTINGS_ENCRYPTION_KEY; else process.env.SETTINGS_ENCRYPTION_KEY = oldKey;
     if (oldAiEnabled === undefined) delete process.env.AI_ENABLED; else process.env.AI_ENABLED = oldAiEnabled;

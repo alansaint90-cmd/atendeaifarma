@@ -1,5 +1,5 @@
 import { administradorHttp } from "@/lib/auth/acesso-http";
-import { environmentSettings, readSettings, saveSettings, SettingsConflict, AgentSettingsIncomplete, InstanciasDuplicadas } from "@/lib/settings/repository";
+import { environmentSettings, readSettings, saveSettings, SettingsConflict, AgentSettingsIncomplete, InstanciasDuplicadas, NumeroModoTesteObrigatorio } from "@/lib/settings/repository";
 import { saveSettingsSchema, settingsStatus } from "@/lib/settings/schema";
 import { origemHttpPermitida } from "@/lib/auth/origem-http";
 
@@ -43,12 +43,18 @@ export async function PUT(request: Request) {
     input = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch { return json({ error: "JSON inválido." }, 400); }
   const parsed = saveSettingsSchema.safeParse(input);
-  if (!parsed.success) return json({ error: "Campos inválidos: " + [...new Set(parsed.error.issues.map(issue => issue.path.join(".")))].join(", ") }, 422);
+  if (!parsed.success) {
+    if (parsed.error.issues.some(issue => issue.path[1] === "AI_TEST_WHATSAPP_NUMBER")) {
+      return json({ error: "Informe um número de WhatsApp válido, com DDD." }, 422);
+    }
+    return json({ error: "Campos inválidos: " + [...new Set(parsed.error.issues.map(issue => issue.path.join(".")))].join(", ") }, 422);
+  }
   try {
     const result = await saveSettings(parsed.data.values, parsed.data.version, acesso.sessao.userId);
     return json(settingsStatus({ ...environmentSettings(), ...result.values }, result.version));
   } catch (error) {
     if (error instanceof InstanciasDuplicadas) return json({ error: "Cada número precisa de um nome de instância diferente na Evolution." }, 422);
+    if (error instanceof NumeroModoTesteObrigatorio) return json({ error: "Informe um número de WhatsApp válido para ativar o Modo teste." }, 422);
     if (error instanceof AgentSettingsIncomplete) return json({ error: "Para ativar, preencha modelo e chave OpenAI, URL/chave/instância Evolution e Redis. Configure também o chatbot em Chatbot IA." }, 422);
     if (error instanceof SettingsConflict) return json({ error: "Outra sessão alterou as configurações. Recarregue antes de salvar." }, 409);
     return unavailable();

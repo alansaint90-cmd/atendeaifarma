@@ -32,7 +32,9 @@ export function settingsDaInstancia(settings: IntegrationSettings, instancia: st
   // Configurações de follow-up não mudam o prompt nem o diário de resposta da IA.
   const { FOLLOW_UP_CONFIG: _principal, FOLLOW_UP_SECOND_CONFIG: _segundo,
     FOLLOW_UP_THIRD_CONFIG: _terceiro, EVOLUTION_SECOND_INSTANCE_NAME: _instancia,
-    EVOLUTION_THIRD_INSTANCE_NAME: _terceiraInstancia, ...base } = settings;
+    EVOLUTION_THIRD_INSTANCE_NAME: _terceiraInstancia, AI_TEST_MODE: _modoTeste,
+    AI_TEST_WHATSAPP_NUMBER: _numeroTeste, ...base } = settings;
   void _principal; void _segundo; void _terceiro; void _instancia; void _terceiraInstancia;
+  void _modoTeste; void _numeroTeste;
   return { ...base, EVOLUTION_INSTANCE_NAME: instancia };
 }

@@ -11,6 +11,7 @@ import { montarInstrucoesDoAgente } from "../src/lib/chatbots/prompt-servidor";
 import { chatbotExample } from "../src/lib/chatbots/defaults";
 import { extrairNomeInformado, respostaComNome } from "../src/lib/agent/nome";
 import { pausaManualParaEvento } from "../src/lib/agent/pausa";
+import { agentePermiteDestinatario } from "../src/lib/agent/destinatarios";
 
 const config: AgentConfig = { AI_ENABLED: "true", AI_SYSTEM_PROMPT: "Atenda com o contexto cadastrado.",
   OPENAI_API_KEY: "sk-test-only", OPENAI_MODEL: "gpt-4.1-mini", EVOLUTION_API_KEY: "teste",
@@ -20,6 +21,21 @@ const event: EvolutionEvent = { event: "messages.upsert", instance: "teste", dat
   messageTimestamp: 1700000000, message: { conversation: "Oi" },
 } };
 const message = incomingMessage(event, "teste", 1700000000000)!;
+
+test("modo de teste só libera o telefone completo configurado", () => {
+  const numero = "5511981234567";
+  const settings = { AI_TEST_MODE: "true" as const, AI_TEST_WHATSAPP_NUMBER: numero };
+  assert.equal(agentePermiteDestinatario(settings, numero), true);
+  assert.equal(agentePermiteDestinatario(settings, "5511981234568"), false);
+  assert.equal(agentePermiteDestinatario(settings, "11981234567"), false);
+  assert.equal(agentePermiteDestinatario({ ...settings, AI_TEST_WHATSAPP_NUMBER: "(11) 98123-4567" }, "551181234567"), true);
+  assert.equal(agentePermiteDestinatario(settings, "551181234568"), false);
+  assert.equal(agentePermiteDestinatario(settings, `${numero}@lid`), false);
+  assert.equal(agentePermiteDestinatario({ ...settings, AI_TEST_WHATSAPP_NUMBER: "11931234567" }, "551131234567"), false);
+  assert.equal(agentePermiteDestinatario({ AI_TEST_MODE: "true" }, numero), false);
+  assert.equal(agentePermiteDestinatario({ ...settings, AI_TEST_MODE: "false" }, "5511981234568"), true);
+  assert.equal(agentePermiteDestinatario({}, numero), true);
+});
 
 test("somente saída manual individual cria prazo de 30 minutos", () => {
   const saida: EvolutionEvent = { ...event, data: { key: { id: "mensagem-saida", fromMe: true,

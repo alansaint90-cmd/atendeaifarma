@@ -1,5 +1,5 @@
 import { afterEach, expect, test, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { AgentSettings } from "@/components/agent-settings";
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -18,4 +18,19 @@ test("diagnóstico é consultado automaticamente pela sessão e exibe erro", asy
   render(<AgentSettings values={{}} disabled={false} onChange={() => {}} />);
   expect(await screen.findByRole("alert")).toHaveTextContent("Redis indisponível");
   expect(fetchMock).toHaveBeenCalledWith("/api/settings/agent", { cache: "no-store" });
+});
+
+test("modo teste permite indicar um número e exige o campo ao ligar", () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(Response.json({ workerEnabled: true, enabled: true, queued: 0 })));
+  const mudar = vi.fn();
+  const tela = render(<AgentSettings values={{}} disabled={false} onChange={mudar} />);
+  expect(screen.getByRole("switch", { name: "Modo teste" })).not.toBeChecked();
+  fireEvent.click(screen.getByRole("switch", { name: "Modo teste" }));
+  expect(mudar).toHaveBeenCalledWith("AI_TEST_MODE", "true");
+  tela.rerender(<AgentSettings values={{ AI_TEST_MODE: "true" }} disabled={false} onChange={mudar} />);
+  expect(screen.getByRole("switch", { name: "Modo teste" })).toBeChecked();
+  const campo = screen.getByRole("textbox", { name: "Número de WhatsApp para teste" });
+  expect(campo).toBeRequired();
+  fireEvent.change(campo, { target: { value: "(11) 98123-4567" } });
+  expect(mudar).toHaveBeenCalledWith("AI_TEST_WHATSAPP_NUMBER", "(11) 98123-4567");
 });

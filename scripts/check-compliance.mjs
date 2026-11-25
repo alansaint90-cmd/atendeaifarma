@@ -397,6 +397,12 @@ function analyzeFile(file) {
     findings.push({ level: "error", id: "pausa-manual", file: rel, line: 1,
       msg: "O worker deve verificar a pausa por atendimento humano antes de responder." });
   }
+  if (rel === "src/lib/agent/worker.ts" && (!/agentePermiteDestinatario\(settings, message\.number\)/.test(content) ||
+    !/agentePermiteDestinatario\(vigentes, message\.number\)/.test(content) ||
+    !/agentePermiteDestinatario\(settings, job\.number\)/.test(content) || !/agentePermiteDestinatario\(currentSettings, job\.number\)/.test(content))) {
+    findings.push({ level: "error", id: "agente-modo-teste", file: rel, line: 1,
+      msg: "Respostas e follow-ups devem validar o destinatário do Modo teste ao processar a fila e antes do envio." });
+  }
     if ((rel === "src/lib/agent/worker.ts" && (!/settingsDaInstancia\(settings, instancia\)/.test(content) || !/dependencies.chatbot\(instancia\)/.test(content))) || (rel === "src/lib/evolution/instancias.ts" && !/EVOLUTION_THIRD_INSTANCE_NAME[\s\S]*FOLLOW_UP_THIRD_CONFIG/.test(content)) || (rel === "src/lib/agendamentos/worker.ts" && !/configuracaoEnvio\(await configuracoes\(\), instancia\)/.test(content))) {
     findings.push({ level: "error", id: "isolamento-instancias", file: rel, line: 1,
       msg: "Os três chips devem ter configuração própria e seleção da origem antes de responder, agendar ou enviar follow-ups." });

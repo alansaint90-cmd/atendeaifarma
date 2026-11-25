@@ -45,3 +45,13 @@ test("sem sinal do processador ou sem Redis não indica IA ativa", async () => {
   expect((await consultarEstadosIa([base])).get("a")).toBe("desativada");
   expect(portas.pausada).not.toHaveBeenCalled();
 });
+
+test("modo teste exibe IA desativada para outras conversas", async () => {
+  portas.settings.mockResolvedValue({ ...configuracao, AI_TEST_MODE: "true", AI_TEST_WHATSAPP_NUMBER: "+55 (11) 99999-0001" });
+  const estados = await consultarEstadosIa([
+    base, { ...base, id: "outra", jid: "5511999990002@s.whatsapp.net" },
+    { ...base, id: "humana", jid: "5511999990002@s.whatsapp.net", assumida: true, atribuida: true },
+  ]);
+  expect(Object.fromEntries(estados)).toEqual({ a: "ativa", outra: "desativada", humana: "humano" });
+  expect(portas.pausada).toHaveBeenCalledOnce();
+});

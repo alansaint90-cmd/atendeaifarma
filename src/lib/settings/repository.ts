@@ -4,6 +4,7 @@ import { settingsSchema, settingNames, type IntegrationSettings } from "./schema
 import { db } from "../db/client";
 import { ensureDatabase } from "../db/migrate";
 import { agentBaseConfigSchema } from "../agent/config";
+import { normalizarNumeroTeste } from "../agent/destinatarios";
 import { defaultFollowup } from "../followups/schema";
 import { camposInstancias } from "../evolution/instancias";
 
@@ -32,6 +33,7 @@ export async function readSettings(database: SettingsDatabase = db(), prepare: (
 
 export class SettingsConflict extends Error {}
 export class AgentSettingsIncomplete extends Error {}
+export class NumeroModoTesteObrigatorio extends Error {}
 export class InstanciasDuplicadas extends Error {}
 export async function saveSettings(values: IntegrationSettings, version: number, usuario: string,
   database: SettingsDatabase = db(), prepare: () => Promise<void> = ensureDatabase) {
@@ -42,6 +44,9 @@ export async function saveSettings(values: IntegrationSettings, version: number,
   const instancias = camposInstancias.map(([nome]) => effective[nome]).filter(Boolean);
   if (new Set(instancias).size !== instancias.length) {
     throw new InstanciasDuplicadas();
+  }
+  if (effective.AI_TEST_MODE === "true" && !normalizarNumeroTeste(effective.AI_TEST_WHATSAPP_NUMBER ?? "")) {
+    throw new NumeroModoTesteObrigatorio();
   }
   if (effective.AI_ENABLED === "true" && !agentBaseConfigSchema.safeParse(effective).success) {
     throw new AgentSettingsIncomplete();

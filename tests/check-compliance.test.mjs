@@ -216,6 +216,7 @@ try {
     ["resposta sem consulta direta da agenda reprova", reprova("agent/processor.ts", "consulta-disponibilidade")],
     ["nome sem persistência separada reprova", reprova("agent/store.ts", "nome-cliente")],
     ["worker sem pausa manual reprova", reprova("agent/worker.ts", "pausa-manual")],
+    ["worker sem revalidação do Modo teste reprova", reprova("agent/worker.ts", "agente-modo-teste")],
     ["worker sem seleção da instância reprova", reprova("agent/worker.ts", "isolamento-instancias")],
     ["configuração sem terceiro chip reprova", reprova("evolution/instancias.ts", "isolamento-instancias")],
     ["agendamento sem revalidar chip reprova", reprova("agendamentos/worker.ts", "isolamento-instancias")],

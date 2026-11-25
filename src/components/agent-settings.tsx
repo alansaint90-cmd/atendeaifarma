@@ -12,6 +12,7 @@ export function AgentSettings({ values, disabled, onChange }: AgentSettingsProps
   const [error, setError] = useState("");
   const [diagnostic, setDiagnostic] = useState("");
   const [loading, setLoading] = useState(false);
+  const modoTesteAtivo = values.AI_TEST_MODE === "true";
   const check = useCallback(async () => {
     setLoading(true); setError("");
     try {
@@ -26,11 +27,19 @@ export function AgentSettings({ values, disabled, onChange }: AgentSettingsProps
     const timer = window.setTimeout(() => void check(), 0);
     return () => window.clearTimeout(timer);
   }, [check]);
-  return <fieldset disabled={disabled} className="form-panel">
+  return <fieldset disabled={disabled} className="form-panel agent-settings">
     <legend>Agente de IA no WhatsApp</legend>
     <label>Respostas automáticas<select value={values.AI_ENABLED || "false"} onChange={event => onChange("AI_ENABLED", event.target.value)}>
       <option value="false">Desativadas</option><option value="true">Ativadas</option>
     </select></label>
+    <label className="feature-switch">
+      <input type="checkbox" role="switch" checked={modoTesteAtivo} onChange={event => onChange("AI_TEST_MODE", String(event.target.checked))} />
+      <span>Modo teste</span>
+    </label>
+    <label>Número de WhatsApp para teste<input type="tel" autoComplete="off" maxLength={32}
+      aria-describedby="modo-teste-ajuda" placeholder="DDD + número" required={modoTesteAtivo}
+      value={values.AI_TEST_WHATSAPP_NUMBER ?? ""} onChange={event => onChange("AI_TEST_WHATSAPP_NUMBER", event.target.value)} /></label>
+    <small id="modo-teste-ajuda">Com o modo ligado, só esse número recebe respostas da IA e follow-ups automáticos. Para números de fora do Brasil, inclua + e o DDI.</small>
     <small>As respostas usam somente o prompt do chatbot SDR configurado em Chatbot IA. Sem um chatbot com prompt vinculado à instância, o agente não responde. Mensagens individuais recentes de texto e áudio são respondidas por texto. Áudios: até 10 MiB; mantenha Webhook Base64 desligado na Evolution.</small>
     {loading && <p role="status">Consultando agente e fila…</p>}
     {diagnostic && <p role="status">{diagnostic}</p>}{error && <p role="alert">{error}</p>}

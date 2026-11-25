@@ -8,6 +8,7 @@ import { configurarAgenteFarmacia as configurarAgente } from "../farmacia/config
 import { consultaEstoqueFarmacia, geradorFarmacia, responderComprovanteFarmacia } from "../farmacia/agente";
 import { estadoPausaIa } from "../farmacia/atendimento";
 import { incomingMessage, digest } from "./message";
+import { agentePermiteDestinatario } from "./destinatarios";
 import { generateReply, sendReply, type ContinuidadeEstoque } from "./providers";
 import { transcribeAudio } from "./audio";
 import { processMessage } from "./processor";
@@ -83,14 +84,19 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
       const followupConfig = followupDaInstancia(settings, instancia);
       if (parsed.success && config.success) await followups.observe(parsed.data, instancia);
       const message = parsed.success && config.success ? incomingMessage(parsed.data, instancia, Date.now(), true) : null;
+      const store = message ? messageStore(client, token, message) : null;
+      const permitido = message !== null && agentePermiteDestinatario(settings, message.number);
+      // Preserve o registro de uma saída já reservada ou aceita antes da mudança de configuração.
+      const envioAnterior = store && !permitido ? await store.read() : null;
       let result = "ignorada";
-      if (message && config.success) {
-        const pausada = await iaPausada(instancia, message.number, message.conversation);
-        if (!pausada
+      if (message && store && config.success && (permitido || envioAnterior?.confirmarEncaminhamento || envioAnterior?.status === "enviando")) {
+        const pausada = permitido && await iaPausada(instancia, message.number, message.conversation);
+        if (permitido && !pausada
           && deveAguardarResposta(config.data.agendaConsultas, message.timestamp)) return false;
-        const store = messageStore(client, token, message);
         const atendimentoAtivo = async () => {
-          const atual = configurarAgente(settingsDaInstancia(await dependencies.settings(), instancia), await dependencies.chatbot(instancia));
+          const vigentes = await dependencies.settings();
+          if (!agentePermiteDestinatario(vigentes, message.number)) return false;
+          const atual = configurarAgente(settingsDaInstancia(vigentes, instancia), await dependencies.chatbot(instancia));
           return atual.success && JSON.stringify(atual.data) === JSON.stringify(config.data)
             && !await dependencies.apagada(instancia, message.number, message.timestamp, message.identity)
             && !await iaPausada(instancia, message.number, message.conversation) && await client.get(agentKeys.lock) === token;
@@ -122,7 +128,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
             await dependencies.registrarEnvio(config.data.EVOLUTION_INSTANCE_NAME, state.providerId);
             await followups.outgoing(config.data.EVOLUTION_INSTANCE_NAME, state.providerId);
           }
-          if (!state.transferencia && !state.consulta && !state.encaminharEntrega && followupConfig.instance === config.data.EVOLUTION_INSTANCE_NAME && state.configHash === digest(JSON.stringify(config.data))) {
+          if (permitido && !state.transferencia && !state.consulta && !state.encaminharEntrega && followupConfig.instance === config.data.EVOLUTION_INSTANCE_NAME && state.configHash === digest(JSON.stringify(config.data))) {
             await followups.schedule(message, followupConfig);
           }
         }
@@ -139,6 +145,10 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
     }
     const job = await followups.due();
     if (job) {
+      if (!agentePermiteDestinatario(settings, job.number)) {
+        await followups.finish(job, job.status === "enviando" ? "incerto" : "cancelado");
+        return true;
+      }
       const instancia = job.instance ?? settings.EVOLUTION_INSTANCE_NAME ?? "";
       if (await dependencies.apagada(instancia, job.number, job.started / 1000, job.identity)) { await followups.finish(job, "cancelado"); return; }
       const chatbot = settingsDaInstancia(settings, instancia) ? await dependencies.chatbot(instancia) : null;
@@ -149,6 +159,7 @@ export async function runAgentTick(substituicoes: Partial<typeof dependenciasPad
         save: followups.save, finish: result => followups.finish(job, result),
         enabled: async () => {
           const currentSettings = await dependencies.settings();
+          if (!agentePermiteDestinatario(currentSettings, job.number)) return false;
           const currentFollowup = followupDaInstancia(currentSettings, instancia);
           const currentBot = await dependencies.chatbot(instancia);
           const current = configurarAgente(settingsDaInstancia(currentSettings, instancia), currentBot);

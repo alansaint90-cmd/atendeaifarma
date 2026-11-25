@@ -426,3 +426,72 @@ test("saída manual em lote somente com LID pausa o telefone associado e cancela
     await client.zrem(followupQueue, conversation); client.disconnect();
   }
 });
+
+test("Redis real: modo de teste restringe gerações, respostas em partes e follow-ups", { skip: !process.env.TEST_REDIS_URL }, async () => {
+  const url = process.env.TEST_REDIS_URL!;
+  const alvo = new URL(url);
+  assert.ok(["localhost", "127.0.0.1"].includes(alvo.hostname) && alvo.pathname === "/15");
+  const client = agentRedis(url); await client.connect();
+  const instancia = `modo-teste-${randomUUID()}`;
+  const permitido = "5511981234567", outro = "5511981234568";
+  const evento = (texto: string, jid: string, jidAlt?: string): EvolutionEvent => ({ event: "messages.upsert", instance: instancia, data: {
+    key: { id: randomUUID(), fromMe: false, remoteJid: jid, remoteJidAlt: jidAlt },
+    messageTimestamp: Math.floor(Date.now() / 1000), message: { conversation: texto },
+  } });
+  const entradaBloqueada = evento("Consulta bloqueada", `${outro}@s.whatsapp.net`);
+  const entradaPermitida = evento("Consulta permitida", "1234567@lid", `${permitido}@s.whatsapp.net`);
+  const entradaEmPartes = evento("Consulta em partes", `${permitido}@s.whatsapp.net`);
+  const mensagens = [entradaBloqueada, entradaPermitida, entradaEmPartes].map(entrada => incomingMessage(entrada, instancia)!);
+  const bloqueada = mensagens[0];
+  const chaveCiclo = (conversa: string) => `atendeia:{evolution}:followup:${conversa}`;
+  const followup = { ...structuredClone(defaultFollowup), enabled: true, instance: instancia, revision: randomUUID(), startHour: 0, endHour: 24 };
+  followup.steps[0] = { enabled: true, text: "Follow-up de teste", delay: 1, unit: "days" };
+  let numeroConfigurado = permitido;
+  const geracoes: string[] = [];
+  const envios: { numero: string; texto: string }[] = [];
+  const dependencias = { settings: async () => ({ AI_ENABLED: "true" as const, AI_TEST_MODE: "true" as const,
+    AI_TEST_WHATSAPP_NUMBER: numeroConfigurado, OPENAI_API_KEY: "sk-teste", OPENAI_MODEL: "teste", EVOLUTION_API_URL: "https://example.invalid",
+    EVOLUTION_API_KEY: "teste", EVOLUTION_INSTANCE_NAME: instancia, REDIS_URL: url, FOLLOW_UP_CONFIG: JSON.stringify(followup) }),
+    chatbot: async () => ({ ...chatbotExample, context: "Fluxo do modo de teste." }), registrarEnvio: async () => {},
+    generate: async (_config: AgentConfig, _historico: Turn[], texto: string) => {
+      geracoes.push(texto);
+      return texto === "Consulta em partes" ? { mensagens: ["Primeira parte", "Segunda parte"] } : "Resposta permitida";
+    },
+    send: async (_config: unknown, numero: string, texto: string) => {
+      envios.push({ numero, texto });
+      if (texto === "Primeira parte") numeroConfigurado = outro;
+      return randomUUID();
+    },
+  };
+  try {
+    await enqueueEvolutionEventWithClient(client, entradaBloqueada);
+    await enqueueEvolutionEventWithClient(client, entradaPermitida);
+    await runAgentTick(dependencias);
+    await runAgentTick(dependencias);
+    assert.deepEqual(geracoes, ["Consulta permitida"]);
+    assert.deepEqual(envios, [{ numero: permitido, texto: "Resposta permitida" }]);
+
+    const lease = randomUUID(); await client.set(agentKeys.lock, lease, "PX", 120000);
+    await followupStore(client, lease).save({ instance: instancia, conversation: bloqueada.conversation,
+      identity: bloqueada.identity, number: outro, started: Date.now() - 60000, due: Date.now() - 1,
+      index: 0, revision: followup.revision, status: "aguardando" });
+    await client.del(agentKeys.lock);
+    await runAgentTick(dependencias);
+    assert.equal(await client.get(chaveCiclo(bloqueada.conversation)), null);
+    assert.equal(envios.length, 1);
+
+    await enqueueEvolutionEventWithClient(client, entradaEmPartes);
+    await runAgentTick(dependencias);
+    await runAgentTick(dependencias);
+    assert.deepEqual(envios.slice(1), [{ numero: permitido, texto: "Primeira parte" }]);
+    assert.equal(await client.xlen(streamKey), 0);
+  } finally {
+    await client.del(streamKey, agentKeys.lock, agentKeys.heartbeat, agentKeys.archive);
+    for (const mensagem of mensagens) {
+      await client.del(chaveCiclo(mensagem.conversation), `atendeia:{evolution}:reply:${mensagem.identity}`,
+        `atendeia:{evolution}:history:${mensagem.conversation}`);
+      await client.zrem(followupQueue, mensagem.conversation);
+    }
+    client.disconnect();
+  }
+});
