@@ -1,10 +1,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, test, vi } from "vitest";
-import { FormularioLogin } from "../src/app/entrar/_components/formulario";
+import { FormularioLogin, FormularioPrimeiroAcesso } from "../src/app/entrar/_components/formulario";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+const { navegar, atualizar } = vi.hoisted(() => ({ navegar: vi.fn(), atualizar: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: navegar, replace: navegar, refresh: atualizar }) }));
 
-beforeEach(() => vi.restoreAllMocks());
+beforeEach(() => {
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+});
 
 function preencherLogin() {
   fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "pessoa@example.com" } });
@@ -47,4 +51,53 @@ test("não mostra convite nem retorno ao painel", () => {
   render(<FormularioLogin />);
   expect(screen.queryByText(/primeiro acesso com convite/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/voltar ao painel/i)).not.toBeInTheDocument();
+});
+
+const conviteTeste = "a".repeat(43);
+const senhaTeste = "senha fictícia para teste";
+
+function preencherConvite(confirmacao = senhaTeste) {
+  fireEvent.change(screen.getByLabelText("Código de primeiro acesso"), { target: { value: ` ${conviteTeste} ` } });
+  fireEvent.change(screen.getByLabelText("Nova senha", { exact: true }), { target: { value: senhaTeste } });
+  fireEvent.change(screen.getByLabelText("Confirme a nova senha"), { target: { value: confirmacao } });
+  fireEvent.click(screen.getByRole("button", { name: "Ativar meu acesso" }));
+}
+
+test("ativa o primeiro acesso pela rota existente e abre o painel", async () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+  render(<FormularioPrimeiroAcesso />);
+  preencherConvite();
+  await vi.waitFor(() => expect(navegar).toHaveBeenCalledWith("/"));
+  expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/api/auth/passkey", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ acao: "concluir_registro_senha", convite: conviteTeste, senha: senhaTeste }),
+  });
+});
+
+test("pede senhas iguais antes de enviar o convite", () => {
+  const fetchMock = vi.spyOn(globalThis, "fetch");
+  render(<FormularioPrimeiroAcesso />);
+  preencherConvite("senha diferente para teste");
+  expect(screen.getByRole("alert")).toHaveTextContent("As senhas precisam ser iguais.");
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test("mostra a mesma orientação quando o servidor recusa o convite", async () => {
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ erro: "detalhe interno" }, { status: 401 }));
+  render(<FormularioPrimeiroAcesso />);
+  preencherConvite();
+  expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível ativar o acesso.");
+  expect(screen.queryByText("detalhe interno")).not.toBeInTheDocument();
+  expect(navegar).not.toHaveBeenCalled();
+});
+
+test("mostra o aviso de verificação da senha após ativar a conta", async () => {
+  const aviso = "A lista de senhas vazadas está temporariamente indisponível.";
+  vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true, aviso }));
+  render(<FormularioPrimeiroAcesso />);
+  preencherConvite();
+  expect(await screen.findByRole("status")).toHaveTextContent(aviso);
+  expect(screen.queryByLabelText("Código de primeiro acesso")).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Ir para o painel" })).toHaveAttribute("href", "/");
 });

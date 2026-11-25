@@ -45,8 +45,9 @@ compilada em /app/scripts/provisionar-proprietario.cjs, executável com Node no
 terminal do serviço. Ela não roda automaticamente no entrypoint Docker.
 Configurar PROVISIONAR_NOME, PROVISIONAR_EMAIL, PROVISIONAR_ARQUIVO (fora do checkout),
 DATABASE_URL e AUTH_ORIGIN. Executar `pnpm exec tsx scripts/provisionar-proprietario.ts`.
-O convite fica somente no arquivo privado, nunca nos logs. Abrir /entrar e escolher
-Primeiro acesso; usuário define a senha em origem HTTPS e entra imediatamente.
+O código de provisionamento fica somente no arquivo privado, nunca nos logs. Em
+`/entrar?modo=primeiro-acesso`, o usuário informa o código e define a senha em
+origem HTTPS. Convites emitidos pela tela Equipe exibem esse link sem o código na URL.
 Se a execução falhar, o arquivo de convite parcial é removido. Para identificar a
 etapa sem expor dados do banco, adicione PROVISIONAR_DIAGNOSTICO=true à execução.
 PROVISIONAR_REINICIAR_PROPRIETARIO=true só reemite convite quando o proprietário
